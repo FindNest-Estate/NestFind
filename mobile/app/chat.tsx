@@ -11,6 +11,7 @@ import {
     KeyboardAvoidingView,
     Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -192,7 +193,7 @@ export default function ChatScreen() {
                     }}
                     ListEmptyComponent={
                         <View style={styles.emptyState}>
-                            <Text style={styles.emptyEmoji}>💬</Text>
+                            <Ionicons name="chatbubble-ellipses-outline" size={48} color={colors.gray400} style={{ marginBottom: spacing.md }} />
                             <Text style={styles.emptyTitle}>No messages yet</Text>
                             <Text style={styles.emptyText}>Start the conversation!</Text>
                         </View>
@@ -221,7 +222,9 @@ export default function ChatScreen() {
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>💬 Messages</Text>
+                <Text style={styles.headerTitle}>
+                    <Ionicons name="chatbubbles-outline" size={24} color={colors.gray900} /> Messages
+                </Text>
             </View>
 
             <FlatList
@@ -262,7 +265,7 @@ export default function ChatScreen() {
                 }}
                 ListEmptyComponent={
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyEmoji}>👥</Text>
+                        <Ionicons name="people-outline" size={64} color={colors.gray400} style={{ marginBottom: spacing.md }} />
                         <Text style={styles.emptyTitle}>No conversations yet</Text>
                         <Text style={styles.emptyText}>Your messages will appear here</Text>
                     </View>
@@ -459,7 +462,7 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.xxl,
     },
     emptyEmoji: {
-        fontSize: 48,
+        // fontSize: 48, (removed)
         marginBottom: spacing.md,
     },
     emptyTitle: {

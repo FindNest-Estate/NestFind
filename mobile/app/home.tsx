@@ -13,24 +13,27 @@ import {
     ScrollView,
     StatusBar,
     Platform,
+    ImageBackground,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNav from '../components/BottomNav';
+import PropertyCard from '../components/PropertyCard';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { API_URL } from '../constants/api';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - spacing.lg * 2 - spacing.md) / 2;
 
 const categories = [
-    { id: 'all', label: 'All', icon: '🏠' },
-    { id: 'apartment', label: 'Apartment', icon: '🏢' },
-    { id: 'house', label: 'House', icon: '🏡' },
-    { id: 'villa', label: 'Villa', icon: '🏰' },
-    { id: 'land', label: 'Land', icon: '🌳' },
-    { id: 'commercial', label: 'Commercial', icon: '🏪' },
+    { id: 'all', label: 'All', iconName: 'grid-outline' },
+    { id: 'apartment', label: 'Apartment', iconName: 'business-outline' },
+    { id: 'house', label: 'House', iconName: 'home-outline' },
+    { id: 'villa', label: 'Villa', iconName: 'leaf-outline' },
+    { id: 'land', label: 'Land', iconName: 'map-outline' },
+    { id: 'commercial', label: 'Commercial', iconName: 'storefront-outline' },
 ];
 
 export default function Home() {
@@ -41,6 +44,7 @@ export default function Home() {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeCategory, setActiveCategory] = useState('all');
     const router = useRouter();
+    const insets = useSafeAreaInsets();
 
     useEffect(() => {
         loadUser();
@@ -86,22 +90,6 @@ export default function Home() {
         return matchesSearch && matchesCategory;
     });
 
-    const getFirstImage = (property: any) => {
-        if (property.images && property.images.length > 0) {
-            return `${API_URL}/${property.images[0].image_path}`;
-        }
-        return null;
-    };
-
-    const formatPrice = (price: number) => {
-        if (price >= 10000000) {
-            return `₹${(price / 10000000).toFixed(1)}Cr`;
-        } else if (price >= 100000) {
-            return `₹${(price / 100000).toFixed(1)}L`;
-        }
-        return `₹${price.toLocaleString()}`;
-    };
-
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
@@ -110,143 +98,125 @@ export default function Home() {
         );
     }
 
-    const renderPropertyCard = ({ item }: { item: any }) => {
-        const imageUrl = getFirstImage(item);
-
-        return (
-            <TouchableOpacity
-                style={styles.propertyCard}
-                onPress={() => router.push(`/property/${item.id}`)}
-                activeOpacity={0.9}
-            >
-                <View style={styles.cardImageContainer}>
-                    {imageUrl ? (
-                        <Image source={{ uri: imageUrl }} style={styles.cardImage} />
-                    ) : (
-                        <View style={styles.cardImagePlaceholder}>
-                            <Text style={styles.placeholderEmoji}>🏠</Text>
-                        </View>
-                    )}
-
-                    {/* Favorite button */}
-                    <TouchableOpacity style={styles.favoriteBtn}>
-                        <Text style={styles.favoriteIcon}>🤍</Text>
-                    </TouchableOpacity>
-
-                    {/* Price badge */}
-                    <View style={styles.priceBadge}>
-                        <Text style={styles.priceText}>{formatPrice(item.price)}</Text>
-                    </View>
-                </View>
-
-                <View style={styles.cardContent}>
-                    <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
-                    <Text style={styles.cardLocation} numberOfLines={1}>
-                        📍 {item.city}
-                    </Text>
-                    <View style={styles.cardMeta}>
-                        <Text style={styles.cardMetaText}>
-                            {item.bedrooms ? `${item.bedrooms} 🛏️` : ''}
-                            {item.bathrooms ? ` ${item.bathrooms} 🚿` : ''}
-                        </Text>
-                    </View>
-                </View>
-            </TouchableOpacity>
-        );
-    };
+    const renderPropertyCard = ({ item }: { item: any }) => (
+        <PropertyCard
+            property={item}
+            onPress={() => router.push(`/property/${item.id}`)}
+        />
+    );
 
     return (
-        <>
-            <StatusBar barStyle="light-content" />
-            <View style={styles.container}>
-                {/* Modern Header */}
-                <View style={styles.header}>
-                    {/* Top Row - Logo */}
-                    <View style={styles.headerTop}>
-                        <View style={styles.logoContainer}>
-                            <View style={styles.logoBadge}>
-                                <Text style={styles.logoBadgeText}>N</Text>
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+            {/* Header / Hero Section */}
+            <View style={styles.heroContainer}>
+                <ImageBackground
+                    source={{ uri: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80' }} // High quality hero
+                    style={[styles.heroImage, { paddingTop: insets.top + (Platform.OS === 'android' ? 12 : 0) }]}
+                    imageStyle={styles.heroImageStyle}
+                >
+                    <View style={styles.heroOverlay}>
+                        {/* Brand & User Greeting */}
+                        <View style={styles.headerTop}>
+                            <View style={styles.logoContainer}>
+                                <Text style={styles.logoText}>Nest<Text style={styles.logoTextHighlight}>Find</Text></Text>
                             </View>
-                            <View>
-                                <Text style={styles.logoText}>NestFind</Text>
-                            </View>
+                            <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/messages' as any)}>
+                                <Ionicons name="chatbubbles-outline" size={24} color={colors.white} />
+                                {/* Optional: Add badge if unread */}
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Hero Text */}
+                        <View style={styles.heroContent}>
+                            <Text style={styles.heroTitle}>Find your home.</Text>
+                            <Text style={styles.heroSubtitle}>Perfect properties, tailored for you.</Text>
+                        </View>
+
+                        {/* Floating Search Bar */}
+                        <View style={styles.searchContainer}>
+                            <Ionicons name="search" size={20} color={colors.gray900} />
+                            <TextInput
+                                style={styles.searchInput}
+                                placeholder="Search by city, locality..."
+                                placeholderTextColor={colors.gray500}
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
+                            />
+                            {searchQuery.length > 0 && (
+                                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                    <Ionicons name="close-circle" size={20} color={colors.gray400} />
+                                </TouchableOpacity>
+                            )}
                         </View>
                     </View>
+                </ImageBackground>
+            </View>
 
-                    {/* Search Bar - White pill */}
-                    <TouchableOpacity style={styles.searchContainer} activeOpacity={0.9}>
-                        <View style={styles.searchLeft}>
-                            <Text style={styles.searchIcon}>🔍</Text>
-                            <View style={styles.searchTextContainer}>
-                                <Text style={styles.searchPlaceholder}>Search Properties</Text>
-                                <Text style={styles.searchSubtext}>Buy • Rent • Commercial</Text>
-                            </View>
-                        </View>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Categories */}
-                <View style={styles.categoriesContainer}>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.categoriesScroll}
-                    >
-                        {categories.map((cat) => (
-                            <TouchableOpacity
-                                key={cat.id}
-                                style={[
-                                    styles.categoryChip,
-                                    activeCategory === cat.id && styles.categoryChipActive
-                                ]}
-                                onPress={() => setActiveCategory(cat.id)}
+            {/* Scrollable Content */}
+            <FlatList
+                data={filteredProperties}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={renderPropertyCard}
+                numColumns={1}
+                contentContainerStyle={styles.listContent}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+                }
+                ListHeaderComponent={() => (
+                    <View>
+                        {/* Categories */}
+                        <View style={styles.categoriesContainer}>
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.categoriesScroll}
                             >
-                                <Text style={styles.categoryIcon}>{cat.icon}</Text>
-                                <Text style={[
-                                    styles.categoryLabel,
-                                    activeCategory === cat.id && styles.categoryLabelActive
-                                ]}>
-                                    {cat.label}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </View>
+                                {categories.map((cat) => (
+                                    <TouchableOpacity
+                                        key={cat.id}
+                                        style={[
+                                            styles.categoryChip,
+                                            activeCategory === cat.id && styles.categoryChipActive
+                                        ]}
+                                        onPress={() => setActiveCategory(cat.id)}
+                                    >
+                                        <Ionicons
+                                            name={cat.iconName as any}
+                                            size={20}
+                                            color={activeCategory === cat.id ? colors.white : colors.gray600}
+                                        />
+                                        <Text style={[
+                                            styles.categoryLabel,
+                                            activeCategory === cat.id && styles.categoryLabelActive
+                                        ]}>
+                                            {cat.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
 
-                {/* Properties List */}
-                <FlatList
-                    data={filteredProperties}
-                    keyExtractor={(item) => item.id.toString()}
-                    numColumns={2}
-                    columnWrapperStyle={styles.row}
-                    renderItem={renderPropertyCard}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                            tintColor={colors.primary}
-                        />
-                    }
-                    contentContainerStyle={styles.listContent}
-                    ListHeaderComponent={() => (
                         <View style={styles.sectionHeader}>
                             <Text style={styles.sectionTitle}>
-                                {activeCategory === 'all' ? 'All Properties' : categories.find(c => c.id === activeCategory)?.label}
+                                {activeCategory === 'all' ? 'Featured Homes' : `${categories.find(c => c.id === activeCategory)?.label}s`}
                             </Text>
                             <Text style={styles.sectionCount}>{filteredProperties.length} found</Text>
                         </View>
-                    )}
-                    ListEmptyComponent={() => (
-                        <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyEmoji}>🏠</Text>
-                            <Text style={styles.emptyText}>No properties found</Text>
-                            <Text style={styles.emptySubtext}>Check back later for new listings</Text>
-                        </View>
-                    )}
-                />
-            </View>
+                    </View>
+                )}
+                ListEmptyComponent={() => (
+                    <View style={styles.emptyContainer}>
+                        <Ionicons name="home-outline" size={48} color={colors.gray400} style={{ marginBottom: 16 }} />
+                        <Text style={styles.emptyText}>No properties found</Text>
+                        <Text style={styles.emptySubtext}>Try adjusting your search or filters</Text>
+                    </View>
+                )}
+            />
+
             <BottomNav />
-        </>
+        </View>
     );
 }
 
@@ -262,295 +232,163 @@ const styles = StyleSheet.create({
         backgroundColor: colors.white,
     },
 
-    // Header
-    header: {
-        backgroundColor: colors.primary,
-        paddingTop: Platform.OS === 'android' ? 12 : 12, // Reduced padding
+    // Hero
+    heroContainer: {
+        height: 250, // Reduced from 280
+        backgroundColor: colors.gray900,
+        overflow: 'hidden',
+        borderBottomLeftRadius: 32,
+        borderBottomRightRadius: 32,
+        marginBottom: spacing.xs,
+    },
+    heroImage: {
+        flex: 1,
+        justifyContent: 'space-between',
+    },
+    heroImageStyle: {
+        opacity: 0.7,
+    },
+    heroOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.2)',
         paddingHorizontal: spacing.lg,
         paddingBottom: spacing.lg,
-        borderBottomLeftRadius: 28,
-        borderBottomRightRadius: 28,
     },
     headerTop: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: spacing.md, // Reduced margin
+        marginBottom: spacing.md, // Reduced from xl
     },
     logoContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.sm,
-    },
-    logoBadge: {
-        width: 36, // Smaller badge
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: colors.white,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    logoBadgeText: {
-        fontSize: 18, // Smaller text
-        fontWeight: '800',
-        color: colors.primary,
     },
     logoText: {
-        fontSize: 20, // Smaller text
+        fontSize: 24,
         fontWeight: '700',
         color: colors.white,
-        letterSpacing: -0.3,
+        letterSpacing: -0.5,
     },
-    locationRow: {
-        flexDirection: 'row',
+    logoTextHighlight: {
+        color: colors.primary,
+    },
+    iconButton: {
+        width: 44,
+        height: 44,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderRadius: 22,
+        justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 2,
     },
-    locationIcon: {
-        fontSize: 12,
+    heroContent: {
+        marginBottom: spacing.md, // Reduced from lg
     },
-    locationText: {
-        fontSize: 12,
-        color: 'rgba(255,255,255,0.85)',
-        marginLeft: 2,
+    heroTitle: {
+        fontSize: 32,
+        fontWeight: '800',
+        color: colors.white,
+        marginBottom: 4,
+    },
+    heroSubtitle: {
+        fontSize: 16,
+        color: 'rgba(255,255,255,0.9)',
         fontWeight: '500',
     },
-    tagline: {
-        fontSize: 14,
-        color: 'rgba(255,255,255,0.8)',
-        marginTop: 2,
-    },
 
-    // Search - Airbnb style white pill
+    // Search
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
         backgroundColor: colors.white,
-        borderRadius: 100, // Full pill shape
-        paddingLeft: spacing.md,
-        paddingRight: spacing.xs,
-        paddingVertical: spacing.sm,
-        // Reduced shadow for cleaner look
+        borderRadius: 100,
+        paddingHorizontal: spacing.md,
+        paddingVertical: Platform.OS === 'ios' ? 14 : 10,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    searchLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-    },
-    searchIcon: {
-        fontSize: 20,
-        marginRight: spacing.sm,
-    },
-    searchTextContainer: {
-        flex: 1,
-    },
-    searchPlaceholder: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: colors.gray900,
-    },
-    searchSubtext: {
-        fontSize: 12,
-        color: colors.gray500,
-        marginTop: 1,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 8,
     },
     searchInput: {
         flex: 1,
         fontSize: 16,
+        fontWeight: '600',
         color: colors.gray900,
-        paddingVertical: spacing.xs,
+        marginLeft: spacing.sm,
     },
 
     // Categories
     categoriesContainer: {
-        backgroundColor: colors.white,
-        paddingVertical: spacing.md,
-        marginTop: -12,
-        marginHorizontal: spacing.md,
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        marginTop: spacing.md, // Reduced from lg
+        paddingBottom: spacing.xs, // Reduced from md
     },
     categoriesScroll: {
-        paddingHorizontal: spacing.md,
+        paddingHorizontal: spacing.lg,
         gap: spacing.sm,
     },
     categoryChip: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        backgroundColor: colors.gray50,
-        borderRadius: 24,
-        marginRight: spacing.sm,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        backgroundColor: colors.white,
+        borderRadius: 100,
         borderWidth: 1,
-        borderColor: colors.gray100,
+        borderColor: colors.gray200,
+        gap: 6,
     },
     categoryChipActive: {
-        backgroundColor: colors.primary,
-        borderColor: colors.primary,
-    },
-    categoryIcon: {
-        fontSize: 16,
-        marginRight: spacing.xs,
+        backgroundColor: colors.gray900,
+        borderColor: colors.gray900,
     },
     categoryLabel: {
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '600',
-        color: colors.gray700,
+        color: colors.gray600,
     },
     categoryLabelActive: {
         color: colors.white,
     },
 
-    // Section
+    // List
+    listContent: {
+        paddingHorizontal: spacing.lg,
+        paddingBottom: 100,
+    },
     sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: spacing.xs,
-        marginBottom: spacing.md,
-        marginTop: spacing.md,
+        paddingHorizontal: spacing.lg,
+        marginBottom: spacing.xs, // Reduced from md
+        marginTop: spacing.sm,
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: '700',
         color: colors.gray900,
     },
     sectionCount: {
-        fontSize: 13,
-        color: colors.gray500,
-    },
-
-    // List
-    listContent: {
-        paddingHorizontal: spacing.lg,
-        paddingBottom: spacing.xl,
-    },
-    row: {
-        justifyContent: 'space-between',
-    },
-
-    // Property Card
-    propertyCard: {
-        width: CARD_WIDTH,
-        marginBottom: spacing.md,
-        backgroundColor: colors.white,
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 3,
-        overflow: 'hidden',
-    },
-    cardImageContainer: {
-        width: '100%',
-        height: CARD_WIDTH * 0.75,
-        position: 'relative',
-    },
-    cardImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
-    },
-    cardImagePlaceholder: {
-        width: '100%',
-        height: '100%',
-        backgroundColor: colors.gray100,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    placeholderEmoji: {
-        fontSize: 32,
-        opacity: 0.5,
-    },
-    favoriteBtn: {
-        position: 'absolute',
-        top: spacing.sm,
-        right: spacing.sm,
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255,255,255,0.9)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-    },
-    favoriteIcon: {
-        fontSize: 16,
-    },
-    priceBadge: {
-        position: 'absolute',
-        bottom: spacing.sm,
-        left: spacing.sm,
-        backgroundColor: 'rgba(0,0,0,0.75)',
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 4,
-        borderRadius: 8,
-    },
-    priceText: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: colors.white,
-    },
-    cardContent: {
-        padding: spacing.sm,
-    },
-    cardTitle: {
         fontSize: 14,
-        fontWeight: '600',
-        color: colors.gray900,
-        marginBottom: 2,
-    },
-    cardLocation: {
-        fontSize: 12,
         color: colors.gray500,
-        marginBottom: 4,
-    },
-    cardMeta: {
-        flexDirection: 'row',
-    },
-    cardMetaText: {
-        fontSize: 11,
-        color: colors.gray400,
+        fontWeight: '500',
     },
 
     // Empty
     emptyContainer: {
         alignItems: 'center',
         paddingVertical: spacing.xxl,
-    },
-    emptyEmoji: {
-        fontSize: 48,
-        marginBottom: spacing.md,
-        opacity: 0.5,
+        marginTop: spacing.xl,
     },
     emptyText: {
-        ...typography.body,
-        color: colors.gray700,
+        fontSize: 18,
         fontWeight: '600',
+        color: colors.gray900,
     },
     emptySubtext: {
-        ...typography.caption,
-        color: colors.gray400,
-        marginTop: spacing.xs,
+        fontSize: 14,
+        color: colors.gray500,
+        marginTop: 4,
     },
 });

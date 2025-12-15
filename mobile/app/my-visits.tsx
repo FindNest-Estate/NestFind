@@ -7,10 +7,14 @@ import {
     ActivityIndicator,
     RefreshControl,
     TouchableOpacity,
+    Platform,
+    StatusBar
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BottomNav from '../components/BottomNav';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { API_URL } from '../constants/api';
@@ -22,6 +26,7 @@ type Booking = {
     buyer_message?: string;
     agent_message?: string;
     created_at: string;
+    approved_slot?: string;
     property?: {
         title: string;
         city: string;
@@ -34,6 +39,7 @@ export default function MyVisits() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const router = useRouter();
+    const insets = useSafeAreaInsets();
 
     useFocusEffect(
         useCallback(() => {
@@ -49,7 +55,7 @@ export default function MyVisits() {
                 return;
             }
 
-            const response = await axios.get(`${API_URL}/bookings/`, {
+            const response = await axios.get(`${API_URL}/bookings/my-visits`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setBookings(response.data);
@@ -67,15 +73,13 @@ export default function MyVisits() {
     };
 
     const getStatusColor = (status: string) => {
-        switch (status.toLowerCase()) {
-            case 'confirmed':
-                return colors.success;
-            case 'pending':
-                return '#F59E0B';
-            case 'cancelled':
-                return colors.error;
-            default:
-                return colors.gray500;
+        switch (status.toUpperCase()) {
+            case 'APPROVED': return colors.success;
+            case 'CONFIRMED': return colors.success;
+            case 'PENDING': return '#F59E0B';
+            case 'CANCELLED': return colors.error;
+            case 'COMPLETED': return colors.secondary;
+            default: return colors.gray500;
         }
     };
 
@@ -88,11 +92,16 @@ export default function MyVisits() {
         });
     };
 
+    const formatTime = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    }
+
     const renderBookingCard = ({ item }: { item: Booking }) => (
         <TouchableOpacity
             style={styles.card}
             onPress={() => router.push(`/property/${item.property_id}`)}
-            activeOpacity={0.8}
+            activeOpacity={0.9}
         >
             <View style={styles.cardHeader}>
                 <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
@@ -101,32 +110,42 @@ export default function MyVisits() {
                 <Text style={styles.date}>{formatDate(item.created_at)}</Text>
             </View>
 
-            <Text style={styles.propertyTitle} numberOfLines={1}>
-                {item.property?.title || 'Property'}
-            </Text>
-            <Text style={styles.propertyLocation}>
-                {item.property?.city || 'Unknown Location'}
-            </Text>
-
-            {item.property?.price && (
-                <Text style={styles.propertyPrice}>
-                    ₹{item.property.price.toLocaleString()}
+            <View style={styles.cardContent}>
+                <Text style={styles.propertyTitle} numberOfLines={1}>
+                    {item.property?.title || 'Unknown Property'}
                 </Text>
-            )}
-
-            {item.buyer_message && (
-                <View style={styles.messageContainer}>
-                    <Text style={styles.messageLabel}>Your message:</Text>
-                    <Text style={styles.messageText}>{item.buyer_message}</Text>
+                <View style={styles.locationRow}>
+                    <Ionicons name="location-outline" size={14} color={colors.gray500} />
+                    <Text style={styles.propertyLocation}>
+                        {item.property?.city || 'Unknown Location'}
+                    </Text>
                 </View>
-            )}
 
-            {item.agent_message && (
-                <View style={styles.agentMessageContainer}>
-                    <Text style={styles.messageLabel}>Agent response:</Text>
-                    <Text style={styles.messageText}>{item.agent_message}</Text>
-                </View>
-            )}
+                {item.property?.price && (
+                    <Text style={styles.propertyPrice}>
+                        ₹{item.property.price.toLocaleString()}
+                    </Text>
+                )}
+
+                {/* Visit Details Box */}
+                {(item.approved_slot || item.buyer_message) && (
+                    <View style={styles.detailsBox}>
+                        {item.approved_slot && (
+                            <View style={styles.dateTimeRow}>
+                                <Ionicons name="calendar-outline" size={16} color={colors.gray700} />
+                                <Text style={styles.dateTimeText}>
+                                    {formatDate(item.approved_slot)} at {formatTime(item.approved_slot)}
+                                </Text>
+                            </View>
+                        )}
+                        {item.buyer_message && !item.approved_slot && (
+                            <Text style={styles.messageText} numberOfLines={2}>
+                                Note: {item.buyer_message}
+                            </Text>
+                        )}
+                    </View>
+                )}
+            </View>
         </TouchableOpacity>
     );
 
@@ -140,13 +159,19 @@ export default function MyVisits() {
 
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()}>
-                    <Text style={styles.backButton}>← Back</Text>
-                </TouchableOpacity>
-                <Text style={styles.title}>My Visits</Text>
-                <View style={styles.placeholder} />
+            {/* Header - Fixed Height & Safe Area */}
+            <View style={[styles.header, { paddingTop: insets.top }]}>
+                <View style={styles.headerContent}>
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        style={styles.backButton}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                        <Ionicons name="arrow-back" size={24} color={colors.gray900} />
+                    </TouchableOpacity>
+                    <Text style={styles.title}>My Visits</Text>
+                    <View style={styles.placeholder} />
+                </View>
             </View>
 
             <FlatList
@@ -163,16 +188,18 @@ export default function MyVisits() {
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={() => (
                     <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyEmoji}>📋</Text>
+                        <View style={styles.emptyIconBg}>
+                            <Ionicons name="calendar" size={48} color={colors.primary} />
+                        </View>
                         <Text style={styles.emptyTitle}>No visits yet</Text>
                         <Text style={styles.emptyText}>
-                            When you schedule a visit to a property, it will appear here.
+                            Your scheduled property visits will appear here. Start exploring properties to book a visit.
                         </Text>
                         <TouchableOpacity
                             style={styles.browseButton}
                             onPress={() => router.push('/home')}
                         >
-                            <Text style={styles.browseButtonText}>Browse Properties</Text>
+                            <Text style={styles.browseButtonText}>Explore Properties</Text>
                         </TouchableOpacity>
                     </View>
                 )}
@@ -185,7 +212,7 @@ export default function MyVisits() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.white,
+        backgroundColor: '#F8F9FA',
     },
     loadingContainer: {
         flex: 1,
@@ -194,130 +221,162 @@ const styles = StyleSheet.create({
         backgroundColor: colors.white,
     },
     header: {
+        backgroundColor: colors.white,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.gray100,
+        zIndex: 10,
+    },
+    headerContent: {
+        height: 56,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.gray200,
     },
     backButton: {
-        ...typography.body,
-        color: colors.primary,
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'flex-start',
     },
     title: {
-        ...typography.h3,
+        fontSize: 18,
+        fontWeight: '700',
         color: colors.gray900,
     },
     placeholder: {
-        width: 50,
+        width: 40,
     },
     listContent: {
         padding: spacing.lg,
+        paddingBottom: 100,
     },
     card: {
         backgroundColor: colors.white,
         borderRadius: borderRadius.lg,
-        padding: spacing.lg,
         marginBottom: spacing.md,
         borderWidth: 1,
-        borderColor: colors.gray200,
+        borderColor: colors.gray100,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowRadius: 8,
+        elevation: 3,
+        overflow: 'hidden',
     },
     cardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: spacing.sm,
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.md,
+        marginBottom: spacing.xs,
     },
     statusBadge: {
-        paddingHorizontal: spacing.sm,
-        paddingVertical: spacing.xs,
-        borderRadius: borderRadius.full,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
     },
     statusText: {
-        ...typography.caption,
+        fontSize: 10,
+        fontWeight: '700',
         color: colors.white,
-        fontWeight: '600',
+        letterSpacing: 0.5,
     },
     date: {
-        ...typography.caption,
-        color: colors.gray500,
+        fontSize: 12,
+        color: colors.gray400,
+        fontWeight: '500',
+    },
+    cardContent: {
+        padding: spacing.md,
     },
     propertyTitle: {
-        ...typography.h3,
+        fontSize: 16,
+        fontWeight: '700',
         color: colors.gray900,
-        marginBottom: spacing.xs,
+        marginBottom: 4,
+    },
+    locationRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginBottom: 8,
     },
     propertyLocation: {
-        ...typography.bodySmall,
+        fontSize: 13,
         color: colors.gray500,
-        marginBottom: spacing.xs,
     },
     propertyPrice: {
-        ...typography.body,
+        fontSize: 16,
+        fontWeight: '800',
         color: colors.gray900,
-        fontWeight: '600',
+        marginBottom: spacing.md,
     },
-    messageContainer: {
-        marginTop: spacing.md,
-        padding: spacing.sm,
+    detailsBox: {
         backgroundColor: colors.gray50,
-        borderRadius: borderRadius.md,
-    },
-    agentMessageContainer: {
-        marginTop: spacing.sm,
         padding: spacing.sm,
-        backgroundColor: colors.gray100,
         borderRadius: borderRadius.md,
-        borderLeftWidth: 3,
-        borderLeftColor: colors.primary,
+        marginTop: 4,
     },
-    messageLabel: {
-        ...typography.caption,
-        color: colors.gray500,
-        marginBottom: spacing.xs,
+    dateTimeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
-    messageText: {
-        ...typography.bodySmall,
+    dateTimeText: {
+        fontSize: 13,
+        fontWeight: '600',
         color: colors.gray700,
     },
+    messageText: {
+        fontSize: 12,
+        color: colors.gray500,
+        fontStyle: 'italic',
+    },
+
+    // Empty State
     emptyContainer: {
-        flex: 1,
+        paddingTop: 80,
+        alignItems: 'center',
+        paddingHorizontal: spacing.xl,
+    },
+    emptyIconBg: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#EFF6FF',
         justifyContent: 'center',
         alignItems: 'center',
-        paddingVertical: spacing.xxl * 2,
-    },
-    emptyEmoji: {
-        fontSize: 64,
         marginBottom: spacing.lg,
     },
     emptyTitle: {
-        ...typography.h2,
+        fontSize: 20,
+        fontWeight: '700',
         color: colors.gray900,
         marginBottom: spacing.sm,
     },
     emptyText: {
-        ...typography.body,
+        fontSize: 14,
         color: colors.gray500,
         textAlign: 'center',
-        marginBottom: spacing.lg,
-        paddingHorizontal: spacing.xl,
+        marginBottom: spacing.xl,
+        lineHeight: 20,
     },
     browseButton: {
         backgroundColor: colors.primary,
         paddingHorizontal: spacing.xl,
-        paddingVertical: spacing.md,
-        borderRadius: borderRadius.lg,
+        paddingVertical: 12,
+        borderRadius: borderRadius.full,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
     browseButtonText: {
         color: colors.white,
-        fontWeight: '600',
-        fontSize: 16,
+        fontWeight: '700',
+        fontSize: 15,
     },
 });

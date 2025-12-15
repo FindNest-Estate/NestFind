@@ -16,6 +16,7 @@ import {
     Share,
     KeyboardAvoidingView,
     StatusBar,
+    useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import axios from 'axios';
@@ -23,10 +24,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapView, { Marker } from 'react-native-maps';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '../../constants/theme';
 import { API_URL } from '../../constants/api';
-
-const { width } = Dimensions.get('window');
 
 // Available time slots
 const TIME_SLOTS = [
@@ -35,7 +35,7 @@ const TIME_SLOTS = [
     '04:00 PM', '05:00 PM', '06:00 PM'
 ];
 
-// Sample coordinates for Indian cities (you can integrate geocoding API later)
+// Sample coordinates for Indian cities
 const CITY_COORDINATES: { [key: string]: { lat: number, lng: number } } = {
     'Mumbai': { lat: 19.0760, lng: 72.8777 },
     'Delhi': { lat: 28.7041, lng: 77.1025 },
@@ -47,9 +47,25 @@ const CITY_COORDINATES: { [key: string]: { lat: number, lng: number } } = {
     'default': { lat: 20.5937, lng: 78.9629 }, // Center of India
 };
 
+// Amenities Icon Mapping
+const AMENITY_ICONS: { [key: string]: keyof typeof Ionicons.glyphMap } = {
+    'Pool': 'water-outline',
+    'Gym': 'barbell-outline',
+    'Parking': 'car-outline',
+    'Security': 'shield-checkmark-outline',
+    'WiFi': 'wifi-outline',
+    'AC': 'snow-outline',
+    'Garden': 'leaf-outline',
+    'Elevator': 'arrow-up-circle-outline',
+};
+
 export default function PropertyDetail() {
-    const { id } = useLocalSearchParams();
+    const params = useLocalSearchParams();
     const router = useRouter();
+    const { id } = params;
+    const { width } = useWindowDimensions();
+    const insets = useSafeAreaInsets();
+
     const [property, setProperty] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -71,6 +87,9 @@ export default function PropertyDetail() {
     const [hasActiveBooking, setHasActiveBooking] = useState(false);
     const [activeBookingStatus, setActiveBookingStatus] = useState<string | null>(null);
 
+    // Image Viewer State
+    const [showImageModal, setShowImageModal] = useState(false);
+
     useEffect(() => {
         fetchProperty();
         loadCurrentUser();
@@ -83,7 +102,6 @@ export default function PropertyDetail() {
             const userData = await AsyncStorage.getItem('user');
             if (userData) {
                 const parsed = JSON.parse(userData);
-                console.log('Current user loaded:', parsed.id, parsed.email, parsed.role);
                 setCurrentUser(parsed);
             }
         } catch (e) {
@@ -94,7 +112,6 @@ export default function PropertyDetail() {
     const fetchProperty = async () => {
         try {
             const response = await axios.get(`${API_URL}/properties/${id}`);
-            console.log('Property owner_id:', response.data.owner_id, 'owner:', response.data.owner?.id);
             setProperty(response.data);
         } catch (error) {
             console.error('Error fetching property:', error);
@@ -104,21 +121,22 @@ export default function PropertyDetail() {
         }
     };
 
-    // Check if property is in favorites
     const checkFavoriteStatus = async () => {
         try {
             const token = await AsyncStorage.getItem('auth_token');
             if (!token) return;
-            const res = await axios.get(`${API_URL}/favorites/check/${id}`, {
+            const res = await axios.get(`${API_URL}/users/favorites/check/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setIsFavorite(res.data.is_favorite);
-        } catch (e) {
-            // Silently fail - favorites might not be implemented
+        } catch (e: any) {
+            if (e.response?.status === 401) {
+                await AsyncStorage.removeItem('auth_token');
+                setCurrentUser(null);
+            }
         }
     };
 
-    // Check if user has an active booking for this property
     const checkActiveBooking = async () => {
         try {
             const token = await AsyncStorage.getItem('auth_token');
@@ -128,7 +146,6 @@ export default function PropertyDetail() {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            // Check if any booking for this property is active (not completed/cancelled)
             const propertyId = parseInt(id as string);
             const activeBooking = res.data.find((booking: any) =>
                 booking.property_id === propertyId &&
@@ -142,12 +159,14 @@ export default function PropertyDetail() {
                 setHasActiveBooking(false);
                 setActiveBookingStatus(null);
             }
-        } catch (e) {
-            console.log('Error checking active booking:', e);
+        } catch (e: any) {
+            if (e.response?.status === 401) {
+                await AsyncStorage.removeItem('auth_token');
+                setCurrentUser(null);
+            }
         }
     };
 
-    // Toggle favorite
     const toggleFavorite = async () => {
         try {
             const token = await AsyncStorage.getItem('auth_token');
@@ -157,16 +176,13 @@ export default function PropertyDetail() {
             }
 
             if (isFavorite) {
-                // Remove from favorites
-                await axios.delete(`${API_URL}/favorites/${id}`, {
+                await axios.delete(`${API_URL}/users/favorites/${id}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setIsFavorite(false);
-                Alert.alert('Removed', 'Property removed from saved list');
             } else {
-                // Add to favorites
-                await axios.post(`${API_URL}/favorites/`,
-                    { property_id: parseInt(id as string) },
+                await axios.post(`${API_URL}/users/favorites/${id}`,
+                    {}, // Empty body for POST
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
                 setIsFavorite(true);
@@ -177,19 +193,15 @@ export default function PropertyDetail() {
         }
     };
 
-    // Share property
     const shareProperty = async () => {
         try {
-            const result = await Share.share({
-                message: `Check out this property: ${property.title}\n\n📍 ${property.city}, ${property.state}\n💰 ₹${property.price?.toLocaleString()}\n🛏️ ${property.bedrooms} beds • 🚿 ${property.bathrooms} baths\n📐 ${property.area} sqft\n\nView on NestFind App!`,
+            await Share.share({
+                message: `Check out ${property.title} in ${property.city} on NestFind! Price: ₹${property.price?.toLocaleString()}`,
                 title: property.title,
             });
-        } catch (error: any) {
-            Alert.alert('Error', error.message);
-        }
+        } catch (error) { }
     };
 
-    // Submit offer
     const handleSubmitOffer = async () => {
         if (!offerAmount || isNaN(parseFloat(offerAmount))) {
             Alert.alert('Invalid Amount', 'Please enter a valid offer amount');
@@ -210,7 +222,7 @@ export default function PropertyDetail() {
             );
             setShowOfferModal(false);
             setOfferAmount('');
-            Alert.alert('Success! 🎉', 'Your offer has been submitted. The agent will review it shortly.');
+            Alert.alert('Success! 🎉', 'Your offer has been submitted.');
         } catch (e: any) {
             Alert.alert('Error', e.response?.data?.detail || 'Failed to submit offer');
         } finally {
@@ -220,7 +232,7 @@ export default function PropertyDetail() {
 
     const handleScheduleVisit = async () => {
         if (!selectedTimeSlot) {
-            Alert.alert('Select Time', 'Please select a time slot for your visit');
+            Alert.alert('Select Time', 'Please select a time slot');
             return;
         }
 
@@ -233,10 +245,9 @@ export default function PropertyDetail() {
             }
 
             setScheduling(true);
-
             const message = visitMessage
-                ? `${visitMessage}\n\n📅 Preferred Date: ${formatDate(selectedDate)}\n⏰ Preferred Time: ${selectedTimeSlot}`
-                : `📅 Preferred Date: ${formatDate(selectedDate)}\n⏰ Preferred Time: ${selectedTimeSlot}`;
+                ? `${visitMessage}\n\n📅 Date: ${formatDate(selectedDate)}\n⏰ Time: ${selectedTimeSlot}`
+                : `📅 Date: ${formatDate(selectedDate)}\n⏰ Time: ${selectedTimeSlot}`;
 
             await axios.post(
                 `${API_URL}/bookings/`,
@@ -247,10 +258,7 @@ export default function PropertyDetail() {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            Alert.alert(
-                'Visit Scheduled! 🎉',
-                `Your visit request for ${formatDate(selectedDate)} at ${selectedTimeSlot} has been sent.`
-            );
+            Alert.alert('Scheduled! 🎉', 'Your visit request has been sent to the agent.');
             setShowScheduleModal(false);
             setVisitMessage('');
             setSelectedTimeSlot(null);
@@ -263,17 +271,12 @@ export default function PropertyDetail() {
 
     const onDateChange = (event: any, date?: Date) => {
         setShowDatePicker(Platform.OS === 'ios');
-        if (date) {
-            setSelectedDate(date);
-        }
+        if (date) setSelectedDate(date);
     };
 
     const formatDate = (date: Date) => {
         return date.toLocaleDateString('en-IN', {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric'
+            weekday: 'short', day: 'numeric', month: 'short'
         });
     };
 
@@ -284,6 +287,9 @@ export default function PropertyDetail() {
     };
 
     const getCoordinates = () => {
+        if (property?.latitude && property?.longitude) {
+            return { lat: property.latitude, lng: property.longitude };
+        }
         const city = property?.city || '';
         return CITY_COORDINATES[city] || CITY_COORDINATES['default'];
     };
@@ -295,9 +301,7 @@ export default function PropertyDetail() {
             ios: `maps:0,0?q=${encodeURIComponent(address)}`,
             android: `geo:${coords.lat},${coords.lng}?q=${encodeURIComponent(address)}`,
         });
-        if (url) {
-            Linking.openURL(url);
-        }
+        if (url) Linking.openURL(url);
     };
 
     if (loading) {
@@ -317,252 +321,359 @@ export default function PropertyDetail() {
     }
 
     const images = property.images || [];
-    const currentImage = images[currentImageIndex];
-    const imageUrl = currentImage
-        ? `${API_URL}/${currentImage.image_path}`
-        : null;
+    const specs = property.specifications || {};
+    const amenities = property.amenities || [];
     const coords = getCoordinates();
 
     return (
-        <View style={styles.container}>
+        <View style={styles.mainContainer}>
             <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-            {/* Header / Image Carousel */}
-            <View style={styles.headerContainer}>
-                <ScrollView
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    onScroll={(e) => {
-                        const offset = e.nativeEvent.contentOffset.x;
-                        setCurrentImageIndex(Math.round(offset / width));
-                    }}
-                    scrollEventThrottle={16}
-                >
-                    {images.length > 0 ? (
-                        images.map((img: any, index: number) => (
-                            <Image
-                                key={index}
-                                source={{ uri: `${API_URL}/${img.image_path}` }}
-                                style={styles.headerImage}
-                                resizeMode="cover"
-                            />
-                        ))
-                    ) : (
-                        <View style={[styles.headerImage, styles.noImageContainer]}>
-                            <Ionicons name="image-outline" size={64} color={colors.gray400} />
-                            <Text style={styles.noImageText}>No Image Available</Text>
-                        </View>
-                    )}
-                </ScrollView>
-
-                {/* Navbar Overlay */}
-                <View style={styles.navbarOverlay}>
-                    <TouchableOpacity
-                        style={styles.circleBtn}
-                        onPress={() => router.back()}
-                    >
-                        <Ionicons name="arrow-back" size={24} color={colors.gray900} />
+            {/* Navbar Overlay - Permanent */}
+            <View style={[styles.navbarOverlay, { top: insets.top + 10 }]}>
+                <TouchableOpacity style={styles.circleBtn} onPress={() => router.back()}>
+                    <Ionicons name="arrow-back" size={20} color={colors.gray900} />
+                </TouchableOpacity>
+                <View style={styles.navbarActions}>
+                    <TouchableOpacity style={styles.circleBtn} onPress={shareProperty}>
+                        <Ionicons name="share-outline" size={20} color={colors.gray900} />
                     </TouchableOpacity>
-
-                    <View style={styles.navbarActions}>
-                        <TouchableOpacity style={styles.circleBtn} onPress={shareProperty}>
-                            <Ionicons name="share-outline" size={24} color={colors.gray900} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.circleBtn} onPress={toggleFavorite}>
-                            <Ionicons
-                                name={isFavorite ? "heart" : "heart-outline"}
-                                size={24}
-                                color={isFavorite ? colors.error : colors.gray900}
-                            />
-                        </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity style={styles.circleBtn} onPress={toggleFavorite}>
+                        <Ionicons
+                            name={isFavorite ? "heart" : "heart-outline"}
+                            size={20}
+                            color={isFavorite ? colors.error : colors.gray900}
+                        />
+                    </TouchableOpacity>
                 </View>
-
-                {/* Image Dots */}
-                {images.length > 1 && (
-                    <View style={styles.paginationDots}>
-                        {images.map((_: any, i: number) => (
-                            <View
-                                key={i}
-                                style={[
-                                    styles.dot,
-                                    i === currentImageIndex && styles.dotActive
-                                ]}
-                            />
-                        ))}
-                    </View>
-                )}
             </View>
 
-            {/* Scrollable Content */}
             <ScrollView
-                style={styles.contentScroll}
-                contentContainerStyle={styles.contentContainer}
+                style={styles.scrollView}
                 showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 120 }} // Space for fixed bottom bar
             >
-                {/* Title & Price Section */}
-                <View style={styles.titleSection}>
-                    <View>
-                        <Text style={styles.propertyTitle}>{property.title}</Text>
+                {/* Image Header */}
+                <View style={[styles.headerContainer, { height: width * 0.75 }]}>
+                    <ScrollView
+                        horizontal
+                        pagingEnabled
+                        showsHorizontalScrollIndicator={false}
+                        onScroll={(e) => {
+                            const offset = e.nativeEvent.contentOffset.x;
+                            setCurrentImageIndex(Math.round(offset / width));
+                        }}
+                        scrollEventThrottle={16}
+                    >
+                        {images.length > 0 ? (
+                            images.map((img: any, index: number) => (
+                                <TouchableOpacity key={index} activeOpacity={0.9} onPress={() => setShowImageModal(true)}>
+                                    <Image
+                                        source={{ uri: `${API_URL}/${img.image_path}` }}
+                                        style={{ width, height: '100%' }}
+                                        resizeMode="cover"
+                                    />
+                                </TouchableOpacity>
+                            ))
+                        ) : (
+                            <View style={[styles.noImageContainer, { width }]}>
+                                <Ionicons name="image-outline" size={48} color={colors.gray400} />
+                                <Text style={styles.noImageText}>No Images</Text>
+                            </View>
+                        )}
+                    </ScrollView>
+
+                    {/* Dots */}
+                    {images.length > 1 && (
+                        <View style={styles.paginationDots}>
+                            {images.map((_: any, i: number) => (
+                                <View
+                                    key={i}
+                                    style={[styles.dot, i === currentImageIndex && styles.dotActive]}
+                                />
+                            ))}
+                        </View>
+                    )}
+                </View>
+
+                {/* Main Content Sheet */}
+                <View style={styles.contentSheet}>
+                    <View style={styles.handleBar}>
+                        <View style={styles.handle} />
+                    </View>
+
+                    {/* Title Section */}
+                    <View style={styles.section}>
+                        <View style={styles.titleRow}>
+                            <Text style={styles.propertyTitle}>{property.title}</Text>
+                            {/* <View style={styles.badge}>
+                                <Text style={styles.badgeText}>New</Text>
+                            </View> */}
+                        </View>
                         <View style={styles.locationRow}>
-                            <Ionicons name="location-sharp" size={16} color={colors.primary} />
+                            <Ionicons name="location-sharp" size={16} color={colors.gray500} />
                             <Text style={styles.locationText}>{property.city}, {property.state}</Text>
                         </View>
                     </View>
-                    <View style={styles.ratingBadge}>
-                        <Ionicons name="star" size={14} color={colors.white} />
-                        <Text style={styles.ratingText}>New</Text>
-                    </View>
-                </View>
 
-                {/* Key Features Grid */}
-                <View style={styles.featuresGrid}>
-                    <View style={styles.featureItem}>
-                        <Ionicons name="bed-outline" size={24} color={colors.gray600} />
-                        <Text style={styles.featureValue}>{property.bedrooms || '-'}</Text>
-                        <Text style={styles.featureLabel}>Bedrooms</Text>
-                    </View>
-                    <View style={styles.featureItem}>
-                        <Ionicons name="water-outline" size={24} color={colors.gray600} />
-                        <Text style={styles.featureValue}>{property.bathrooms || '-'}</Text>
-                        <Text style={styles.featureLabel}>Bathrooms</Text>
-                    </View>
-                    <View style={styles.featureItem}>
-                        <Ionicons name="expand-outline" size={24} color={colors.gray600} />
-                        <Text style={styles.featureValue}>{property.area || '-'}</Text>
-                        <Text style={styles.featureLabel}>Sq Ft</Text>
-                    </View>
-                    <View style={styles.featureItem}>
-                        <Ionicons name="home-outline" size={24} color={colors.gray600} />
-                        <Text style={styles.featureValue}>{property.property_type}</Text>
-                        <Text style={styles.featureLabel}>Type</Text>
-                    </View>
-                </View>
+                    <View style={styles.divider} />
 
-                <View style={styles.divider} />
+                    {/* Dynamic Stats Grid */}
+                    <View style={styles.statsGrid}>
+                        {(() => {
+                            const type = property.property_type?.toLowerCase() || 'residential';
+                            const isPlot = ['land', 'plot'].includes(type);
+                            const isCommercial = ['commercial', 'office', 'shop'].includes(type);
 
-                {/* Description */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>About this home</Text>
-                    <Text style={styles.descriptionText}>
-                        {property.description || 'No description provided for this property.'}
-                    </Text>
-                </View>
+                            if (isPlot) {
+                                return (
+                                    <>
+                                        <View style={styles.statItem}>
+                                            <View style={styles.statIconContainer}>
+                                                <Ionicons name="expand-outline" size={20} color={colors.primary} />
+                                            </View>
+                                            <Text style={styles.statValue}>{specs.area || specs.area_sqft || '-'}</Text>
+                                            <Text style={styles.statLabel}>Area</Text>
+                                        </View>
+                                        <View style={styles.statItem}>
+                                            <View style={styles.statIconContainer}>
+                                                <Ionicons name="resize-outline" size={20} color={colors.primary} />
+                                            </View>
+                                            <Text style={styles.statValue}>{specs.dimensions || '-'}</Text>
+                                            <Text style={styles.statLabel}>Dimensions</Text>
+                                        </View>
+                                        <View style={styles.statItem}>
+                                            <View style={styles.statIconContainer}>
+                                                <Ionicons name="compass-outline" size={20} color={colors.primary} />
+                                            </View>
+                                            <Text style={styles.statValue}>{specs.facing || '-'}</Text>
+                                            <Text style={styles.statLabel}>Facing</Text>
+                                        </View>
+                                    </>
+                                );
+                            }
 
-                <View style={styles.divider} />
+                            if (isCommercial) {
+                                return (
+                                    <>
+                                        <View style={styles.statItem}>
+                                            <View style={styles.statIconContainer}>
+                                                <Ionicons name="scan-outline" size={20} color={colors.primary} />
+                                            </View>
+                                            <Text style={styles.statValue}>{specs.area_sqft || '-'}</Text>
+                                            <Text style={styles.statLabel}>Sqft</Text>
+                                        </View>
+                                        <View style={styles.statItem}>
+                                            <View style={styles.statIconContainer}>
+                                                <Ionicons name="car-outline" size={20} color={colors.primary} />
+                                            </View>
+                                            <Text style={styles.statValue}>{specs.parking || '-'}</Text>
+                                            <Text style={styles.statLabel}>Parking</Text>
+                                        </View>
+                                        <View style={styles.statItem}>
+                                            <View style={styles.statIconContainer}>
+                                                <Ionicons name="water-outline" size={20} color={colors.primary} />
+                                            </View>
+                                            <Text style={styles.statValue}>{specs.washrooms || '-'}</Text>
+                                            <Text style={styles.statLabel}>Washrooms</Text>
+                                        </View>
+                                    </>
+                                );
+                            }
 
-                {/* Host / Agent */}
-                {property.owner && (
-                    <View style={styles.agentSection}>
-                        <Text style={styles.sectionTitle}>Hosted by</Text>
-                        <View style={styles.agentRow}>
-                            <View style={styles.agentAvatar}>
-                                <Text style={styles.agentInitial}>{property.owner.first_name?.[0]}</Text>
+                            // Default: Residential
+                            return (
+                                <>
+                                    <View style={styles.statItem}>
+                                        <View style={styles.statIconContainer}>
+                                            <Ionicons name="bed-outline" size={20} color={colors.primary} />
+                                        </View>
+                                        <Text style={styles.statValue}>{specs.bedrooms || '-'}</Text>
+                                        <Text style={styles.statLabel}>Beds</Text>
+                                    </View>
+                                    <View style={styles.statItem}>
+                                        <View style={styles.statIconContainer}>
+                                            <Ionicons name="water-outline" size={20} color={colors.primary} />
+                                        </View>
+                                        <Text style={styles.statValue}>{specs.bathrooms || '-'}</Text>
+                                        <Text style={styles.statLabel}>Baths</Text>
+                                    </View>
+                                    <View style={styles.statItem}>
+                                        <View style={styles.statIconContainer}>
+                                            <Ionicons name="expand-outline" size={20} color={colors.primary} />
+                                        </View>
+                                        <Text style={styles.statValue}>{specs.area_sqft || '-'}</Text>
+                                        <Text style={styles.statLabel}>Sqft</Text>
+                                    </View>
+                                </>
+                            );
+                        })()}
+
+                        <View style={styles.statItem}>
+                            <View style={[styles.statIconContainer, { backgroundColor: '#F3E8FF' }]}>
+                                <Ionicons name="home-outline" size={20} color="#7C3AED" />
                             </View>
-                            <View style={styles.agentInfo}>
-                                <Text style={styles.agentName}>{property.owner.first_name} {property.owner.last_name}</Text>
-                                <Text style={styles.agentRole}>Real Estate Agent</Text>
+                            <Text style={styles.statValue} numberOfLines={1}>{property.property_type}</Text>
+                            <Text style={styles.statLabel}>Type</Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.divider} />
+
+                    {/* Description */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>About this home</Text>
+                        <Text style={styles.description}>
+                            {property.description || 'No description provided.'}
+                        </Text>
+                    </View>
+
+                    <View style={styles.divider} />
+
+                    {/* Detailed Specifications */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Property Details</Text>
+                        <View style={styles.detailsGrid}>
+                            {Object.entries(specs).map(([key, value]) => {
+                                // Skip generic keys if already shown or irrelevant
+                                if (['bedrooms', 'bathrooms', 'area_sqft'].includes(key) && ['apartment', 'villa', 'house'].includes(property.property_type?.toLowerCase())) return null;
+                                if (!value) return null;
+
+                                return (
+                                    <View key={key} style={styles.detailRow}>
+                                        <Text style={styles.detailLabel}>{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</Text>
+                                        <Text style={styles.detailValue}>{String(value)}</Text>
+                                    </View>
+                                );
+                            })}
+                        </View>
+                    </View>
+
+                    <View style={styles.divider} />
+
+                    {/* Amenities */}
+                    {amenities.length > 0 && (
+                        <>
+                            <View style={styles.section}>
+                                <Text style={styles.sectionTitle}>Amenities</Text>
+                                <View style={styles.amenitiesContainer}>
+                                    {amenities.map((amenity: string, idx: number) => (
+                                        <View key={idx} style={styles.amenityChip}>
+                                            <Ionicons
+                                                name={AMENITY_ICONS[amenity] || 'checkmark-circle-outline'}
+                                                size={18}
+                                                color={colors.gray700}
+                                            />
+                                            <Text style={styles.amenityText}>{amenity}</Text>
+                                        </View>
+                                    ))}
+                                </View>
                             </View>
-                            <TouchableOpacity
-                                style={styles.contactBtn}
-                                onPress={() => {
-                                    if (property.owner.phone) Linking.openURL(`tel:${property.owner.phone}`);
-                                    else Alert.alert('Info', 'Phone number not available');
+                            <View style={styles.divider} />
+                        </>
+                    )}
+
+                    {/* Host Info */}
+                    {property.owner && (
+                        <>
+                            <View style={styles.section}>
+                                <Text style={styles.sectionTitle}>Hosted by</Text>
+                                <View style={styles.hostCard}>
+                                    <View style={styles.hostAvatar}>
+                                        <Text style={styles.hostInitial}>{property.owner.first_name?.[0]}</Text>
+                                    </View>
+                                    <View style={styles.hostInfo}>
+                                        <Text style={styles.hostName}>
+                                            {property.owner.first_name} {property.owner.last_name}
+                                        </Text>
+                                        <Text style={styles.hostRole}>
+                                            {property.owner.agency_name || 'Individual Agent'}
+                                        </Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.contactBtn}
+                                        onPress={() => {
+                                            if (property.owner.phone) Linking.openURL(`tel:${property.owner.phone}`);
+                                            else Alert.alert('Info', 'Phone unavailable');
+                                        }}
+                                    >
+                                        <Ionicons name="call" size={20} color={colors.gray900} />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                            <View style={styles.divider} />
+                        </>
+                    )}
+
+                    {/* Map */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Where you'll be</Text>
+                        <Text style={styles.addressText}>{property.address}</Text>
+                        <View style={styles.mapContainer}>
+                            <MapView
+                                style={StyleSheet.absoluteFill}
+                                initialRegion={{
+                                    latitude: coords.lat,
+                                    longitude: coords.lng,
+                                    latitudeDelta: 0.01,
+                                    longitudeDelta: 0.01,
                                 }}
+                                scrollEnabled={false}
+                                zoomEnabled={false}
                             >
-                                <Ionicons name="call-outline" size={20} color={colors.gray900} />
+                                <Marker coordinate={{ latitude: coords.lat, longitude: coords.lng }} />
+                            </MapView>
+                            <TouchableOpacity style={styles.mapBtn} onPress={openMapsApp}>
+                                <Text style={styles.mapBtnText}>Open in Maps</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
-                )}
-
-                <View style={styles.divider} />
-
-                {/* Map Preview */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Where you'll be</Text>
-                    <Text style={styles.addressText}>{property.address}</Text>
-                    <View style={styles.mapPreview}>
-                        <MapView
-                            style={styles.map}
-                            initialRegion={{
-                                latitude: coords.lat,
-                                longitude: coords.lng,
-                                latitudeDelta: 0.01,
-                                longitudeDelta: 0.01,
-                            }}
-                            scrollEnabled={false}
-                            zoomEnabled={false}
-                        >
-                            <Marker
-                                coordinate={{
-                                    latitude: coords.lat,
-                                    longitude: coords.lng
-                                }}
-                            />
-                        </MapView>
-                        <TouchableOpacity style={styles.openMapBtn} onPress={openMapsApp}>
-                            <Text style={styles.openMapText}>Open in Maps</Text>
-                        </TouchableOpacity>
-                    </View>
                 </View>
-
-                {/* Bottom Padding for scroll */}
-                <View style={{ height: 100 }} />
             </ScrollView>
 
-            {/* Fixed Bottom Action Bar */}
-            <View style={styles.bottomBar}>
-                <View style={styles.priceContainer}>
-                    <Text style={styles.priceLabel}>Price</Text>
+            {/* Bottom Bar */}
+            <View style={[styles.bottomBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : spacing.lg }]}>
+                <View style={styles.priceMeta}>
+                    <Text style={styles.priceLabel}>Total Price</Text>
                     <Text style={styles.priceValue}>₹{property.price?.toLocaleString()}</Text>
                 </View>
 
                 {currentUser?.role === 'agent' ? (
-                    <View style={styles.actionButtons}>
-                        <TouchableOpacity
-                            style={[styles.actionBtn, styles.editBtn]}
-                            onPress={() => router.push(`/agent/edit-property/${id}`)}
-                        >
-                            <Text style={styles.editBtnText}>Edit</Text>
-                        </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity
+                        style={styles.primaryActionBtn}
+                        onPress={() => router.push(`/agent/edit-property/${id}`)}
+                    >
+                        <Text style={styles.primaryBtnText}>Edit Property</Text>
+                    </TouchableOpacity>
                 ) : (
-                    <View style={styles.actionButtons}>
-                        {hasActiveBooking ? (
-                            <View style={styles.statusBadge}>
-                                <Text style={styles.statusText}>
-                                    {activeBookingStatus === 'PENDING' ? 'Request Sent' : activeBookingStatus}
-                                </Text>
-                            </View>
-                        ) : (
-                            <>
-                                <TouchableOpacity
-                                    style={[styles.actionBtn, styles.secondaryBtn]}
-                                    onPress={() => setShowScheduleModal(true)}
-                                >
-                                    <Text style={styles.secondaryBtnText}>Schedule</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.actionBtn, styles.primaryBtn]}
-                                    onPress={() => setShowOfferModal(true)}
-                                >
-                                    <Text style={styles.primaryBtnText}>Make Offer</Text>
-                                </TouchableOpacity>
-                            </>
-                        )}
-                    </View>
+                    hasActiveBooking ? (
+                        <View style={styles.statusBadgeFull}>
+                            <Text style={styles.statusTextFull}>
+                                {activeBookingStatus === 'PENDING' ? 'Req Sent' : activeBookingStatus}
+                            </Text>
+                        </View>
+                    ) : (
+                        <View style={styles.actionsRow}>
+                            <TouchableOpacity
+                                style={styles.secondaryActionBtn}
+                                onPress={() => setShowScheduleModal(true)}
+                            >
+                                <Text style={styles.secondaryBtnText}>Schedule</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.primaryActionBtn}
+                                onPress={() => setShowOfferModal(true)}
+                            >
+                                <Text style={styles.primaryBtnText}>Offer</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )
                 )}
             </View>
 
-            {/* Modals remain mostly same but could be styled if needed */}
-            <Modal
-                visible={showScheduleModal}
-                animationType="slide"
-                transparent={true}
-            >
-                <View style={styles.modalContainer}>
+            {/* Modals reused */}
+            <Modal visible={showScheduleModal} animationType="slide" transparent={true}>
+                <View style={[styles.modalOverlay, { paddingBottom: insets.bottom }]}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Schedule Visit</Text>
@@ -570,18 +681,12 @@ export default function PropertyDetail() {
                                 <Ionicons name="close" size={24} color={colors.gray500} />
                             </TouchableOpacity>
                         </View>
-
                         <ScrollView showsVerticalScrollIndicator={false}>
-                            {/* Simplified Modal Content structure */}
                             <Text style={styles.label}>Select Date</Text>
-                            <TouchableOpacity
-                                style={styles.inputBox}
-                                onPress={() => setShowDatePicker(true)}
-                            >
-                                <Ionicons name="calendar-outline" size={20} color={colors.gray500} />
+                            <TouchableOpacity style={styles.inputBox} onPress={() => setShowDatePicker(true)}>
+                                <Ionicons name="calendar-outline" size={20} color={colors.gray900} />
                                 <Text style={styles.inputText}>{formatDate(selectedDate)}</Text>
                             </TouchableOpacity>
-
                             {showDatePicker && (
                                 <DateTimePicker
                                     value={selectedDate}
@@ -590,35 +695,26 @@ export default function PropertyDetail() {
                                     onChange={onDateChange}
                                 />
                             )}
-
                             <Text style={styles.label}>Select Time</Text>
                             <View style={styles.chipsContainer}>
                                 {TIME_SLOTS.map((slot) => (
                                     <TouchableOpacity
                                         key={slot}
-                                        style={[
-                                            styles.chip,
-                                            selectedTimeSlot === slot && styles.chipActive
-                                        ]}
+                                        style={[styles.chip, selectedTimeSlot === slot && styles.chipActive]}
                                         onPress={() => setSelectedTimeSlot(slot)}
                                     >
-                                        <Text style={[
-                                            styles.chipText,
-                                            selectedTimeSlot === slot && styles.chipTextActive
-                                        ]}>{slot}</Text>
+                                        <Text style={[styles.chipText, selectedTimeSlot === slot && styles.chipTextActive]}>{slot}</Text>
                                     </TouchableOpacity>
                                 ))}
                             </View>
-
                             <TouchableOpacity
                                 style={[styles.fullWidthBtn, (!selectedTimeSlot || scheduling) && styles.btnDisabled]}
                                 onPress={handleScheduleVisit}
-                                disabled={!selectedTimeSlot || scheduling}
                             >
                                 {scheduling ? (
-                                    <ActivityIndicator color="white" />
+                                    <ActivityIndicator color={colors.white} />
                                 ) : (
-                                    <Text style={styles.btnText}>Confirm Schedule</Text>
+                                    <Text style={styles.fullWidthBtnText}>Confirm Visit</Text>
                                 )}
                             </TouchableOpacity>
                         </ScrollView>
@@ -626,27 +722,56 @@ export default function PropertyDetail() {
                 </View>
             </Modal>
 
-            <Modal
-                visible={showOfferModal}
-                animationType="slide"
-                transparent={true}
-            >
+            {/* Full Screen Image Viewer Modal */}
+            {/* Full Screen Image Viewer Modal */}
+            <Modal visible={showImageModal} animationType="fade" transparent={true}>
+                <View style={styles.imageModalContainer}>
+                    <StatusBar hidden />
+                    <TouchableOpacity
+                        style={[styles.closeImageBtn, { top: insets.top + 20 }]}
+                        onPress={() => setShowImageModal(false)}
+                    >
+                        <Ionicons name="close" size={28} color="white" />
+                    </TouchableOpacity>
+
+                    <ScrollView
+                        horizontal
+                        pagingEnabled
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ alignItems: 'center' }}
+                    >
+                        {images.map((img: any, index: number) => (
+                            <View key={index} style={{ width, height: '100%', justifyContent: 'center' }}>
+                                <Image
+                                    source={{ uri: `${API_URL}/${img.image_path}` }}
+                                    style={{ width, height: width * 0.75 }} // Maintain aspect ratio or contain
+                                    resizeMode="contain"
+                                />
+                            </View>
+                        ))}
+                    </ScrollView>
+
+                    <View style={styles.imagePagination}>
+                        <Text style={styles.imagePaginationText}>
+                            Swipe to view • {images.length} photos
+                        </Text>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal visible={showOfferModal} animationType="slide" transparent={true}>
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    style={styles.modalContainer}
+                    style={[styles.modalOverlay, { paddingBottom: insets.bottom }]}
                 >
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Make an Offer</Text>
+                            <Text style={styles.modalTitle}>Make Offer</Text>
                             <TouchableOpacity onPress={() => setShowOfferModal(false)}>
                                 <Ionicons name="close" size={24} color={colors.gray500} />
                             </TouchableOpacity>
                         </View>
-
-                        <Text style={styles.offerSubtitle}>
-                            Listed Price: <Text style={{ fontWeight: '700' }}>₹{property.price?.toLocaleString()}</Text>
-                        </Text>
-
+                        <Text style={styles.subtext}>Listing: ₹{property.price?.toLocaleString()}</Text>
                         <View style={styles.amountInputContainer}>
                             <Text style={styles.currencySymbol}>₹</Text>
                             <TextInput
@@ -654,47 +779,42 @@ export default function PropertyDetail() {
                                 value={offerAmount}
                                 onChangeText={setOfferAmount}
                                 keyboardType="numeric"
-                                placeholder="Enter amount"
+                                placeholder="Amount"
                             />
                         </View>
-
-                        <View style={styles.quickAmountRow}>
-                            {['-10%', '-5%', 'Full', '+5%'].map((label, idx) => {
-                                const multiplier = [0.9, 0.95, 1, 1.05][idx];
-                                return (
-                                    <TouchableOpacity
-                                        key={label}
-                                        style={styles.quickChip}
-                                        onPress={() => setOfferAmount((property.price * multiplier).toFixed(0))}
-                                    >
-                                        <Text style={styles.quickChipText}>{label}</Text>
-                                    </TouchableOpacity>
-                                )
-                            })}
+                        <View style={styles.chipsContainer}>
+                            {['-10%', '-5%', 'Fair', '+5%'].map((l, i) => (
+                                <TouchableOpacity
+                                    key={l}
+                                    style={styles.chip}
+                                    onPress={() => setOfferAmount((property.price * [0.9, 0.95, 1, 1.05][i]).toFixed(0))}
+                                >
+                                    <Text style={styles.chipText}>{l}</Text>
+                                </TouchableOpacity>
+                            ))}
                         </View>
-
                         <TouchableOpacity
                             style={[styles.fullWidthBtn, (submittingOffer || !offerAmount) && styles.btnDisabled]}
                             onPress={handleSubmitOffer}
                             disabled={submittingOffer || !offerAmount}
                         >
-                            {submittingOffer ? (
-                                <ActivityIndicator color="white" />
-                            ) : (
-                                <Text style={styles.btnText}>Submit Offer</Text>
-                            )}
+                            {submittingOffer ? <ActivityIndicator color="white" /> : <Text style={styles.btnText}>Submit</Text>}
                         </TouchableOpacity>
                     </View>
                 </KeyboardAvoidingView>
             </Modal>
+
         </View >
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
+    mainContainer: {
         flex: 1,
         backgroundColor: colors.gray50,
+    },
+    scrollView: {
+        flex: 1,
     },
     loadingContainer: {
         flex: 1,
@@ -706,67 +826,33 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: colors.white,
     },
     errorText: {
-        fontSize: 16,
         color: colors.gray500,
+        fontSize: 16,
     },
 
-    // Header & Image Carousel
+    // Header
     headerContainer: {
-        height: width * 0.8,
-        position: 'relative',
+        width: '100%',
         backgroundColor: colors.gray900,
-    },
-    headerImage: {
-        width: width,
-        height: '100%',
+        position: 'relative',
     },
     noImageContainer: {
+        height: '100%',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: colors.gray100,
+        backgroundColor: colors.gray200,
     },
     noImageText: {
-        marginTop: spacing.sm,
+        marginTop: 8,
         color: colors.gray500,
-        fontSize: 14,
-    },
-    navbarOverlay: {
-        position: 'absolute',
-        top: Platform.OS === 'ios' ? 48 : 32,
-        left: 0,
-        right: 0,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg,
-        zIndex: 10,
-    },
-    navbarActions: {
-        flexDirection: 'row',
-        gap: spacing.md,
-    },
-    circleBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255,255,255,0.9)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 4,
     },
     paginationDots: {
         position: 'absolute',
         bottom: 24,
-        left: 0,
-        right: 0,
+        alignSelf: 'center',
         flexDirection: 'row',
-        justifyContent: 'center',
         gap: 6,
     },
     dot: {
@@ -776,157 +862,238 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.5)',
     },
     dotActive: {
-        backgroundColor: colors.white,
         width: 20,
+        backgroundColor: '#fff',
     },
 
-    // Content
-    contentScroll: {
-        flex: 1,
-        marginTop: -20, // Overlap the header
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        backgroundColor: colors.gray50,
-        overflow: 'visible',
-    },
-    contentContainer: {
-        paddingTop: spacing.xl,
+    // Navbar
+    navbarOverlay: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         paddingHorizontal: spacing.lg,
     },
-    titleSection: {
+    navbarActions: {
+        flexDirection: 'row',
+        gap: spacing.md,
+    },
+    circleBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.95)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+        elevation: 4,
+    },
+
+    // Content Sheet
+    contentSheet: {
+        marginTop: -24,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        backgroundColor: colors.white,
+        paddingHorizontal: spacing.lg,
+        paddingBottom: spacing.lg,
+        minHeight: 500,
+    },
+    handleBar: {
+        alignItems: 'center',
+        paddingVertical: spacing.sm,
+    },
+    handle: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: colors.gray200,
+    },
+
+    // Title
+    section: {
+        marginTop: spacing.md,
+    },
+    titleRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        marginBottom: spacing.lg,
     },
     propertyTitle: {
         fontSize: 24,
         fontWeight: '700',
         color: colors.gray900,
-        marginBottom: 4,
-        maxWidth: width * 0.7,
+        flex: 1,
+        marginRight: spacing.sm,
     },
     locationRow: {
         flexDirection: 'row',
         alignItems: 'center',
+        marginTop: 4,
         gap: 4,
     },
     locationText: {
-        fontSize: 14,
+        fontSize: 15,
         color: colors.gray500,
     },
-    ratingBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    badge: {
         backgroundColor: colors.gray900,
-        paddingHorizontal: spacing.sm,
+        paddingHorizontal: 8,
         paddingVertical: 4,
-        borderRadius: borderRadius.full,
-        gap: 4,
+        borderRadius: 100,
     },
-    ratingText: {
+    badgeText: {
         color: colors.white,
         fontSize: 12,
         fontWeight: '600',
     },
-
-    // Features
-    featuresGrid: {
-        flexDirection: 'row',
-        backgroundColor: colors.white,
-        padding: spacing.md,
-        borderRadius: borderRadius.xl,
-        justifyContent: 'space-between',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+    divider: {
+        height: 1,
+        backgroundColor: colors.gray100,
+        marginVertical: spacing.md,
     },
-    featureItem: {
+
+    // Grid
+    statsGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        backgroundColor: colors.white,
+        paddingVertical: spacing.md,
+        borderRadius: borderRadius.lg,
+        borderWidth: 1,
+        borderColor: colors.gray100,
+        paddingHorizontal: spacing.sm,
+    },
+    statItem: {
         alignItems: 'center',
         flex: 1,
     },
-    featureValue: {
-        fontSize: 16,
+    statIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: '#E0F2FE', // Light blue bg
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    statValue: {
+        fontSize: 14,
         fontWeight: '700',
         color: colors.gray900,
-        marginTop: 4,
     },
-    featureLabel: {
-        fontSize: 12,
+    statLabel: {
+        fontSize: 11,
         color: colors.gray500,
+        fontWeight: '500',
     },
 
-    divider: {
-        height: 1,
-        backgroundColor: colors.gray200,
-        marginVertical: spacing.xl,
+    // Details List
+    detailsGrid: {
+        backgroundColor: colors.gray50,
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        gap: spacing.sm,
+    },
+    detailRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.03)',
+    },
+    detailLabel: {
+        fontSize: 14,
+        color: colors.gray600,
+        fontWeight: '500',
+    },
+    detailValue: {
+        fontSize: 14,
+        color: colors.gray900,
+        fontWeight: '600',
     },
 
-    // Standard Section
-    section: {
-        marginBottom: spacing.sm,
-    },
+    // Text
     sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
         color: colors.gray900,
-        marginBottom: spacing.md,
+        marginBottom: 8,
     },
-    descriptionText: {
+    description: {
         fontSize: 15,
         lineHeight: 24,
         color: colors.gray600,
     },
 
-    // Agent Section
-    agentSection: {
-        marginBottom: spacing.lg,
+    // Amenities
+    amenitiesContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.sm,
     },
-    agentRow: {
+    amenityChip: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.white,
+        backgroundColor: colors.gray50,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 100,
+        borderWidth: 1,
+        borderColor: colors.gray200,
+        gap: 6,
+    },
+    amenityText: {
+        fontSize: 14,
+        color: colors.gray700,
+    },
+
+    // Host
+    hostCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.gray50,
         padding: spacing.md,
         borderRadius: borderRadius.lg,
         borderWidth: 1,
-        borderColor: colors.gray100,
+        borderColor: colors.gray200,
     },
-    agentAvatar: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
+    hostAvatar: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
         backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: spacing.md,
     },
-    agentInitial: {
+    hostInitial: {
         fontSize: 20,
         fontWeight: '700',
         color: colors.white,
     },
-    agentInfo: {
+    hostInfo: {
         flex: 1,
     },
-    agentName: {
+    hostName: {
         fontSize: 16,
         fontWeight: '700',
         color: colors.gray900,
     },
-    agentRole: {
-        fontSize: 12,
+    hostRole: {
+        fontSize: 13,
         color: colors.gray500,
-        marginTop: 2,
     },
     contactBtn: {
-        width: 40,
-        height: 40,
+        padding: 8,
+        backgroundColor: colors.white,
         borderRadius: 20,
-        backgroundColor: colors.gray50,
-        justifyContent: 'center',
-        alignItems: 'center',
         borderWidth: 1,
         borderColor: colors.gray200,
     },
@@ -934,33 +1101,29 @@ const styles = StyleSheet.create({
     // Map
     addressText: {
         fontSize: 14,
-        color: colors.gray600,
+        color: colors.gray500,
         marginBottom: spacing.md,
     },
-    mapPreview: {
+    mapContainer: {
         height: 180,
-        borderRadius: borderRadius.xl,
+        borderRadius: borderRadius.lg,
         overflow: 'hidden',
         position: 'relative',
     },
-    map: {
-        ...StyleSheet.absoluteFillObject,
-    },
-    openMapBtn: {
+    mapBtn: {
         position: 'absolute',
-        bottom: spacing.md,
-        right: spacing.md,
+        bottom: 12,
+        right: 12,
         backgroundColor: colors.white,
-        paddingHorizontal: spacing.md,
+        paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: borderRadius.full,
+        borderRadius: 100,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
-        shadowRadius: 4,
         elevation: 3,
     },
-    openMapText: {
+    mapBtnText: {
         fontSize: 12,
         fontWeight: '600',
         color: colors.gray900,
@@ -968,20 +1131,24 @@ const styles = StyleSheet.create({
 
     // Bottom Bar
     bottomBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: spacing.lg,
-        paddingBottom: Platform.OS === 'ios' ? 34 : spacing.lg,
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
         backgroundColor: colors.white,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.lg,
         borderTopWidth: 1,
         borderTopColor: colors.gray200,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -4 },
         shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 10,
+        elevation: 8,
     },
-    priceContainer: {
+    priceMeta: {
         flex: 1,
     },
     priceLabel: {
@@ -989,114 +1156,100 @@ const styles = StyleSheet.create({
         color: colors.gray500,
     },
     priceValue: {
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: '700',
         color: colors.gray900,
     },
-    actionButtons: {
+    actionsRow: {
         flexDirection: 'row',
         gap: spacing.sm,
     },
-    actionBtn: {
-        paddingVertical: 12,
-        paddingHorizontal: 20,
-        borderRadius: borderRadius.lg,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    primaryBtn: {
+    primaryActionBtn: {
         backgroundColor: colors.primary,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: borderRadius.lg,
+    },
+    secondaryActionBtn: {
+        backgroundColor: colors.white,
+        borderWidth: 1,
+        borderColor: colors.gray200,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: borderRadius.lg,
     },
     primaryBtnText: {
         color: colors.white,
         fontWeight: '600',
-        fontSize: 15,
-    },
-    secondaryBtn: {
-        backgroundColor: colors.white,
-        borderWidth: 1,
-        borderColor: colors.gray200,
+        fontSize: 14,
     },
     secondaryBtnText: {
         color: colors.gray900,
         fontWeight: '600',
-        fontSize: 15,
+        fontSize: 14,
     },
-    editBtn: {
-        backgroundColor: colors.gray900,
-        width: 120,
-    },
-    editBtnText: {
-        color: colors.white,
-        fontWeight: '600',
-        fontSize: 15,
-    },
-    statusBadge: {
+    statusBadgeFull: {
         backgroundColor: '#DCFCE7',
-        paddingHorizontal: spacing.md,
+        paddingHorizontal: 16,
         paddingVertical: 10,
         borderRadius: borderRadius.lg,
     },
-    statusText: {
+    statusTextFull: {
         color: '#166534',
         fontWeight: '700',
     },
 
-    // Modals
-    modalContainer: {
+    // Modal
+    modalOverlay: {
         flex: 1,
         justifyContent: 'flex-end',
         backgroundColor: 'rgba(0,0,0,0.5)',
     },
     modalContent: {
         backgroundColor: colors.white,
-        borderTopLeftRadius: 30,
-        borderTopRightRadius: 30,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
         padding: spacing.xl,
-        maxHeight: '90%',
+        maxHeight: '80%',
     },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: spacing.xl,
+        marginBottom: spacing.lg,
     },
     modalTitle: {
         fontSize: 20,
         fontWeight: '700',
-        color: colors.gray900,
     },
     label: {
-        fontSize: 14,
+        marginTop: spacing.md,
+        marginBottom: 8,
         fontWeight: '600',
         color: colors.gray700,
-        marginBottom: spacing.sm,
-        marginTop: spacing.md,
     },
     inputBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.gray50,
         padding: spacing.md,
-        borderRadius: borderRadius.lg,
         borderWidth: 1,
         borderColor: colors.gray200,
+        borderRadius: borderRadius.lg,
+        gap: 12,
     },
     inputText: {
-        marginLeft: spacing.md,
         fontSize: 16,
         color: colors.gray900,
     },
     chipsContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: spacing.sm,
+        gap: 8,
+        marginTop: 8,
     },
     chip: {
         paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: borderRadius.full,
-        backgroundColor: colors.gray50,
+        paddingVertical: 8,
+        borderRadius: 100,
         borderWidth: 1,
         borderColor: colors.gray200,
     },
@@ -1105,7 +1258,6 @@ const styles = StyleSheet.create({
         borderColor: colors.primary,
     },
     chipText: {
-        fontSize: 14,
         color: colors.gray700,
     },
     chipTextActive: {
@@ -1113,65 +1265,72 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     fullWidthBtn: {
+        marginTop: spacing.xl,
         backgroundColor: colors.primary,
         padding: spacing.md,
         borderRadius: borderRadius.lg,
         alignItems: 'center',
-        marginTop: spacing.xl,
-        marginBottom: Platform.OS === 'ios' ? 20 : 0,
     },
     btnDisabled: {
         backgroundColor: colors.gray200,
     },
     btnText: {
         color: colors.white,
-        fontSize: 16,
         fontWeight: '700',
-    },
-    // Offer Modal specific
-    offerSubtitle: {
         fontSize: 16,
-        color: colors.gray600,
+    },
+    subtext: {
+        color: colors.gray500,
         marginBottom: spacing.lg,
     },
     amountInputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.gray50,
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
-        borderRadius: borderRadius.lg,
         borderWidth: 1,
         borderColor: colors.gray200,
+        borderRadius: borderRadius.lg,
+        paddingHorizontal: spacing.md,
         marginBottom: spacing.lg,
     },
     currencySymbol: {
         fontSize: 24,
         fontWeight: '600',
         color: colors.gray900,
-        marginRight: spacing.sm,
     },
     amountInput: {
         flex: 1,
         fontSize: 24,
         fontWeight: '600',
+        padding: spacing.md,
         color: colors.gray900,
     },
-    quickAmountRow: {
-        flexDirection: 'row',
-        gap: spacing.sm,
-        marginBottom: spacing.xl,
+    fullWidthBtnText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: colors.white,
     },
-    quickChip: {
+    // Image Modal Styles
+    imageModalContainer: {
         flex: 1,
-        paddingVertical: 8,
-        backgroundColor: colors.gray100,
-        borderRadius: borderRadius.md,
-        alignItems: 'center',
+        backgroundColor: 'black',
+        justifyContent: 'center',
     },
-    quickChipText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: colors.gray700,
+    closeImageBtn: {
+        position: 'absolute',
+        right: 20,
+        zIndex: 50,
+        padding: 8,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        borderRadius: 20,
+    },
+    imagePagination: {
+        position: 'absolute',
+        bottom: 40,
+        alignSelf: 'center',
+    },
+    imagePaginationText: {
+        color: 'white',
+        fontSize: 14,
+        fontWeight: '500',
     },
 });

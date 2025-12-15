@@ -8,6 +8,7 @@ import {
     ActivityIndicator,
     RefreshControl,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -130,7 +131,9 @@ export default function EarningsScreen() {
                 <View style={styles.kpiContainer}>
                     {/* Total Earned */}
                     <View style={styles.kpiCardPrimary}>
-                        <Text style={styles.kpiLabel}>💰 Total Payouts</Text>
+                        <Text style={styles.kpiLabel}>
+                            <Ionicons name="cash-outline" size={14} color="rgba(255,255,255,0.8)" /> Total Payouts
+                        </Text>
                         <Text style={styles.kpiValueLarge}>{formatCurrency(data.total_earned)}</Text>
                         <Text style={styles.kpiSubtext}>Lifetime earnings</Text>
                     </View>
@@ -138,14 +141,14 @@ export default function EarningsScreen() {
                     <View style={styles.kpiRow}>
                         {/* Pending */}
                         <View style={[styles.kpiCard, { backgroundColor: '#FEF3C7' }]}>
-                            <Text style={styles.kpiIcon}>⏳</Text>
+                            <Ionicons name="hourglass-outline" size={24} color="#D97706" style={{ marginBottom: 4 }} />
                             <Text style={styles.kpiValue}>{formatCurrency(data.pending_clearance)}</Text>
                             <Text style={styles.kpiLabelSmall}>Pending</Text>
                         </View>
 
                         {/* Growth */}
                         <View style={[styles.kpiCard, { backgroundColor: '#D1FAE5' }]}>
-                            <Text style={styles.kpiIcon}>📈</Text>
+                            <Ionicons name="trending-up" size={24} color={colors.success} style={{ marginBottom: 4 }} />
                             <Text style={[styles.kpiValue, { color: colors.success }]}>+12.5%</Text>
                             <Text style={styles.kpiLabelSmall}>Growth</Text>
                         </View>
@@ -154,7 +157,9 @@ export default function EarningsScreen() {
 
                 {/* Revenue Chart */}
                 <View style={styles.chartSection}>
-                    <Text style={styles.sectionTitle}>📊 Earnings History</Text>
+                    <Text style={styles.sectionTitle}>
+                        <Ionicons name="bar-chart-outline" size={20} color={colors.gray900} /> Earnings History
+                    </Text>
                     <View style={styles.chartContainer}>
                         {data.revenue_trend.map((item, index) => (
                             <TouchableOpacity key={`bar-${index}`} style={styles.barContainer} activeOpacity={1}>
@@ -175,7 +180,9 @@ export default function EarningsScreen() {
                 {/* Transactions */}
                 <View style={styles.transactionsSection}>
                     <View style={styles.transactionsHeader}>
-                        <Text style={styles.sectionTitle}>📋 Recent Payouts</Text>
+                        <Text style={styles.sectionTitle}>
+                            <Ionicons name="document-text-outline" size={20} color={colors.gray900} /> Recent Payouts
+                        </Text>
                         <TouchableOpacity>
                             <Text style={styles.exportBtn}>Export →</Text>
                         </TouchableOpacity>
@@ -183,7 +190,7 @@ export default function EarningsScreen() {
 
                     {data.transactions.length === 0 ? (
                         <View style={styles.emptyState}>
-                            <Text style={styles.emptyEmoji}>💸</Text>
+                            <Ionicons name="cash-outline" size={40} color={colors.gray400} style={{ marginBottom: 8 }} />
                             <Text style={styles.emptyTitle}>No payouts yet</Text>
                         </View>
                     ) : (
@@ -207,7 +214,9 @@ export default function EarningsScreen() {
                 {/* Next Payout */}
                 {data.pending_clearance > 0 && (
                     <View style={styles.nextPayoutCard}>
-                        <Text style={styles.nextPayoutLabel}>🗓️ Next Batch Payout</Text>
+                        <Text style={styles.nextPayoutLabel}>
+                            <Ionicons name="calendar-outline" size={14} color="#6366F1" /> Next Batch Payout
+                        </Text>
                         <Text style={styles.nextPayoutDate}>{data.next_payout}</Text>
                     </View>
                 )}

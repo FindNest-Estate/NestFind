@@ -11,6 +11,7 @@ import {
     Platform,
     ScrollView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -68,7 +69,7 @@ export default function Login() {
             >
                 {/* Logo Area */}
                 <View style={styles.logoContainer}>
-                    <Text style={styles.logo}>🏠</Text>
+                    <Ionicons name="home" size={64} color={colors.primary} style={{ marginBottom: spacing.sm }} />
                     <Text style={styles.appName}>NestFind</Text>
                     <Text style={styles.tagline}>Find your perfect home</Text>
                 </View>
@@ -143,10 +144,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: spacing.xxl,
     },
-    logo: {
-        fontSize: 64,
-        marginBottom: spacing.sm,
-    },
+    // logo style removed
     appName: {
         ...typography.h1,
         color: colors.primary,

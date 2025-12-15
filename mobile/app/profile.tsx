@@ -7,7 +7,9 @@ import {
     Alert,
     ScrollView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNav from '../components/BottomNav';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
@@ -15,6 +17,7 @@ import { colors, spacing, borderRadius, typography } from '../constants/theme';
 export default function Profile() {
     const [user, setUser] = useState<any>(null);
     const router = useRouter();
+    const insets = useSafeAreaInsets();
 
     useEffect(() => {
         loadUser();
@@ -51,16 +54,16 @@ export default function Profile() {
     };
 
     const menuItems = [
-        { icon: '📋', label: 'My Visits', route: '/my-visits' },
-        { icon: '❤️', label: 'Saved Properties', route: '/saved' },
-        { icon: '⚙️', label: 'Settings', route: '/settings' },
-        { icon: '❓', label: 'Help & Support', route: '/help' },
+        { icon: 'clipboard-outline', label: 'My Visits', route: '/my-visits' },
+        { icon: 'heart-outline', label: 'Saved Properties', route: '/saved' },
+        { icon: 'settings-outline', label: 'Settings', route: '/settings' },
+        { icon: 'help-circle-outline', label: 'Help & Support', route: '/help' },
     ];
 
     return (
         <View style={styles.container}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top }]}>
                 <TouchableOpacity onPress={() => router.back()}>
                     <Text style={styles.backButton}>← Back</Text>
                 </TouchableOpacity>
@@ -95,9 +98,9 @@ export default function Profile() {
                             style={styles.menuItem}
                             onPress={() => router.push(item.route as any)}
                         >
-                            <Text style={styles.menuIcon}>{item.icon}</Text>
+                            <Ionicons name={item.icon as any} size={24} color={colors.gray700} style={{ marginRight: spacing.md }} />
                             <Text style={styles.menuLabel}>{item.label}</Text>
-                            <Text style={styles.menuArrow}>→</Text>
+                            <Ionicons name="chevron-forward" size={20} color={colors.gray400} />
                         </TouchableOpacity>
                     ))}
                 </View>
@@ -198,7 +201,7 @@ const styles = StyleSheet.create({
         backgroundColor: colors.white,
     },
     menuIcon: {
-        fontSize: 24,
+        // fontSize: 24, (removed)
         marginRight: spacing.md,
     },
     menuLabel: {
@@ -207,7 +210,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     menuArrow: {
-        ...typography.body,
+        // ...typography.body, (removed)
         color: colors.gray400,
     },
     logoutButton: {

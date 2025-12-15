@@ -91,6 +91,18 @@ def add_favorite(
     db.refresh(new_favorite)
     return new_favorite
 
+@router.get("/favorites/check/{property_id}")
+def check_favorite(
+    property_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    exists = db.query(models.Favorite).filter(
+        models.Favorite.user_id == current_user.id,
+        models.Favorite.property_id == property_id
+    ).first() is not None
+    return {"is_favorite": exists}
+
 @router.delete("/favorites/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_favorite(
     property_id: int,

@@ -13,9 +13,11 @@ import {
     Platform,
     Image,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BottomNav from '../../components/BottomNav';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
@@ -439,7 +441,7 @@ export default function AgentDashboard() {
                     <View style={styles.headerTop}>
                         <View>
                             <Text style={styles.greeting}>Agent Dashboard</Text>
-                            <Text style={styles.subtitle}>Hello, {user?.first_name}! 🏠</Text>
+                            <Text style={styles.subtitle}>Hello, {user?.first_name}!</Text>
                         </View>
                         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
                             <Text style={styles.logoutText}>Logout</Text>
@@ -450,22 +452,22 @@ export default function AgentDashboard() {
                 {/* Stats */}
                 <View style={styles.statsContainer}>
                     <View style={[styles.statCard, { backgroundColor: '#FEF3C7' }]}>
-                        <Text style={styles.statIcon}>⏳</Text>
+                        <Ionicons name="time-outline" size={24} color="#D97706" style={{ marginBottom: 8 }} />
                         <Text style={styles.statNumber}>{pendingCount}</Text>
                         <Text style={styles.statLabel}>Pending</Text>
                     </View>
                     <View style={[styles.statCard, { backgroundColor: '#DBEAFE' }]}>
-                        <Text style={styles.statIcon}>📅</Text>
+                        <Ionicons name="calendar-outline" size={24} color="#2563EB" style={{ marginBottom: 8 }} />
                         <Text style={styles.statNumber}>{todayCount}</Text>
                         <Text style={styles.statLabel}>Today</Text>
                     </View>
                     <View style={[styles.statCard, { backgroundColor: '#D1FAE5' }]}>
-                        <Text style={styles.statIcon}>✅</Text>
+                        <Ionicons name="checkmark-circle-outline" size={24} color="#059669" style={{ marginBottom: 8 }} />
                         <Text style={styles.statNumber}>{completedCount}</Text>
                         <Text style={styles.statLabel}>Completed</Text>
                     </View>
                     <View style={[styles.statCard, { backgroundColor: '#E0E7FF' }]}>
-                        <Text style={styles.statIcon}>🏠</Text>
+                        <Ionicons name="home-outline" size={24} color="#4F46E5" style={{ marginBottom: 8 }} />
                         <Text style={styles.statNumber}>{totalListings}</Text>
                         <Text style={styles.statLabel}>Listings</Text>
                     </View>
@@ -475,19 +477,19 @@ export default function AgentDashboard() {
                 <Text style={styles.sectionTitle}>Quick Actions</Text>
                 <View style={styles.actionsRow}>
                     <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/agent/add-property')}>
-                        <Text style={styles.actionCardIcon}>➕</Text>
+                        <Ionicons name="add-circle-outline" size={28} color={colors.primary} style={{ marginBottom: 8 }} />
                         <Text style={styles.actionCardLabel}>Add Property</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.actionCard} onPress={() => setActiveTab('listings')}>
-                        <Text style={styles.actionCardIcon}>🏠</Text>
+                        <Ionicons name="list-outline" size={28} color={colors.primary} style={{ marginBottom: 8 }} />
                         <Text style={styles.actionCardLabel}>My Listings</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/chat')}>
-                        <Text style={styles.actionCardIcon}>💬</Text>
-                        <Text style={styles.actionCardLabel}>Messages</Text>
+                    <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/dashboard/deals' as any)}>
+                        <Ionicons name="document-text-outline" size={28} color={colors.primary} style={{ marginBottom: 8 }} />
+                        <Text style={styles.actionCardLabel}>Deals</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.actionCard} onPress={() => router.push('/agent/earnings')}>
-                        <Text style={styles.actionCardIcon}>💰</Text>
+                        <Ionicons name="cash-outline" size={28} color={colors.primary} style={{ marginBottom: 8 }} />
                         <Text style={styles.actionCardLabel}>Earnings</Text>
                     </TouchableOpacity>
                 </View>
@@ -573,7 +575,7 @@ export default function AgentDashboard() {
                             ))
                         ) : (
                             <View style={styles.emptyState}>
-                                <Text style={styles.emptyEmoji}>✅</Text>
+                                <Ionicons name="checkmark-done-circle-outline" size={48} color={colors.gray200} style={{ marginBottom: 16 }} />
                                 <Text style={styles.emptyTitle}>All caught up!</Text>
                                 <Text style={styles.emptyText}>No pending requests</Text>
                             </View>
@@ -608,7 +610,9 @@ export default function AgentDashboard() {
                                                 style={styles.startBtn}
                                                 onPress={() => handleGenerateOTP(visit.id)}
                                             >
-                                                <Text style={styles.startBtnText}>🔐 Start Visit</Text>
+                                                <Text style={styles.startBtnText}>
+                                                    <Ionicons name="key-outline" size={16} color={colors.white} /> Start Visit
+                                                </Text>
                                             </TouchableOpacity>
                                         )}
                                         {visit.status === 'IN_PROGRESS' && (
@@ -628,7 +632,9 @@ export default function AgentDashboard() {
                                                     uploading: false
                                                 })}
                                             >
-                                                <Text style={styles.completeBtnText}>✓ Complete Visit</Text>
+                                                <Text style={styles.completeBtnText}>
+                                                    <Ionicons name="checkmark-circle-outline" size={16} color={colors.white} /> Complete Visit
+                                                </Text>
                                             </TouchableOpacity>
                                         )}
                                     </View>
@@ -636,7 +642,7 @@ export default function AgentDashboard() {
                             ))
                         ) : (
                             <View style={styles.emptyState}>
-                                <Text style={styles.emptyEmoji}>📅</Text>
+                                <Ionicons name="calendar-outline" size={48} color={colors.gray200} style={{ marginBottom: 16 }} />
                                 <Text style={styles.emptyTitle}>No upcoming visits</Text>
                             </View>
                         )
@@ -649,11 +655,11 @@ export default function AgentDashboard() {
                                 <TouchableOpacity key={`prop-${prop.id}-${idx}`} style={styles.listingCard} activeOpacity={1}>
                                     <View style={styles.listingHeader}>
                                         <View style={styles.listingImageContainer}>
-                                            <Text style={styles.listingEmoji}>🏠</Text>
+                                            <Ionicons name="image-outline" size={24} color={colors.gray400} />
                                         </View>
                                         <View style={styles.listingInfo}>
                                             <Text style={styles.listingTitle} numberOfLines={1}>{prop.title}</Text>
-                                            <Text style={styles.listingCity}>📍 {prop.city}</Text>
+                                            <Text style={styles.listingCity}><Ionicons name="location-outline" size={12} /> {prop.city}</Text>
                                             <Text style={styles.listingPrice}>₹{prop.price?.toLocaleString()}</Text>
                                         </View>
                                         <View style={[styles.listingStatus,
@@ -669,13 +675,17 @@ export default function AgentDashboard() {
                                             style={styles.listingActionBtn}
                                             onPress={() => router.push(`/property/${prop.id}`)}
                                         >
-                                            <Text style={styles.listingActionText}>👁️ View</Text>
+                                            <Text style={styles.listingActionText}>
+                                                <Ionicons name="eye-outline" size={14} color={colors.gray700} /> View
+                                            </Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={styles.listingActionBtn}
                                             onPress={() => Alert.alert('Edit', 'Edit property feature coming soon')}
                                         >
-                                            <Text style={styles.listingActionText}>✏️ Edit</Text>
+                                            <Text style={styles.listingActionText}>
+                                                <Ionicons name="pencil-outline" size={14} color={colors.gray700} /> Edit
+                                            </Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[styles.listingActionBtn, styles.listingDeleteBtn]}
@@ -705,14 +715,16 @@ export default function AgentDashboard() {
                                                 );
                                             }}
                                         >
-                                            <Text style={styles.listingDeleteText}>🗑️ Delete</Text>
+                                            <Text style={styles.listingDeleteText}>
+                                                <Ionicons name="trash-outline" size={14} color={colors.error} /> Delete
+                                            </Text>
                                         </TouchableOpacity>
                                     </View>
                                 </TouchableOpacity>
                             ))
                         ) : (
                             <View style={styles.emptyState}>
-                                <Text style={styles.emptyEmoji}>🏡</Text>
+                                <Ionicons name="home-outline" size={48} color={colors.gray200} style={{ marginBottom: 16 }} />
                                 <Text style={styles.emptyTitle}>No listings yet</Text>
                                 <TouchableOpacity
                                     style={styles.addButton}
@@ -728,12 +740,14 @@ export default function AgentDashboard() {
                 <View style={{ height: spacing.xxl }} />
             </ScrollView>
 
+            <BottomNav />
+
             {/* OTP Modal */}
             <Modal visible={otpModal.show} transparent animationType="fade">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.otpHeader}>
-                            <Text style={styles.otpIcon}>🔐</Text>
+                            <Ionicons name="lock-closed-outline" size={48} color={colors.primary} style={{ marginBottom: 16 }} />
                             <Text style={styles.modalTitle}>Security Check</Text>
                         </View>
                         <Text style={styles.modalText}>Ask the buyer for the 4-digit code displayed on their app</Text>
@@ -774,7 +788,9 @@ export default function AgentDashboard() {
                         <Text style={styles.modalText}>Select a different date and time for this visit</Text>
 
                         {/* Date Picker */}
-                        <Text style={styles.fieldLabel}>📆 Select Date</Text>
+                        <Text style={styles.fieldLabel}>
+                            <Ionicons name="calendar-outline" size={14} color={colors.gray700} /> Select Date
+                        </Text>
                         <TouchableOpacity
                             style={styles.datePickerBtn}
                             onPress={() => setCounterModal(prev => ({ ...prev, showDatePicker: true }))}
@@ -787,7 +803,7 @@ export default function AgentDashboard() {
                                     year: 'numeric'
                                 })}
                             </Text>
-                            <Text>📅</Text>
+                            <Ionicons name="calendar" size={20} color={colors.gray500} />
                         </TouchableOpacity>
 
                         {counterModal.showDatePicker && (
@@ -806,7 +822,9 @@ export default function AgentDashboard() {
                         )}
 
                         {/* Time Slots */}
-                        <Text style={styles.fieldLabel}>⏰ Select Time</Text>
+                        <Text style={styles.fieldLabel}>
+                            <Ionicons name="time-outline" size={14} color={colors.gray700} /> Select Time
+                        </Text>
                         <View style={styles.timeSlotsGrid}>
                             {['09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM'].map((slot) => (
                                 <TouchableOpacity
@@ -828,7 +846,9 @@ export default function AgentDashboard() {
                         </View>
 
                         {/* Reason Message */}
-                        <Text style={styles.fieldLabel}>💬 Reason (Optional)</Text>
+                        <Text style={styles.fieldLabel}>
+                            <Ionicons name="chatbubble-outline" size={14} color={colors.gray700} /> Reason (Optional)
+                        </Text>
                         <TextInput
                             style={styles.counterMessageInput}
                             placeholder="Why are you proposing a different time?"
@@ -915,7 +935,9 @@ export default function AgentDashboard() {
                             </View>
 
                             {/* Location Capture */}
-                            <Text style={styles.fieldLabel}>📍 Location Verification</Text>
+                            <Text style={styles.fieldLabel}>
+                                <Ionicons name="navigate-circle-outline" size={14} color={colors.gray700} /> Location Verification
+                            </Text>
                             <TouchableOpacity
                                 style={[
                                     styles.locationBtn,
@@ -928,30 +950,42 @@ export default function AgentDashboard() {
                                 {completeModal.locationStatus === 'loading' ? (
                                     <ActivityIndicator size="small" color={colors.primary} />
                                 ) : completeModal.locationStatus === 'success' ? (
-                                    <Text style={styles.locationBtnTextSuccess}>✅ Location Captured</Text>
+                                    <Text style={styles.locationBtnTextSuccess}>
+                                        <Ionicons name="checkmark-circle" size={14} /> Location Captured
+                                    </Text>
                                 ) : completeModal.locationStatus === 'error' ? (
-                                    <Text style={styles.locationBtnTextError}>❌ Retry Location</Text>
+                                    <Text style={styles.locationBtnTextError}>
+                                        <Ionicons name="alert-circle" size={14} /> Retry Location
+                                    </Text>
                                 ) : (
-                                    <Text style={styles.locationBtnText}>📍 Capture Current Location</Text>
+                                    <Text style={styles.locationBtnText}>
+                                        <Ionicons name="navigate-outline" size={14} /> Capture Current Location
+                                    </Text>
                                 )}
                             </TouchableOpacity>
 
                             {/* Image Upload */}
-                            <Text style={styles.fieldLabel}>📷 Visit Photos</Text>
+                            <Text style={styles.fieldLabel}>
+                                <Ionicons name="camera-outline" size={14} color={colors.gray700} /> Visit Photos
+                            </Text>
                             <View style={styles.imageButtonsRow}>
                                 <TouchableOpacity
                                     style={styles.imageBtn}
                                     onPress={handleTakePhoto}
                                     disabled={completeModal.uploading}
                                 >
-                                    <Text style={styles.imageBtnText}>📷 Camera</Text>
+                                    <Text style={styles.imageBtnText}>
+                                        <Ionicons name="camera" size={14} color={colors.gray700} /> Camera
+                                    </Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={styles.imageBtn}
                                     onPress={handlePickImage}
                                     disabled={completeModal.uploading}
                                 >
-                                    <Text style={styles.imageBtnText}>🖼️ Gallery</Text>
+                                    <Text style={styles.imageBtnText}>
+                                        <Ionicons name="images" size={14} color={colors.gray700} /> Gallery
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
                             {completeModal.uploading && (
@@ -1013,6 +1047,7 @@ export default function AgentDashboard() {
                     </ScrollView>
                 </View>
             </Modal>
+            <BottomNav />
         </View>
     );
 }

@@ -12,6 +12,7 @@ import {
     Image,
     ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -247,7 +248,7 @@ export default function EditPropertyScreen() {
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()}>
-                    <Text style={styles.backBtn}>← Cancel</Text>
+                    <Text style={styles.backBtn}><Ionicons name="arrow-back" size={16} /> Cancel</Text>
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Edit Property</Text>
                 <View style={{ width: 60 }} />
@@ -256,7 +257,9 @@ export default function EditPropertyScreen() {
             <ScrollView showsVerticalScrollIndicator={false} style={styles.content}>
                 {/* Basic Info Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>📋 Basic Information</Text>
+                    <Text style={styles.sectionTitle}>
+                        <Ionicons name="clipboard-outline" size={20} color={colors.gray900} /> Basic Information
+                    </Text>
 
                     <Text style={styles.label}>Title *</Text>
                     <TextInput
@@ -290,7 +293,11 @@ export default function EditPropertyScreen() {
                                 onPress={() => updateForm('listing_type', type)}
                             >
                                 <Text style={[styles.listingTypeBtnText, form.listing_type === type && styles.listingTypeBtnTextActive]}>
-                                    {type === 'sale' ? '🏠 For Sale' : '🔑 For Rent'}
+                                    {type === 'sale' ? (
+                                        <><Ionicons name="home-outline" size={14} /> For Sale</>
+                                    ) : (
+                                        <><Ionicons name="key-outline" size={14} /> For Rent</>
+                                    )}
                                 </Text>
                             </TouchableOpacity>
                         ))}
@@ -308,7 +315,9 @@ export default function EditPropertyScreen() {
 
                 {/* Location Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>📍 Location</Text>
+                    <Text style={styles.sectionTitle}>
+                        <Ionicons name="location-outline" size={20} color={colors.gray900} /> Location
+                    </Text>
 
                     <Text style={styles.label}>Address</Text>
                     <TextInput
@@ -347,7 +356,9 @@ export default function EditPropertyScreen() {
                         {fetchingLocation ? (
                             <ActivityIndicator color={colors.white} />
                         ) : (
-                            <Text style={styles.locationBtnText}>📍 Update Current Location</Text>
+                            <Text style={styles.locationBtnText}>
+                                <Ionicons name="navigate-outline" size={16} color={colors.white} /> Update Current Location
+                            </Text>
                         )}
                     </TouchableOpacity>
 
@@ -360,7 +371,9 @@ export default function EditPropertyScreen() {
 
                 {/* Details Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>🏡 Property Details</Text>
+                    <Text style={styles.sectionTitle}>
+                        <Ionicons name="home-outline" size={20} color={colors.gray900} /> Property Details
+                    </Text>
 
                     <View style={styles.row}>
                         <View style={styles.thirdInput}>
@@ -423,7 +436,9 @@ export default function EditPropertyScreen() {
 
                 {/* Images Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>📷 Property Photos</Text>
+                    <Text style={styles.sectionTitle}>
+                        <Ionicons name="camera-outline" size={20} color={colors.gray900} /> Property Photos
+                    </Text>
 
                     {/* Existing Images */}
                     {existingImages.length > 0 && (
@@ -438,7 +453,7 @@ export default function EditPropertyScreen() {
                                         style={styles.removeImageBtn}
                                         onPress={() => removeExistingImage(img.id)}
                                     >
-                                        <Text style={styles.removeImageText}>✕</Text>
+                                        <Ionicons name="close" size={14} color={colors.white} />
                                     </TouchableOpacity>
                                     {index === 0 && (
                                         <View style={styles.coverBadge}>
@@ -460,7 +475,7 @@ export default function EditPropertyScreen() {
                                         style={styles.removeImageBtn}
                                         onPress={() => removeNewImage(index)}
                                     >
-                                        <Text style={styles.removeImageText}>✕</Text>
+                                        <Ionicons name="close" size={14} color={colors.white} />
                                     </TouchableOpacity>
                                     <View style={styles.newBadge}>
                                         <Text style={styles.newBadgeText}>New</Text>
@@ -471,7 +486,9 @@ export default function EditPropertyScreen() {
                     )}
 
                     <TouchableOpacity style={styles.addImageBtn} onPress={pickImage}>
-                        <Text style={styles.addImageBtnText}>+ Add More Photos</Text>
+                        <Text style={styles.addImageBtnText}>
+                            <Ionicons name="add" size={16} /> Add More Photos
+                        </Text>
                     </TouchableOpacity>
                 </View>
 
@@ -488,7 +505,9 @@ export default function EditPropertyScreen() {
                     {saving ? (
                         <ActivityIndicator color={colors.white} />
                     ) : (
-                        <Text style={styles.saveBtnText}>💾 Save Changes</Text>
+                        <Text style={styles.saveBtnText}>
+                            <Ionicons name="save-outline" size={18} color={colors.white} /> Save Changes
+                        </Text>
                     )}
                 </TouchableOpacity>
             </View>

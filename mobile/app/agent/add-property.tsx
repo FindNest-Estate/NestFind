@@ -13,6 +13,7 @@ import {
     Linking,
     ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -230,7 +231,9 @@ export default function AddPropertyScreen() {
                 {/* Step 1: Basic Info */}
                 {step === 1 && (
                     <View style={styles.stepContent}>
-                        <Text style={styles.stepTitle}>📝 Basic Information</Text>
+                        <Text style={styles.stepTitle}>
+                            <Ionicons name="clipboard-outline" size={20} color={colors.gray900} /> Basic Information
+                        </Text>
 
                         <Text style={styles.label}>Property Title *</Text>
                         <TextInput
@@ -264,7 +267,11 @@ export default function AddPropertyScreen() {
                                     onPress={() => updateForm('listing_type', type)}
                                 >
                                     <Text style={[styles.optionBtnText, form.listing_type === type && styles.optionBtnTextActive]}>
-                                        {type === 'sale' ? '🏠 For Sale' : '🔑 For Rent'}
+                                        {type === 'sale' ? (
+                                            <><Ionicons name="home-outline" size={14} /> For Sale</>
+                                        ) : (
+                                            <><Ionicons name="key-outline" size={14} /> For Rent</>
+                                        )}
                                     </Text>
                                 </TouchableOpacity>
                             ))}
@@ -284,7 +291,9 @@ export default function AddPropertyScreen() {
                 {/* Step 2: Location */}
                 {step === 2 && (
                     <View style={styles.stepContent}>
-                        <Text style={styles.stepTitle}>📍 Location Details</Text>
+                        <Text style={styles.stepTitle}>
+                            <Ionicons name="location-outline" size={20} color={colors.gray900} /> Location Details
+                        </Text>
 
                         <Text style={styles.label}>Address *</Text>
                         <TextInput
@@ -326,7 +335,9 @@ export default function AddPropertyScreen() {
 
                         {/* Map Coordinates */}
                         <View style={styles.mapSection}>
-                            <Text style={styles.mapTitle}>🗺️ Map Location</Text>
+                            <Text style={styles.mapTitle}>
+                                <Ionicons name="map-outline" size={16} color={colors.gray900} /> Map Location
+                            </Text>
                             <Text style={styles.mapHint}>Use GPS or enter coordinates manually</Text>
 
                             {/* Use Current Location Button */}
@@ -357,7 +368,9 @@ export default function AddPropertyScreen() {
                                 {fetchingLocation ? (
                                     <ActivityIndicator size="small" color={colors.white} />
                                 ) : (
-                                    <Text style={styles.useLocationBtnText}>📍 Use Current Location</Text>
+                                    <Text style={styles.useLocationBtnText}>
+                                        <Ionicons name="navigate-outline" size={16} color={colors.white} /> Use Current Location
+                                    </Text>
                                 )}
                             </TouchableOpacity>
 
@@ -393,8 +406,10 @@ export default function AddPropertyScreen() {
                                     onPress={() => Linking.openURL(`https://www.google.com/maps?q=${form.latitude},${form.longitude}`)}
                                 >
                                     <View style={styles.mapPlaceholder}>
-                                        <Text style={styles.mapPlaceholderEmoji}>🗺️</Text>
-                                        <Text style={styles.mapPlaceholderText}>📍 {form.latitude}, {form.longitude}</Text>
+                                        <Ionicons name="map-outline" size={40} color={colors.gray400} style={{ marginBottom: 8 }} />
+                                        <Text style={styles.mapPlaceholderText}>
+                                            <Ionicons name="pin" size={14} /> {form.latitude}, {form.longitude}
+                                        </Text>
                                         <Text style={styles.mapTapHint}>Tap to view in Google Maps</Text>
                                     </View>
                                 </TouchableOpacity>
@@ -406,7 +421,9 @@ export default function AddPropertyScreen() {
                 {/* Step 3: Details */}
                 {step === 3 && (
                     <View style={styles.stepContent}>
-                        <Text style={styles.stepTitle}>🏡 Property Details</Text>
+                        <Text style={styles.stepTitle}>
+                            <Ionicons name="home-outline" size={20} color={colors.gray900} /> Property Details
+                        </Text>
 
                         <View style={styles.row}>
                             <View style={styles.halfInput}>
@@ -466,17 +483,19 @@ export default function AddPropertyScreen() {
 
                         {/* Image Upload Section */}
                         <View style={styles.imageSection}>
-                            <Text style={styles.imageSectionTitle}>📷 Property Photos</Text>
+                            <Text style={styles.imageSectionTitle}>
+                                <Ionicons name="camera-outline" size={16} color={colors.gray900} /> Property Photos
+                            </Text>
                             <Text style={styles.imageSectionHint}>Add up to 10 photos of your property</Text>
 
                             {/* Upload Buttons */}
                             <View style={styles.imageButtonsRow}>
                                 <TouchableOpacity style={styles.imagePickBtn} onPress={pickImage}>
-                                    <Text style={styles.imagePickBtnIcon}>🖼️</Text>
+                                    <Ionicons name="images-outline" size={24} color={colors.primary} style={{ marginBottom: 4 }} />
                                     <Text style={styles.imagePickBtnText}>Gallery</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={styles.imagePickBtn} onPress={takePhoto}>
-                                    <Text style={styles.imagePickBtnIcon}>📸</Text>
+                                    <Ionicons name="camera-outline" size={24} color={colors.primary} style={{ marginBottom: 4 }} />
                                     <Text style={styles.imagePickBtnText}>Camera</Text>
                                 </TouchableOpacity>
                             </View>
@@ -491,7 +510,7 @@ export default function AddPropertyScreen() {
                                                 style={styles.removeImageBtn}
                                                 onPress={() => removeImage(index)}
                                             >
-                                                <Text style={styles.removeImageBtnText}>✕</Text>
+                                                <Ionicons name="close" size={14} color={colors.white} />
                                             </TouchableOpacity>
                                             {index === 0 && (
                                                 <View style={styles.coverBadge}>
@@ -511,7 +530,9 @@ export default function AddPropertyScreen() {
                 {/* Step 4: Review */}
                 {step === 4 && (
                     <View style={styles.stepContent}>
-                        <Text style={styles.stepTitle}>✅ Review & Submit</Text>
+                        <Text style={styles.stepTitle}>
+                            <Ionicons name="checkmark-circle-outline" size={20} color={colors.gray900} /> Review & Submit
+                        </Text>
 
                         <View style={styles.reviewCard}>
                             <Text style={styles.reviewLabel}>Title</Text>
@@ -528,11 +549,11 @@ export default function AddPropertyScreen() {
 
                             <Text style={styles.reviewLabel}>Features</Text>
                             <Text style={styles.reviewValue}>
-                                🛏️ {form.bedrooms || 0} beds • 🚿 {form.bathrooms || 0} baths • 📐 {form.area || 0} sqft
+                                <Ionicons name="bed-outline" size={12} /> {form.bedrooms || 0} beds • <Ionicons name="water-outline" size={12} /> {form.bathrooms || 0} baths • <Ionicons name="scan-outline" size={12} /> {form.area || 0} sqft
                             </Text>
 
                             <Text style={styles.reviewLabel}>Photos</Text>
-                            <Text style={styles.reviewValue}>📷 {images.length} photos added</Text>
+                            <Text style={styles.reviewValue}><Ionicons name="camera-outline" size={12} /> {images.length} photos added</Text>
                         </View>
                     </View>
                 )}
@@ -559,7 +580,7 @@ export default function AddPropertyScreen() {
                         disabled={loading}
                     >
                         <Text style={styles.submitBtnText}>
-                            {loading ? 'Submitting...' : '🚀 List Property'}
+                            {loading ? 'Submitting...' : <><Ionicons name="rocket-outline" size={18} color={colors.white} /> List Property</>}
                         </Text>
                     </TouchableOpacity>
                 )}
