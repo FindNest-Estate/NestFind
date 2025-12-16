@@ -16,6 +16,17 @@ class VisitStatusEnum(PyEnum):
     CANCELLED = "CANCELLED"
     EXPIRED = "EXPIRED"
 
+class AgentClientStatus(PyEnum):
+    REQUESTED = "REQUESTED"
+    OFFER_SENT = "OFFER_SENT"
+    ACTIVE = "ACTIVE"
+    COMPLETED = "COMPLETED"
+    REJECTED = "REJECTED"
+
+class AgentClientServiceType(PyEnum):
+    BUYING = "BUYING"
+    SELLING = "SELLING"
+
 class User(Base):
     __tablename__ = "users"
 
@@ -39,6 +50,7 @@ class User(Base):
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     service_radius = Column(Integer, default=50) # km
+    service_areas = Column(String, default="") # Comma-separated list of areas
     commission_rate = Column(Float, default=2.0) # %
     is_available = Column(Boolean, default=True) # Online/Offline
     
@@ -50,7 +62,17 @@ class User(Base):
     received_messages = relationship("Message", foreign_keys="Message.receiver_id", back_populates="receiver")
     favorites = relationship("Favorite", back_populates="user")
     recently_viewed = relationship("RecentlyViewed", back_populates="user", order_by="desc(RecentlyViewed.viewed_at)")
+    favorites = relationship("Favorite", back_populates="user")
+    recently_viewed = relationship("RecentlyViewed", back_populates="user", order_by="desc(RecentlyViewed.viewed_at)")
     offers = relationship("Offer", back_populates="buyer")
+
+    # Agent Relations
+    agent_clients = relationship("AgentClient", foreign_keys="[AgentClient.agent_id]", back_populates="agent")
+    my_agents = relationship("AgentClient", foreign_keys="[AgentClient.client_id]", back_populates="client")
+
+    # Agent Relations
+    agent_clients = relationship("AgentClient", foreign_keys="[AgentClient.agent_id]", back_populates="agent")
+    my_agents = relationship("AgentClient", foreign_keys="[AgentClient.client_id]", back_populates="client")
 
 
 class Property(Base):
@@ -480,3 +502,41 @@ class SupportTicket(Base):
 
     user = relationship("User")
     assigned_to = relationship("AdminUser")
+
+
+class BankOffer(Base):
+    __tablename__ = "bank_offers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    bank_name = Column(String, nullable=False)
+    bank_logo_icon = Column(String, nullable=False) # Ionicon name e.g., 'logo-bitcoin'
+    interest_rate = Column(String, nullable=False) # e.g. '8.35%'
+    processing_fee = Column(String, nullable=False) # e.g. '0.5%'
+    max_tenure_years = Column(Integer, default=20)
+    
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class AgentClient(Base):
+    __tablename__ = "agent_clients"
+
+    id = Column(Integer, primary_key=True, index=True)
+    agent_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    client_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    service_type = Column(String, nullable=False) # 'BUYING', 'SELLING'
+    status = Column(String, default="REQUESTED", nullable=False) # REQUESTED, OFFER_SENT, ACTIVE, COMPLETED, REJECTED
+    
+    commission_rate = Column(Float, nullable=True) # Proposed/Agreed commission %
+    contract_url = Column(String, nullable=True) # Signed digital agreement
+    
+    property_preferences = Column(JSON, nullable=True) # Buy criteria or Sell property details
+    initial_message = Column(Text, nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+
+    agent = relationship("User", foreign_keys=[agent_id], back_populates="agent_clients")
+    client = relationship("User", foreign_keys=[client_id], back_populates="my_agents")
+

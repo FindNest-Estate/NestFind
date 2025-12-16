@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import Navbar from "@/components/navbar/Navbar";
 import AgentListView from "@/components/agents/AgentListView";
 import AgentMapView from "@/components/agents/AgentMapView";
+import HireAgentModal from "@/components/agents/hire/HireAgentModal";
 
 export default function FindAgentPage() {
     const [agents, setAgents] = useState<any[]>([]);
@@ -15,16 +16,24 @@ export default function FindAgentPage() {
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [sortBy, setSortBy] = useState("Recommended");
+    const [selectedAgent, setSelectedAgent] = useState<any>(null);
+    const [isHireModalOpen, setIsHireModalOpen] = useState(false);
 
-    // Fetch agents on mount
+    // Fetch agents when searchTerm changes (Debounced)
     useEffect(() => {
-        fetchAllAgents();
-    }, []);
+        const timer = setTimeout(() => {
+            fetchAgents();
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
-    const fetchAllAgents = async () => {
+    const fetchAgents = async () => {
         try {
             setLoading(true);
-            const data = await api.agents.listAll({ limit: 50 });
+            const data = await api.agents.listAll({
+                limit: 50,
+                search: searchTerm
+            });
             setAgents(data || []);
         } catch (error) {
             console.error("Failed to fetch agents", error);
@@ -64,13 +73,6 @@ export default function FindAgentPage() {
             }
         );
     };
-
-    const filteredAgents = (agents || []).filter(agent =>
-        agent?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        agent?.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        agent?.agency_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        agent?.specialty?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
 
     return (
         <div className="min-h-screen bg-white font-sans selection:bg-rose-100 selection:text-rose-900">
@@ -130,8 +132,8 @@ export default function FindAgentPage() {
                             <button
                                 onClick={() => setViewMode("list")}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === "list"
-                                        ? "bg-white text-gray-900 shadow-sm"
-                                        : "text-gray-500 hover:text-gray-700"
+                                    ? "bg-white text-gray-900 shadow-sm"
+                                    : "text-gray-500 hover:text-gray-700"
                                     }`}
                             >
                                 <List size={18} />
@@ -140,8 +142,8 @@ export default function FindAgentPage() {
                             <button
                                 onClick={() => setViewMode("map")}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === "map"
-                                        ? "bg-white text-gray-900 shadow-sm"
-                                        : "text-gray-500 hover:text-gray-700"
+                                    ? "bg-white text-gray-900 shadow-sm"
+                                    : "text-gray-500 hover:text-gray-700"
                                     }`}
                             >
                                 <MapIcon size={18} />
@@ -150,7 +152,7 @@ export default function FindAgentPage() {
                         </div>
                         <div className="h-8 w-px bg-gray-200" />
                         <span className="text-sm font-medium text-gray-500">
-                            Showing <span className="text-gray-900 font-bold">{filteredAgents.length}</span> agents
+                            Showing <span className="text-gray-900 font-bold">{agents.length}</span> agents
                         </span>
                     </div>
 
@@ -190,17 +192,27 @@ export default function FindAgentPage() {
                 <div className="min-h-[600px]">
                     {viewMode === "list" ? (
                         <AgentListView
-                            agents={filteredAgents}
+                            agents={agents}
                             loading={loading}
                             searchTerm={searchTerm}
+                            onHire={(agent) => {
+                                setSelectedAgent(agent);
+                                setIsHireModalOpen(true);
+                            }}
                         />
                     ) : (
                         <AgentMapView
-                            agents={filteredAgents}
+                            agents={agents}
                             userLocation={userLocation}
                         />
                     )}
                 </div>
+
+                <HireAgentModal
+                    isOpen={isHireModalOpen}
+                    onClose={() => setIsHireModalOpen(false)}
+                    agent={selectedAgent}
+                />
             </div>
         </div>
     );

@@ -740,7 +740,7 @@ export default function AgentDashboard() {
                 <View style={{ height: spacing.xxl }} />
             </ScrollView>
 
-            <BottomNav />
+
 
             {/* OTP Modal */}
             <Modal visible={otpModal.show} transparent animationType="fade">

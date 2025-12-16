@@ -2,14 +2,18 @@
 
 import AgentCard from "./AgentCard";
 import { User, ShieldCheck } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface AgentListViewProps {
     agents: any[];
     loading?: boolean;
     searchTerm: string;
+    onHire?: (agent: any) => void;
 }
 
-export default function AgentListView({ agents, loading, searchTerm }: AgentListViewProps) {
+export default function AgentListView({ agents, loading, searchTerm, onHire }: AgentListViewProps) {
+    const router = useRouter();
+
     if (loading) {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in duration-500">
@@ -45,7 +49,8 @@ export default function AgentListView({ agents, loading, searchTerm }: AgentList
                     <AgentCard
                         agent={agent}
                         variant="full"
-                        onHire={() => console.log('Hire', agent.id)}
+                        onSelect={() => router.push(`/find-agent/${agent.id}`)}
+                        onHire={() => onHire ? onHire(agent) : router.push(`/find-agent/${agent.id}`)}
                         onMessage={() => console.log('Message', agent.id)}
                     />
                 </div>
@@ -53,3 +58,4 @@ export default function AgentListView({ agents, loading, searchTerm }: AgentList
         </div>
     );
 }
+

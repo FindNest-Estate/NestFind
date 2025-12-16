@@ -18,12 +18,15 @@ import MapView, { Marker, Callout, PROVIDER_GOOGLE } from 'react-native-maps';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
-import { colors, spacing, borderRadius } from '../constants/theme';
-import { API_URL } from '../constants/api';
+
+import { api } from '../lib/api';
 import ScreenHeader from '../components/common/ScreenHeader'; // We might use a custom header here instead
+import BottomNav from '../components/BottomNav';
 import AgentCard from '../components/agent/AgentCard';
+import HireAgentModal from '../components/agent/HireAgentModal';
 import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, spacing, borderRadius } from '../constants/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -43,6 +46,10 @@ export default function FindAgent() {
         longitudeDelta: number;
     } | null>(null);
 
+    // Modal State
+    const [selectedAgent, setSelectedAgent] = useState<any>(null);
+    const [isHireModalVisible, setIsHireModalVisible] = useState(false);
+
     // Initial Region (Bangalore or Default)
     const initialRegion = {
         latitude: 12.9716,
@@ -52,7 +59,15 @@ export default function FindAgent() {
     };
 
     useEffect(() => {
-        fetchAgents();
+        const timer = setTimeout(() => {
+            fetchAgents(searchQuery);
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    useEffect(() => {
+        // Initial load happens via the searchQuery effect with empty string
         getUserLocation();
     }, []);
 
@@ -73,10 +88,11 @@ export default function FindAgent() {
         }
     };
 
-    const fetchAgents = async () => {
+    const fetchAgents = async (query = '') => {
+        setLoading(true);
         try {
-            const response = await axios.get(`${API_URL}/agents/all`);
-            setAgents(response.data);
+            const data = await api.agents.list({ search: query });
+            setAgents(data);
         } catch (error) {
             console.error('Error fetching agents:', error);
             Alert.alert('Error', 'Failed to load agents');
@@ -86,95 +102,12 @@ export default function FindAgent() {
     };
 
     const handleHire = (agent: any) => {
-        Alert.alert(
-            'Hire Agent',
-            `Send a hire request to ${agent.first_name}?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Send Request',
-                    onPress: () => Alert.alert('Success', 'Hire request sent!')
-                }
-            ]
-        );
+        setSelectedAgent(agent);
+        setIsHireModalVisible(true);
     };
 
-    const filteredAgents = agents.filter(agent => {
-        const query = searchQuery.toLowerCase();
-        return (
-            agent.first_name?.toLowerCase().includes(query) ||
-            agent.last_name?.toLowerCase().includes(query) ||
-            agent.agency_name?.toLowerCase().includes(query) ||
-            agent.specialty?.toLowerCase().includes(query)
-        );
-    });
-
-    // Custom Header Component for this Page
-    const RenderHeader = () => (
-        <View style={styles.headerWrapper}>
-            <LinearGradient
-                colors={[colors.gray900, colors.gray700]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.headerContainer, { paddingTop: insets.top }]}
-            >
-                <View style={styles.headerTopRow}>
-                    <TouchableOpacity
-                        onPress={() => router.back()}
-                        style={styles.backBtn}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                        <Ionicons name="arrow-back" size={24} color={colors.white} />
-                    </TouchableOpacity>
-
-                    <View style={styles.titleContainer}>
-                        <Text style={styles.headerTitle}>Find Agent</Text>
-                        <Text style={styles.headerSubtitle}>Verified professionals nearby</Text>
-                    </View>
-
-                    <TouchableOpacity style={styles.filterBtn}>
-                        <Ionicons name="options-outline" size={20} color={colors.white} />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Search Bar */}
-                <View style={styles.searchContainer}>
-                    <View style={styles.searchBar}>
-                        <Ionicons name="search" size={20} color={colors.gray400} />
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Search name, city, or specialty..."
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                            placeholderTextColor={colors.gray400}
-                        />
-                    </View>
-                </View>
-
-                {/* View Toggle - Segmented Control Style */}
-                <View style={styles.toggleContainer}>
-                    <View style={styles.toggleBg}>
-                        <TouchableOpacity
-                            style={[styles.toggleBtn, viewMode === 'list' && styles.toggleBtnActive]}
-                            onPress={() => setViewMode('list')}
-                            activeOpacity={0.9}
-                        >
-                            <Ionicons name="list" size={16} color={viewMode === 'list' ? colors.gray900 : colors.gray400} />
-                            <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>List View</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.toggleBtn, viewMode === 'map' && styles.toggleBtnActive]}
-                            onPress={() => setViewMode('map')}
-                            activeOpacity={0.9}
-                        >
-                            <Ionicons name="map" size={16} color={viewMode === 'map' ? colors.gray900 : colors.gray400} />
-                            <Text style={[styles.toggleText, viewMode === 'map' && styles.toggleTextActive]}>Map View</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </LinearGradient>
-        </View>
-    );
+    // No more client-side filtering needed
+    const filteredAgents = agents;
 
     const renderMapHandler = () => (
         <View style={styles.mapContainer}>
@@ -186,14 +119,15 @@ export default function FindAgent() {
                 showsMyLocationButton={true}
                 rotateEnabled={false}
             >
-                {filteredAgents.map((agent) => {
-                    const lat = agent.latitude || (initialRegion.latitude + (Math.random() - 0.5) * 0.05);
-                    const lng = agent.longitude || (initialRegion.longitude + (Math.random() - 0.5) * 0.05);
-
-                    return (
+                {filteredAgents
+                    .filter(a => a.latitude && a.longitude)
+                    .map((agent) => (
                         <Marker
                             key={agent.id}
-                            coordinate={{ latitude: lat, longitude: lng }}
+                            coordinate={{
+                                latitude: agent.latitude,
+                                longitude: agent.longitude
+                            }}
                         >
                             <View style={styles.markerContainer}>
                                 <View style={styles.markerBubble}>
@@ -202,7 +136,7 @@ export default function FindAgent() {
                                     ) : (
                                         <Ionicons name="person" size={10} color={colors.white} />
                                     )}
-                                    <Text style={styles.markerText}>{agent.rating || '4.9'}★</Text>
+                                    <Text style={styles.markerText}>{agent.rating || 'N/A'}★</Text>
                                 </View>
                                 <View style={styles.markerArrow} />
                             </View>
@@ -215,11 +149,8 @@ export default function FindAgent() {
                                 />
                             </Callout>
                         </Marker>
-                    );
-                })}
+                    ))}
             </MapView>
-
-            {/* Floating 'Search Area' Button could go here */}
         </View>
     );
 
@@ -249,9 +180,52 @@ export default function FindAgent() {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
+            <StatusBar barStyle="dark-content" />
 
-            <RenderHeader />
+            <ScreenHeader
+                title="Find Agent"
+                subtitle="Verified professionals nearby"
+                showBack={false}
+                rightAction={{
+                    icon: "options-outline",
+                    onPress: () => { }
+                }}
+            />
+
+            <View style={styles.searchSection}>
+                {/* Search Bar */}
+                <View style={styles.searchContainer}>
+                    <Ionicons name="search" size={20} color={colors.gray400} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search name, city, or specialty..."
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholderTextColor={colors.gray400}
+                    />
+                </View>
+
+                {/* View Toggle */}
+                <View style={styles.toggleContainer}>
+                    <TouchableOpacity
+                        style={[styles.toggleBtn, viewMode === 'list' && styles.toggleBtnActive]}
+                        onPress={() => setViewMode('list')}
+                        activeOpacity={0.9}
+                    >
+                        <Ionicons name="list" size={18} color={viewMode === 'list' ? colors.gray900 : colors.gray500} />
+                        <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>List</Text>
+                    </TouchableOpacity>
+                    <View style={styles.toggleDivider} />
+                    <TouchableOpacity
+                        style={[styles.toggleBtn, viewMode === 'map' && styles.toggleBtnActive]}
+                        onPress={() => setViewMode('map')}
+                        activeOpacity={0.9}
+                    >
+                        <Ionicons name="map" size={18} color={viewMode === 'map' ? colors.gray900 : colors.gray500} />
+                        <Text style={[styles.toggleText, viewMode === 'map' && styles.toggleTextActive]}>Map</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
 
             {loading ? (
                 <View style={styles.loadingContainer}>
@@ -262,6 +236,17 @@ export default function FindAgent() {
                     {viewMode === 'map' ? renderMapHandler() : renderListHandler()}
                 </View>
             )}
+            <BottomNav />
+
+            <HireAgentModal
+                visible={isHireModalVisible}
+                onClose={() => setIsHireModalVisible(false)}
+                agent={selectedAgent}
+                onSuccess={() => {
+                    // Refresh or show confirmation
+                    fetchAgents(searchQuery);
+                }}
+            />
         </View>
     );
 }
@@ -271,70 +256,22 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.gray50,
     },
-
-    // CUSTOM HEADER
-    headerWrapper: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 10,
-        elevation: 8,
-        zIndex: 10,
-        backgroundColor: colors.gray900, // Fallback
-        borderBottomLeftRadius: 32,
-        borderBottomRightRadius: 32,
-    },
-    headerContainer: {
+    searchSection: {
+        backgroundColor: colors.white,
         paddingHorizontal: spacing.md,
         paddingBottom: spacing.md,
-        borderBottomLeftRadius: 32,
-        borderBottomRightRadius: 32,
-    },
-    headerTopRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: spacing.sm,
-        marginBottom: spacing.md,
-        gap: 12,
-    },
-    headerTitle: {
-        fontSize: 24,
-        fontWeight: '800',
-        color: colors.white,
-        letterSpacing: -0.5,
-    },
-    headerSubtitle: {
-        fontSize: 14,
-        color: colors.gray400,
-        fontWeight: '500',
-    },
-    backBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    titleContainer: {
-        flex: 1,
-    },
-    filterBtn: {
-        padding: 8,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRadius: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.gray100,
+        zIndex: 5,
     },
     searchContainer: {
-        marginBottom: spacing.md,
-    },
-    searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.white,
-        borderRadius: 16,
+        backgroundColor: colors.gray100,
+        borderRadius: 12,
         paddingHorizontal: spacing.md,
         paddingVertical: 12,
-        borderWidth: 0,
+        marginBottom: spacing.md,
     },
     searchInput: {
         flex: 1,
@@ -345,21 +282,16 @@ const styles = StyleSheet.create({
     },
     toggleContainer: {
         flexDirection: 'row',
-        justifyContent: 'center',
-    },
-    toggleBg: {
-        flexDirection: 'row',
-        backgroundColor: 'rgba(255,255,255,0.15)',
+        backgroundColor: colors.gray100,
+        borderRadius: 12,
         padding: 4,
-        borderRadius: 14,
-        width: '100%',
     },
     toggleBtn: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 10,
+        paddingVertical: 8,
         borderRadius: 10,
         gap: 6,
     },
@@ -368,13 +300,20 @@ const styles = StyleSheet.create({
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowRadius: 3,
         elevation: 2,
     },
+    toggleDivider: {
+        width: 1,
+        backgroundColor: colors.gray200,
+        marginVertical: 6,
+        marginHorizontal: 4,
+        display: 'none', // Hidden since we use button active state styling
+    },
     toggleText: {
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '600',
-        color: colors.gray400,
+        color: colors.gray500,
     },
     toggleTextActive: {
         color: colors.gray900,

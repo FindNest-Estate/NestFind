@@ -21,6 +21,7 @@ class UserBase(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     service_radius: Optional[int] = 50
+    service_areas: Optional[str] = ""
     commission_rate: Optional[float] = 2.0
     is_available: bool = True
 
@@ -55,10 +56,31 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+    id: int
+    is_active: bool
+    created_at: datetime
+    
+    # Computed Stats for Agents
+    average_rating: Optional[float] = 0.0
+    review_count: Optional[int] = 0
+    sales_count: Optional[int] = 0
+    clients_count: Optional[int] = 0
+    active_listings_count: Optional[int] = 0
+
+    class Config:
+        from_attributes = True
+
 class UserOut(UserBase):
     id: int
     is_active: bool
     created_at: datetime
+    
+    # Computed Stats for Agents
+    average_rating: Optional[float] = 0.0
+    review_count: Optional[int] = 0
+    sales_count: Optional[int] = 0
+    clients_count: Optional[int] = 0
+    active_listings_count: Optional[int] = 0
 
     class Config:
         from_attributes = True
@@ -505,4 +527,55 @@ class DealSettlementOut(BaseModel):
     property_image: Optional[str] = None
     agent_name: str
     agent_email: str
+    agent_name: str
+    agent_email: str
     offers: List[DealOfferSettlement] = []
+
+# --- Bank Offer Schemas ---
+class BankOfferBase(BaseModel):
+    bank_name: str
+    bank_logo_icon: str
+    interest_rate: str
+    processing_fee: str
+    max_tenure_years: Optional[int] = 20
+    is_active: bool = True
+
+class BankOfferCreate(BankOfferBase):
+    pass
+
+class BankOfferOut(BankOfferBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# --- Agent Client / Hire Request Schemas ---
+class AgentClientBase(BaseModel):
+    service_type: str # 'BUYING', 'SELLING'
+    property_preferences: Optional[Dict[str, Any]] = None # Buy criteria or Sell property details
+    initial_message: Optional[str] = None
+
+class AgentClientCreate(AgentClientBase):
+    pass
+
+class AgentClientUpdate(BaseModel):
+    status: Optional[str] = None
+    commission_rate: Optional[float] = None
+    contract_url: Optional[str] = None # For signing
+
+class AgentClientOut(AgentClientBase):
+    id: int
+    agent_id: int
+    client_id: int
+    status: str
+    commission_rate: Optional[float] = None
+    contract_url: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    agent: Optional[UserOut] = None
+    client: Optional[UserOut] = None
+
+    class Config:
+        from_attributes = True

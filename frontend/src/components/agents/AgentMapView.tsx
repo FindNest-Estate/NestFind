@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import AgentCard from './AgentCard';
+import { useRouter } from 'next/navigation';
 // Dynamically import Leaflet components to avoid SSR issues
 const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false });
 const TileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLayer), { ssr: false });
@@ -32,6 +33,7 @@ interface AgentMapViewProps {
 }
 
 export default function AgentMapView({ agents, userLocation }: AgentMapViewProps) {
+    const router = useRouter();
     const [mounted, setMounted] = useState(false);
 
     // Default center (San Francisco) if no user location
@@ -79,6 +81,7 @@ export default function AgentMapView({ agents, userLocation }: AgentMapViewProps
                                     <AgentCard
                                         agent={agent}
                                         variant="map"
+                                        onSelect={() => router.push(`/find-agent/${agent.id}`)}
                                     />
                                 </div>
                             </Popup>

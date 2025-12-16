@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing, borderRadius } from '../../../constants/theme';
 import { API_URL } from '../../../constants/api';
 import ScreenHeader from '../../../components/common/ScreenHeader';
+import DealCard from '../../../components/deals/DealCard';
 
 export default function DealsList() {
     const router = useRouter();
@@ -45,31 +46,10 @@ export default function DealsList() {
     };
 
     const renderItem = ({ item }: { item: any }) => (
-        <TouchableOpacity
-            style={styles.card}
+        <DealCard
+            deal={item}
             onPress={() => router.push(`/dashboard/deals/${item.id}`)}
-            activeOpacity={0.7}
-        >
-            <View style={styles.cardHeader}>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
-                    <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-                        {item.status.toUpperCase()}
-                    </Text>
-                </View>
-                <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString()}</Text>
-            </View>
-
-            <View style={styles.cardContent}>
-                <Text style={styles.propertyTitle}>{item.property?.title}</Text>
-                <Text style={styles.propertyAddress}>{item.property?.city}</Text>
-                <Text style={styles.price}>₹{item.amount.toLocaleString()}</Text>
-            </View>
-
-            <View style={styles.cardFooter}>
-                <Text style={styles.viewDetailsText}>View Deal Room</Text>
-                <Ionicons name="arrow-forward" size={16} color={colors.primary} />
-            </View>
-        </TouchableOpacity>
+        />
     );
 
     return (
@@ -91,7 +71,7 @@ export default function DealsList() {
                     }
                     ListEmptyComponent={
                         <View style={styles.emptyState}>
-                            <Ionicons name="document-text-outline" size={48} color={colors.gray300} />
+                            <Ionicons name="document-text-outline" size={48} color={colors.gray400} />
                             <Text style={styles.emptyText}>No deals yet</Text>
                         </View>
                     }

@@ -73,7 +73,7 @@ export default function BottomNav() {
                         <TouchableOpacity
                             key={`${tab.route}-${index}`}
                             style={styles.tab}
-                            onPress={() => router.push(tab.route as any)}
+                            onPress={() => router.replace(tab.route as any)}
                             activeOpacity={0.7}
                         >
                             {/* Active indicator pill */}

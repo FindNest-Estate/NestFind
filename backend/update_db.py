@@ -31,6 +31,23 @@ def update_schema():
     except sqlite3.OperationalError:
         print("'receipt_path' already exists in 'transactions'.")
 
+    # Add columns to users table (Find Agent features)
+    user_columns = [
+        ("latitude", "FLOAT"),
+        ("longitude", "FLOAT"),
+        ("service_radius", "INTEGER DEFAULT 50"),
+        ("service_areas", "TEXT DEFAULT ''"),
+        ("commission_rate", "FLOAT DEFAULT 2.0"),
+        ("is_available", "BOOLEAN DEFAULT 1")
+    ]
+
+    for col_name, col_type in user_columns:
+        try:
+            cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
+            print(f"Successfully added '{col_name}' to 'users'.")
+        except sqlite3.OperationalError:
+            print(f"'{col_name}' already exists in 'users'.")
+
     conn.commit()
     conn.close()
 

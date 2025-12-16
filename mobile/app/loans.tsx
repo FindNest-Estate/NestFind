@@ -9,8 +9,11 @@ import {
     Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing, borderRadius } from '../constants/theme';
 import ScreenHeader from '../components/common/ScreenHeader';
+import { API_URL } from '../constants/api';
 
 const { width } = Dimensions.get('window');
 
@@ -20,9 +23,7 @@ export default function Loans() {
     const [tenure, setTenure] = useState('20');
     const [emi, setEmi] = useState(0);
 
-    useEffect(() => {
-        calculateEmi();
-    }, [amount, rate, tenure]);
+    const [banks, setBanks] = useState<any[]>([]);
 
     const calculateEmi = () => {
         const p = parseFloat(amount);
@@ -37,11 +38,23 @@ export default function Loans() {
         }
     };
 
-    const banks = [
-        { id: 1, name: 'HDFC Bank', rate: '8.35%', processing: '0.5%', logo: 'logo-bitcoin' }, // Using dummy icons
-        { id: 2, name: 'SBI Home Loans', rate: '8.40%', processing: 'Nil', logo: 'logo-euro' },
-        { id: 3, name: 'ICICI Bank', rate: '8.75%', processing: '10000', logo: 'logo-yen' },
-    ];
+    const fetchBankOffers = async () => {
+        try {
+            // No auth needed for public bank offers potentially, but using token if avail
+            const token = await AsyncStorage.getItem('auth_token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+            const response = await axios.get(`${API_URL}/loans/offers`, { headers });
+            setBanks(response.data);
+        } catch (error) {
+            console.error('Error fetching bank offers:', error);
+        }
+    };
+
+    useEffect(() => {
+        calculateEmi();
+        fetchBankOffers();
+    }, [amount, rate, tenure]);
 
     return (
         <View style={styles.container}>
@@ -99,14 +112,14 @@ export default function Loans() {
                 {banks.map((bank) => (
                     <TouchableOpacity key={bank.id} style={styles.bankCard} activeOpacity={0.8}>
                         <View style={styles.bankIcon}>
-                            <Ionicons name={bank.logo as any} size={24} color={colors.white} />
+                            <Ionicons name={bank.bank_logo_icon as any} size={24} color={colors.white} />
                         </View>
                         <View style={styles.bankInfo}>
-                            <Text style={styles.bankName}>{bank.name}</Text>
-                            <Text style={styles.bankMeta}>Processing Fee: {bank.processing}</Text>
+                            <Text style={styles.bankName}>{bank.bank_name}</Text>
+                            <Text style={styles.bankMeta}>Processing Fee: {bank.processing_fee}</Text>
                         </View>
                         <View style={styles.bankRate}>
-                            <Text style={styles.rateValue}>{bank.rate}</Text>
+                            <Text style={styles.rateValue}>{bank.interest_rate}</Text>
                             <Text style={styles.rateLabel}>Interest</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={20} color={colors.gray400} />

@@ -7,24 +7,24 @@ import {
     ActivityIndicator,
     TouchableOpacity,
     Alert,
-    Modal,
-    TextInput,
-    Linking
+    Linking,
+    StatusBar
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors, spacing, borderRadius, typography } from '../../../constants/theme';
+import { colors, spacing, borderRadius } from '../../../constants/theme';
 import { API_URL } from '../../../constants/api';
 import ScreenHeader from '../../../components/common/ScreenHeader';
+import DealTimeline from '../../../components/deals/DealTimeline';
+import NegotiationRoom from '../../../components/deals/NegotiationRoom';
 
 export default function DealRoom() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
     const [deal, setDeal] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [counterModal, setCounterModal] = useState({ show: false, amount: '', message: '' });
 
     useEffect(() => {
         if (id) fetchDeal();
@@ -45,29 +45,36 @@ export default function DealRoom() {
         }
     };
 
-    const handleAction = async (action: 'ACCEPT' | 'REJECT' | 'COUNTER', data?: any) => {
+    const handleNegotiationAction = async (action: 'ACCEPT' | 'REJECT' | 'COUNTER', data?: any) => {
         try {
             const token = await AsyncStorage.getItem('auth_token');
-            const endpoint = action === 'COUNTER'
-                ? `${API_URL}/offers/${id}/negotiate`
-                : `${API_URL}/offers/${id}/${action.toLowerCase()}`;
+            // Backend expects PUT /offers/{id} with { status: string, amount?: number }
+            const endpoint = `${API_URL}/offers/${id}`;
 
-            const payload = action === 'COUNTER'
-                ? {
-                    counter_price: parseFloat(data.amount),
-                    message: data.message
-                }
-                : {}; // Accept/Reject might not need body or might need reasoning
+            let payload: any = {};
 
-            await axios.post(endpoint, payload, {
+            if (action === 'ACCEPT') {
+                payload = { status: 'accepted' };
+            } else if (action === 'REJECT') {
+                payload = { status: 'rejected' };
+            } else if (action === 'COUNTER') {
+                // For Buyer, countering means setting status to 'pending' with new amount
+                payload = {
+                    status: 'pending',
+                    amount: parseFloat(data.amount)
+                };
+            }
+
+            await axios.put(endpoint, payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
             Alert.alert('Success', `Offer ${action.toLowerCase()}ed successfully`);
-            setCounterModal({ show: false, amount: '', message: '' });
             fetchDeal();
-        } catch (e) {
-            Alert.alert('Error', 'Failed to process action');
+        } catch (error: any) {
+            console.error('Negotiation error:', error);
+            const msg = error.response?.data?.detail || 'Failed to update offer';
+            Alert.alert('Error', msg);
         }
     };
 
@@ -82,8 +89,17 @@ export default function DealRoom() {
         }
     };
 
-    const steps = ['submitted', 'negotiating', 'accepted', 'token_paid', 'registration', 'completed'];
-    const currentStepIndex = deal ? steps.indexOf(deal.status === 'countered' || deal.status === 'pending' ? 'negotiating' : deal.status) : 0;
+    // Assuming Web Steps parity
+    const steps = ['accepted', 'token_paid', 'registration', 'commission', 'completed'];
+
+    // Calculate index based on status mapping
+    let currentStepIndex = -1;
+    if (deal) {
+        if (deal.status === 'completed') currentStepIndex = 4;
+        else if (deal.sale_deed_url) currentStepIndex = 3; // Commission/Docs done
+        else if (deal.status === 'token_paid') currentStepIndex = 1;
+        else if (deal.status === 'accepted') currentStepIndex = 0;
+    }
 
     if (loading) {
         return (
@@ -95,9 +111,12 @@ export default function DealRoom() {
 
     if (!deal) return null;
 
+    const isNegotiating = ['pending', 'countered', 'rejected'].includes(deal.status);
+
     return (
         <View style={styles.container}>
-            <ScreenHeader title="Deal Room" subtitle={`#${deal.id} • ${deal.property?.title}`} />
+            <StatusBar barStyle="dark-content" />
+            <ScreenHeader title="Deal Room" subtitle={`#${deal.id} • ${deal.property?.city}`} />
 
             <ScrollView contentContainerStyle={styles.content}>
 
@@ -109,138 +128,84 @@ export default function DealRoom() {
                     </Text>
                 </View>
 
-                {/* Property Card */}
+                {/* Property Context */}
                 <View style={styles.section}>
-                    <View style={styles.propertyCard}>
-                        {/* Image placeholder since backend might not send image in this payload directly or its nested */}
+                    <TouchableOpacity
+                        style={styles.propertyCard}
+                        onPress={() => router.push(`/property/${deal.property?.id}`)} // Fixed route
+                        activeOpacity={0.8}
+                    >
                         <View style={styles.propertyIcon}>
                             <Ionicons name="home" size={24} color={colors.gray500} />
                         </View>
-                        <View>
-                            <Text style={styles.propTitle}>{deal.property?.title}</Text>
-                            <Text style={styles.propAddress}>{deal.property?.city}</Text>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.propTitle} numberOfLines={1}>{deal.property?.title}</Text>
+                            <Text style={styles.propAddress}>{deal.property?.address}</Text>
                             <Text style={styles.propPrice}>Listing: ₹{deal.property?.price?.toLocaleString()}</Text>
                         </View>
-                    </View>
-                </View>
-
-                {/* Timeline */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Timeline</Text>
-                    <View style={styles.timelineContainer}>
-                        {steps.map((step, index) => {
-                            const isCompleted = index <= currentStepIndex;
-                            const isCurrent = index === currentStepIndex;
-                            return (
-                                <View key={step} style={styles.timelineItem}>
-                                    <View style={[
-                                        styles.timelineDot,
-                                        isCompleted && styles.timelineDotCompleted,
-                                        isCurrent && styles.timelineDotCurrent
-                                    ]}>
-                                        {isCompleted && <Ionicons name="checkmark" size={12} color={colors.white} />}
-                                    </View>
-                                    <View style={styles.timelineLine} />
-                                    <Text style={[
-                                        styles.timelineText,
-                                        isCompleted && styles.timelineTextCompleted
-                                    ]}>
-                                        {step.replace('_', ' ').toUpperCase()}
-                                    </Text>
-                                </View>
-                            );
-                        })}
-                    </View>
-                </View>
-
-                {/* Negotiation / Current Offer */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Current Terms</Text>
-                    <View style={styles.card}>
-                        <Text style={styles.offerLabel}>Offer Amount</Text>
-                        <Text style={styles.offerAmount}>₹{deal.amount.toLocaleString()}</Text>
-                        {deal.status === 'countered' && (
-                            <Text style={styles.counterAlert}>Counter Offer Received</Text>
-                        )}
-
-                        {['pending', 'countered'].includes(deal.status) && (
-                            <View style={styles.actionButtons}>
-                                <TouchableOpacity style={styles.rejectBtn} onPress={() => handleAction('REJECT')}>
-                                    <Text style={styles.btnText}>Reject</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.counterBtn}
-                                    onPress={() => setCounterModal({ show: true, amount: deal.amount.toString(), message: '' })}
-                                >
-                                    <Text style={styles.btnText}>Counter</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAction('ACCEPT')}>
-                                    <Text style={styles.btnText}>Accept</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-                    </View>
-                </View>
-
-                {/* Documents */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Documents</Text>
-                    {/* Placeholder docs */}
-                    <TouchableOpacity style={styles.docItem} onPress={() => Alert.alert('Preview', 'Document preview coming soon')}>
-                        <Ionicons name="document-text-outline" size={24} color={colors.primary} />
-                        <Text style={styles.docName}>Offer Letter.pdf</Text>
-                        <Ionicons name="cloud-download-outline" size={20} color={colors.gray400} />
+                        <Ionicons name="chevron-forward" size={16} color={colors.gray400} />
                     </TouchableOpacity>
-                    {deal.sale_deed_url && (
-                        <TouchableOpacity
-                            style={styles.docItem}
-                            onPress={() => Linking.openURL(`${API_URL}/${deal.sale_deed_url}`)}
-                        >
-                            <Ionicons name="ribbon-outline" size={24} color={colors.success} />
-                            <Text style={styles.docName}>Sale Deed</Text>
-                            <Ionicons name="open-outline" size={20} color={colors.gray400} />
-                        </TouchableOpacity>
+                </View>
+
+                {/* Workflow Area */}
+                <View style={styles.section}>
+                    {isNegotiating ? (
+                        <NegotiationRoom deal={deal} onAction={handleNegotiationAction} />
+                    ) : (
+                        <DealTimeline currentStepIndex={currentStepIndex} steps={steps} />
                     )}
                 </View>
 
-            </ScrollView>
+                {/* Document Vault (simplified) */}
+                {!isNegotiating && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Document Vault</Text>
 
-            {/* Counter Modal */}
-            <Modal visible={counterModal.show} transparent animationType="slide">
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Counter Offer</Text>
-                        <Text style={styles.label}>New Price (₹)</Text>
-                        <TextInput
-                            style={styles.input}
-                            value={counterModal.amount}
-                            onChangeText={t => setCounterModal(p => ({ ...p, amount: t }))}
-                            keyboardType="numeric"
-                        />
-                        <Text style={styles.label}>Message</Text>
-                        <TextInput
-                            style={[styles.input, styles.textArea]}
-                            value={counterModal.message}
-                            onChangeText={t => setCounterModal(p => ({ ...p, message: t }))}
-                            multiline
-                        />
-                        <View style={styles.modalActions}>
+                        {/* Static / Dynamic Docs */}
+                        <TouchableOpacity style={styles.docItem} onPress={() => Alert.alert('Preview', 'Offer Letter preview')}>
+                            <View style={[styles.docIcon, { backgroundColor: colors.blue50 }]}>
+                                <Ionicons name="document-text-outline" size={20} color={colors.blue500} />
+                            </View>
+                            <Text style={styles.docName}>Offer Letter.pdf</Text>
+                            <Ionicons name="cloud-download-outline" size={18} color={colors.gray400} />
+                        </TouchableOpacity>
+
+                        {deal.sale_deed_url && (
                             <TouchableOpacity
-                                style={styles.cancelBtn}
-                                onPress={() => setCounterModal({ show: false, amount: '', message: '' })}
+                                style={styles.docItem}
+                                onPress={() => Linking.openURL(`${API_URL}/${deal.sale_deed_url}`)}
                             >
-                                <Text style={styles.cancelBtnText}>Cancel</Text>
+                                <View style={[styles.docIcon, { backgroundColor: colors.green50 }]}>
+                                    <Ionicons name="ribbon-outline" size={20} color={colors.success} />
+                                </View>
+                                <Text style={styles.docName}>Sale Deed</Text>
+                                <Ionicons name="open-outline" size={18} color={colors.gray400} />
                             </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.submitBtn}
-                                onPress={() => handleAction('COUNTER', counterModal)}
-                            >
-                                <Text style={styles.submitBtnText}>Send Offer</Text>
-                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
+
+                {/* Financials (If not negotiating) */}
+                {!isNegotiating && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Financial Snapshot</Text>
+                        <View style={styles.card}>
+                            <View style={styles.statRow}>
+                                <Text style={styles.statLabel}>Agreed Amount</Text>
+                                <Text style={styles.statValue}>₹{deal.amount?.toLocaleString()}</Text>
+                            </View>
+                            <View style={styles.divider} />
+                            <View style={styles.statRow}>
+                                <Text style={styles.statLabel}>Token Paid</Text>
+                                <Text style={[styles.statValue, { color: colors.success }]}>
+                                    {deal.status !== 'accepted' ? 'Yes' : 'Pending'}
+                                </Text>
+                            </View>
                         </View>
                     </View>
-                </View>
-            </Modal>
+                )}
+
+            </ScrollView>
         </View>
     );
 }
@@ -266,7 +231,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: colors.gray900,
-        marginBottom: spacing.sm,
+        marginBottom: spacing.md,
     },
 
     // Status Banner
@@ -274,8 +239,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         padding: spacing.md,
-        borderRadius: borderRadius.md,
-        marginBottom: spacing.md,
+        borderRadius: 16,
+        marginBottom: spacing.lg,
         gap: 8,
     },
     statusBannerText: {
@@ -289,132 +254,39 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: colors.white,
         padding: spacing.md,
-        borderRadius: borderRadius.lg,
+        borderRadius: 20,
         gap: spacing.md,
+        borderWidth: 1,
+        borderColor: colors.gray100,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
     },
     propertyIcon: {
         width: 48,
         height: 48,
-        borderRadius: borderRadius.md,
-        backgroundColor: colors.gray100,
+        borderRadius: 14,
+        backgroundColor: colors.gray50,
         justifyContent: 'center',
         alignItems: 'center',
     },
     propTitle: {
         fontWeight: '700',
-        fontSize: 16,
+        fontSize: 15,
         color: colors.gray900,
+        marginBottom: 2,
     },
     propAddress: {
         color: colors.gray500,
         fontSize: 12,
+        marginBottom: 4,
     },
     propPrice: {
         color: colors.primary,
         fontSize: 12,
-        fontWeight: '600',
-        marginTop: 2,
-    },
-
-    // Timeline
-    timelineContainer: {
-        backgroundColor: colors.white,
-        padding: spacing.md,
-        borderRadius: borderRadius.lg,
-    },
-    timelineItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        height: 40,
-        overflow: 'hidden',
-    },
-    timelineDot: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        backgroundColor: colors.gray200,
-        marginRight: spacing.sm,
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 2,
-    },
-    timelineDotCompleted: {
-        backgroundColor: colors.success,
-    },
-    timelineDotCurrent: {
-        borderColor: colors.primary,
-        borderWidth: 2,
-        backgroundColor: colors.white,
-    },
-    timelineLine: {
-        position: 'absolute',
-        left: 9,
-        top: 20,
-        bottom: -20,
-        width: 2,
-        backgroundColor: colors.gray200,
-        zIndex: 1,
-    },
-    timelineText: {
-        color: colors.gray400,
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    timelineTextCompleted: {
-        color: colors.gray900,
-    },
-
-    // Card
-    card: {
-        backgroundColor: colors.white,
-        padding: spacing.md,
-        borderRadius: borderRadius.lg,
-    },
-    offerLabel: {
-        fontSize: 12,
-        color: colors.gray500,
-        marginBottom: 4,
-    },
-    offerAmount: {
-        fontSize: 24,
         fontWeight: '700',
-        color: colors.gray900,
-        marginBottom: spacing.md,
-    },
-    counterAlert: {
-        color: '#D97706',
-        fontWeight: '600',
-        marginBottom: spacing.md,
-    },
-    actionButtons: {
-        flexDirection: 'row',
-        gap: spacing.sm,
-    },
-    rejectBtn: {
-        flex: 1,
-        backgroundColor: colors.error,
-        padding: spacing.sm,
-        borderRadius: borderRadius.md,
-        alignItems: 'center',
-    },
-    counterBtn: {
-        flex: 1,
-        backgroundColor: '#F59E0B',
-        padding: spacing.sm,
-        borderRadius: borderRadius.md,
-        alignItems: 'center',
-    },
-    acceptBtn: {
-        flex: 1,
-        backgroundColor: colors.success,
-        padding: spacing.sm,
-        borderRadius: borderRadius.md,
-        alignItems: 'center',
-    },
-    btnText: {
-        color: colors.white,
-        fontWeight: '600',
-        fontSize: 12,
     },
 
     // Docs
@@ -422,75 +294,54 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: colors.white,
-        padding: spacing.md,
-        borderRadius: borderRadius.md,
+        padding: spacing.sm,
+        paddingRight: spacing.md,
+        borderRadius: 16,
         marginBottom: spacing.sm,
-        gap: spacing.sm,
+        gap: spacing.md,
+        borderWidth: 1,
+        borderColor: colors.gray100,
+    },
+    docIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     docName: {
         flex: 1,
         color: colors.gray900,
         fontSize: 14,
+        fontWeight: '500',
     },
 
-    // Modal
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'center',
-        padding: spacing.lg,
-    },
-    modalContent: {
+    // Financial Card
+    card: {
         backgroundColor: colors.white,
-        borderRadius: borderRadius.lg,
         padding: spacing.lg,
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        marginBottom: spacing.lg,
-        textAlign: 'center',
-    },
-    label: {
-        fontSize: 12,
-        fontWeight: '600',
-        marginBottom: 4,
-        color: colors.gray700,
-    },
-    input: {
-        backgroundColor: colors.gray50,
+        borderRadius: 20,
         borderWidth: 1,
-        borderColor: colors.gray200,
-        borderRadius: borderRadius.md,
-        padding: spacing.md,
-        marginBottom: spacing.md,
+        borderColor: colors.gray100,
     },
-    textArea: {
-        height: 80,
-        textAlignVertical: 'top',
-    },
-    modalActions: {
+    statRow: {
         flexDirection: 'row',
-        gap: spacing.md,
-    },
-    cancelBtn: {
-        flex: 1,
-        padding: spacing.md,
+        justifyContent: 'space-between',
         alignItems: 'center',
     },
-    cancelBtnText: {
+    statLabel: {
+        fontSize: 14,
         color: colors.gray500,
-        fontWeight: '600',
+        fontWeight: '500',
     },
-    submitBtn: {
-        flex: 1,
-        backgroundColor: colors.primary,
-        borderRadius: borderRadius.md,
-        padding: spacing.md,
-        alignItems: 'center',
+    statValue: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: colors.gray900,
     },
-    submitBtnText: {
-        color: colors.white,
-        fontWeight: '600',
+    divider: {
+        height: 1,
+        backgroundColor: colors.gray100,
+        marginVertical: spacing.md,
     },
 });

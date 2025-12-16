@@ -18,11 +18,11 @@ export default function AgentCard({ agent, onPress, onHire, layout = 'list' }: A
         ? `${API_URL}/${agent.profile_image}`
         : null;
 
-    // Mock data for display richness
-    const rating = agent.rating || 4.9;
-    const reviewCount = agent.review_count || 124;
-    const experience = agent.years_experience || 8;
-    const sales = agent.sales_count || 32;
+    // Real data from backend (with fallbacks only if 0/null)
+    const rating = agent.average_rating || 0;
+    const reviewCount = agent.review_count || 0;
+    const experience = agent.experience_years || 0; // Backend field is experience_years
+    const sales = agent.sales_count || 0;
 
     if (layout === 'map-callout') {
         return (
@@ -152,10 +152,10 @@ export default function AgentCard({ agent, onPress, onHire, layout = 'list' }: A
                     style={styles.hireBtn}
                     onPress={(e) => {
                         e.stopPropagation();
-                        onHire();
+                        onPress();
                     }}
                 >
-                    <Text style={styles.hireBtnText}>Hire Now</Text>
+                    <Text style={styles.hireBtnText}>View Profile</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.msgBtn}
@@ -365,19 +365,17 @@ const styles = StyleSheet.create({
     },
     hireBtn: {
         flex: 1,
-        backgroundColor: colors.gray900,
+        backgroundColor: colors.white,
         paddingVertical: 12,
         borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: colors.gray900,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 3,
+        borderWidth: 1,
+        borderColor: colors.gray900,
+        // Removed shadow for secondary look
     },
     hireBtnText: {
-        color: colors.white,
+        color: colors.gray900,
         fontWeight: '700',
         fontSize: 14,
     },

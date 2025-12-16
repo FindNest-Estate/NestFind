@@ -2,217 +2,183 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import AgentLayout from "@/components/dashboard/AgentLayout";
-import { Search, Filter, Phone, Mail, Calendar, Home, Loader2, User } from "lucide-react";
-import Link from "next/link";
 import { toast } from "sonner";
+import { Loader2, User, Clock, CheckCircle2, XCircle, ArrowRight, MessageSquare, AlertCircle } from "lucide-react";
+import LeadResponseModal from "@/components/dashboard/agent/LeadResponseModal";
+import AgentLayout from "@/components/dashboard/AgentLayout";
 
-export default function LeadsPage() {
-    const [leads, setLeads] = useState<any[]>([]);
+export default function AgentLeadsPage() {
+    const [requests, setRequests] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState("");
+    const [selectedRequest, setSelectedRequest] = useState<any>(null);
+    const [isResponseModalOpen, setIsResponseModalOpen] = useState(false);
 
     useEffect(() => {
-        fetchLeads();
+        fetchRequests();
     }, []);
 
-    const fetchLeads = async () => {
+    const fetchRequests = async () => {
         try {
-            // Aggregate leads from Bookings and Offers
-            const [bookings, offers] = await Promise.all([
-                api.bookings.list(),
-                api.offers.list()
-            ]);
-
-            // Map to a common Lead structure
-            const leadsMap = new Map();
-
-            // Process Bookings
-            bookings.forEach((booking: any) => {
-                const userId = booking.user_id;
-                if (!leadsMap.has(userId)) {
-                    leadsMap.set(userId, {
-                        id: userId,
-                        user: booking.user,
-                        interests: [],
-                        last_interaction: booking.created_at,
-                        status: 'New',
-                        source: 'Visit Request'
-                    });
-                }
-                const lead = leadsMap.get(userId);
-                lead.interests.push({
-                    type: 'booking',
-                    property: booking.property,
-                    date: booking.created_at,
-                    status: booking.status
-                });
-                if (new Date(booking.created_at) > new Date(lead.last_interaction)) {
-                    lead.last_interaction = booking.created_at;
-                }
-            });
-
-            // Process Offers
-            offers.forEach((offer: any) => {
-                const userId = offer.buyer_id;
-                if (!leadsMap.has(userId)) {
-                    leadsMap.set(userId, {
-                        id: userId,
-                        user: offer.buyer,
-                        interests: [],
-                        last_interaction: offer.created_at,
-                        status: 'Hot',
-                        source: 'Offer Made'
-                    });
-                }
-                const lead = leadsMap.get(userId);
-                lead.interests.push({
-                    type: 'offer',
-                    property: offer.property,
-                    date: offer.created_at,
-                    status: offer.status,
-                    amount: offer.amount
-                });
-                lead.status = 'Hot'; // Upgrade status if they made an offer
-                if (new Date(offer.created_at) > new Date(lead.last_interaction)) {
-                    lead.last_interaction = offer.created_at;
-                }
-            });
-
-            setLeads(Array.from(leadsMap.values()));
+            setLoading(true);
+            const data = await api.agents.getRequests();
+            setRequests(data || []);
         } catch (error) {
-            console.error("Failed to fetch leads", error);
-            toast.error("Failed to load leads");
+            console.error(error);
+            toast.error("Failed to load requests");
         } finally {
             setLoading(false);
         }
     };
 
-    const filteredLeads = leads.filter(lead =>
-        lead.user?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.user?.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.user?.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const handleRespond = (request: any) => {
+        setSelectedRequest(request);
+        setIsResponseModalOpen(true);
+    };
 
-    if (loading) {
-        return (
-            <AgentLayout title="Leads Management">
-                <div className="flex justify-center items-center h-64">
-                    <Loader2 className="animate-spin text-rose-500" size={32} />
-                </div>
-            </AgentLayout>
-        );
-    }
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'REQUESTED': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+            case 'OFFER_SENT': return 'bg-blue-100 text-blue-700 border-blue-200';
+            case 'ACTIVE': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+            case 'REJECTED': return 'bg-red-100 text-red-700 border-red-200';
+            default: return 'bg-gray-100 text-gray-700 border-gray-200';
+        }
+    };
 
     return (
-        <AgentLayout title="Leads Management">
-            <div className="space-y-6">
-                {/* Header Actions */}
-                <div className="flex flex-col sm:flex-row gap-4 justify-between">
-                    <div className="relative flex-1 max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                        <input
-                            type="text"
-                            placeholder="Search leads by name or email..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none"
-                        />
+        <AgentLayout title="Client Leads">
+            <div className="max-w-5xl mx-auto">
+                <div className="flex items-center justify-between mb-8">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">Manage Leads</h1>
+                        <p className="text-gray-500 text-sm">View incoming requests and active clients</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <span className="px-3 py-1 bg-white border border-gray-200 rounded-full text-xs font-bold text-gray-600 shadow-sm">
+                            {requests.filter(r => r.status === 'REQUESTED').length} New
+                        </span>
+                        <span className="px-3 py-1 bg-white border border-gray-200 rounded-full text-xs font-bold text-gray-600 shadow-sm">
+                            {requests.filter(r => r.status === 'ACTIVE').length} Active
+                        </span>
                     </div>
                 </div>
 
-                {/* Leads List */}
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-gray-50 text-gray-500 font-medium">
-                                <tr>
-                                    <th className="px-6 py-4">Lead Name</th>
-                                    <th className="px-6 py-4">Contact</th>
-                                    <th className="px-6 py-4">Interest</th>
-                                    <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4">Last Active</th>
-                                    <th className="px-6 py-4 text-right">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {filteredLeads.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                                            No leads found matching your search.
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    filteredLeads.map((lead) => (
-                                        <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-medium overflow-hidden">
-                                                        {lead.user?.avatar_url ? (
-                                                            <img src={lead.user.avatar_url} alt="" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <User size={20} />
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-semibold text-gray-900">
-                                                            {lead.user?.first_name} {lead.user?.last_name}
-                                                        </p>
-                                                        <p className="text-xs text-gray-500">
-                                                            {lead.source}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="space-y-1">
-                                                    <div className="flex items-center gap-2 text-gray-600">
-                                                        <Mail size={14} />
-                                                        {lead.user?.email}
-                                                    </div>
-                                                    {lead.user?.phone && (
-                                                        <div className="flex items-center gap-2 text-gray-600">
-                                                            <Phone size={14} />
-                                                            {lead.user.phone}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <Home size={16} className="text-gray-400" />
-                                                    <span className="font-medium">
-                                                        {lead.interests.length} Properties
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lead.status === 'Hot'
-                                                        ? 'bg-rose-100 text-rose-800'
-                                                        : 'bg-blue-100 text-blue-800'
-                                                    }`}>
-                                                    {lead.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-gray-500">
-                                                {new Date(lead.last_interaction).toLocaleDateString()}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <Link
-                                                    href={`/dashboard/chat/${lead.id}`}
-                                                    className="text-rose-600 hover:text-rose-700 font-medium text-sm"
-                                                >
-                                                    Message
-                                                </Link>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20">
+                        <Loader2 className="animate-spin text-gray-300 mb-4" size={40} />
+                        <p className="text-gray-400 font-medium">Loading leads...</p>
                     </div>
-                </div>
+                ) : requests.length === 0 ? (
+                    <div className="text-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <User className="text-gray-300" size={32} />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900">No leads yet</h3>
+                        <p className="text-gray-500 max-w-sm mx-auto">
+                            Your profile is visible to thousands of potential clients. Optimizing your profile can help you get more leads.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {requests.map((request) => (
+                            <div
+                                key={request.id}
+                                className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-all group"
+                            >
+                                <div className="flex flex-col md:flex-row gap-6">
+                                    {/* Left: Client Info */}
+                                    <div className="flex items-start gap-4 min-w-[240px]">
+                                        <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 text-gray-400 font-bold text-lg">
+                                            {request.client?.first_name?.[0]}
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-gray-900">
+                                                {request.client?.first_name} {request.client?.last_name}
+                                            </h3>
+                                            <div className="flex items-center gap-1.5 mt-1">
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide ${getStatusColor(request.status)}`}>
+                                                    {request.status.replace('_', ' ')}
+                                                </span>
+                                                <span className="text-xs text-gray-400 font-medium">
+                                                    • {new Date(request.created_at).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Middle: Request Details */}
+                                    <div className="flex-1 border-l border-gray-100 pl-6 border-dashed md:border-solid">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-xs font-bold text-gray-500 uppercase">Looking to</span>
+                                            <span className="font-bold text-gray-900">{request.service_type}</span>
+                                        </div>
+
+                                        <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                                            "{request.initial_message}"
+                                        </p>
+
+                                        {request.property_preferences && (
+                                            <div className="flex flex-wrap gap-2">
+                                                {request.property_preferences.budget && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-50 rounded text-xs font-medium text-gray-600">
+                                                        <DollarSign size={12} /> {request.property_preferences.budget}
+                                                    </span>
+                                                )}
+                                                {request.property_preferences.locations && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-50 rounded text-xs font-medium text-gray-600">
+                                                        <MapPin size={12} /> {request.property_preferences.locations}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Right: Actions */}
+                                    <div className="flex flex-col justify-center items-end min-w-[160px] gap-2">
+                                        {request.status === 'REQUESTED' && (
+                                            <button
+                                                onClick={() => handleRespond(request)}
+                                                className="w-full h-10 bg-gray-900 hover:bg-black text-white text-sm font-bold rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2"
+                                            >
+                                                Respond <ArrowRight size={16} />
+                                            </button>
+                                        )}
+
+                                        {request.status === 'OFFER_SENT' && (
+                                            <div className="text-right">
+                                                <div className="text-xs font-bold text-gray-500 uppercase mb-1">Proposal Sent</div>
+                                                <div className="text-lg font-bold text-gray-900">{request.commission_rate}% Comm.</div>
+                                                <p className="text-[10px] text-gray-400 mt-1">Waiting for client...</p>
+                                            </div>
+                                        )}
+
+                                        {request.status === 'ACTIVE' && (
+                                            <div className="w-full">
+                                                <button className="w-full h-10 border border-gray-200 hover:border-gray-300 text-gray-700 bg-white text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
+                                                    <MessageSquare size={16} /> Chat
+                                                </button>
+                                                <div className="flex items-center justify-center gap-1.5 mt-2 text-[10px] font-bold text-emerald-600">
+                                                    <CheckCircle2 size={12} /> Agreement Active
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <LeadResponseModal
+                    isOpen={isResponseModalOpen}
+                    onClose={() => setIsResponseModalOpen(false)}
+                    request={selectedRequest}
+                    onSuccess={fetchRequests}
+                />
             </div>
         </AgentLayout>
     );
 }
+
+// Helper icons needed for the component
+import { DollarSign, MapPin } from "lucide-react";

@@ -3,19 +3,20 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { User, MapPin, Star, ShieldCheck, Mail, Phone, Building, Award, MessageSquare, ExternalLink, Calendar } from "lucide-react";
+import { User, ShieldCheck, Mail, Phone, MessageSquare, Twitter, Linkedin, Globe, MapPin, BadgeCheck, ArrowRight, Share2, Star } from "lucide-react";
 import { toast } from "sonner";
 import Navbar from "@/components/navbar/Navbar";
 import PropertyCard from "@/components/listing/PropertyCard";
+import { StatCard, ActionBtn, SocialBtn, ContactRow, InfoChip, SectionTitle, AreaChip } from "@/components/agents/AgentProfileComponents";
 
 export default function AgentDetailsPage() {
     const params = useParams();
     const [agent, setAgent] = useState<any>(null);
     const [properties, setProperties] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'about' | 'listings' | 'reviews'>('about');
     const [hireModalOpen, setHireModalOpen] = useState(false);
     const [hireMessage, setHireMessage] = useState("");
+    const [serviceType, setServiceType] = useState<"Buying" | "Selling" | "Renting" | "Other">("Buying");
 
     useEffect(() => {
         if (params.id) {
@@ -29,8 +30,6 @@ export default function AgentDetailsPage() {
             const agentData = await api.agents.get(id);
             setAgent(agentData);
 
-            // Fetch properties for this agent
-            // Assuming agentData.user_id is available, otherwise try with agent id
             const userId = agentData.user_id || agentData.id;
             const propertiesData = await api.properties.list({ user_id: userId });
             setProperties(propertiesData);
@@ -45,9 +44,13 @@ export default function AgentDetailsPage() {
     const handleHire = async () => {
         if (!agent) return;
         try {
-            await api.agents.hire(agent.id, hireMessage);
+            await api.agents.hire(agent.id, {
+                service_type: serviceType,
+                initial_message: hireMessage
+            });
             toast.success(`Request sent to ${agent.first_name}!`);
             setHireModalOpen(false);
+            setHireMessage("");
         } catch (error) {
             toast.error("Failed to send hire request");
         }
@@ -57,13 +60,13 @@ export default function AgentDetailsPage() {
         return (
             <div className="min-h-screen bg-gray-50 flex flex-col">
                 <Navbar />
-                <div className="flex-1 flex items-center justify-center">
-                    <div className="w-full max-w-4xl px-4 space-y-8 animate-pulse">
-                        <div className="h-64 bg-gray-200 rounded-2xl" />
-                        <div className="space-y-4">
-                            <div className="h-8 bg-gray-200 rounded w-1/3" />
-                            <div className="h-4 bg-gray-200 rounded w-2/3" />
-                        </div>
+                <div className="flex-1 max-w-7xl mx-auto w-full px-6 py-12 grid grid-cols-1 lg:grid-cols-12 gap-12">
+                    <div className="lg:col-span-4 space-y-4">
+                        <div className="aspect-[3/4] bg-gray-200 rounded-3xl animate-pulse" />
+                    </div>
+                    <div className="lg:col-span-8 space-y-8">
+                        <div className="h-8 bg-gray-200 rounded w-1/3" />
+                        <div className="h-32 bg-gray-200 rounded-2xl" />
                     </div>
                 </div>
             </div>
@@ -73,231 +76,198 @@ export default function AgentDetailsPage() {
     if (!agent) return null;
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-[#FAFAFA] font-sans selection:bg-rose-100 selection:text-rose-900">
             <Navbar />
 
-            <main className="pt-24 pb-20 px-4">
-                <div className="max-w-6xl mx-auto space-y-8">
-                    {/* Header Profile Card */}
-                    <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50 overflow-hidden">
-                        {/* Cover Image */}
-                        <div className="h-48 bg-gradient-to-r from-gray-900 to-gray-800 relative">
-                            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&auto=format&fit=crop&w=1032&q=80')] opacity-20 bg-cover bg-center mix-blend-overlay" />
-                        </div>
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-24 pb-12">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
 
-                        <div className="px-8 pb-8">
-                            <div className="relative flex flex-col md:flex-row gap-6 items-start -mt-16">
-                                {/* Avatar */}
-                                <div className="w-32 h-32 rounded-3xl border-4 border-white bg-white shadow-lg overflow-hidden flex-shrink-0">
-                                    {agent.avatar_url ? (
-                                        <img src={agent.avatar_url} alt={agent.first_name} className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
-                                            <User size={40} />
-                                        </div>
-                                    )}
+                    {/* --- Left Column: Sticky Sidebar (The "Card") --- */}
+                    <div className="lg:col-span-4 lg:sticky lg:top-24 space-y-6">
+                        <div className="bg-white rounded-[32px] p-3 border border-gray-100 shadow-[0_20px_40px_-12px_rgba(0,0,0,0.1)] transition-transform duration-500">
+                            {/* Avatar Section */}
+                            <div className="relative aspect-square rounded-[24px] overflow-hidden bg-gray-100 ring-1 ring-black/5">
+                                {agent.avatar_url ? (
+                                    <img src={agent.avatar_url} alt={agent.first_name} className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-700" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-50 text-gray-300">
+                                        <User size={80} strokeWidth={1} />
+                                    </div>
+                                )}
+                                {/* Verified Badge */}
+                                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-white/50 shadow-sm">
+                                    <ShieldCheck size={14} className="text-blue-500 fill-blue-500/10" />
+                                    <span className="text-xs font-bold text-gray-900">Verified Pro</span>
                                 </div>
-
-                                {/* Info */}
-                                <div className="flex-1 pt-6 md:pt-16 space-y-4">
-                                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                                        <div>
-                                            <div className="flex items-center gap-3 mb-1">
-                                                <h1 className="text-3xl font-bold text-gray-900">{agent.first_name} {agent.last_name}</h1>
-                                                <span className="bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full text-xs font-bold flex items-center gap-1 border border-blue-100">
-                                                    <ShieldCheck size={12} /> Verified Agent
-                                                </span>
-                                            </div>
-                                            <p className="text-gray-500 font-medium flex items-center gap-2">
-                                                {agent.agency_name || "Independent Real Estate Agent"}
-                                            </p>
-                                        </div>
-
-                                        <div className="flex gap-3">
-                                            <button
-                                                onClick={() => setHireModalOpen(true)}
-                                                className="px-6 py-3 bg-rose-500 text-white font-bold rounded-xl hover:bg-rose-600 transition shadow-lg shadow-rose-500/20"
-                                            >
-                                                Hire Agent
-                                            </button>
-                                            <button className="px-6 py-3 border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition flex items-center gap-2">
-                                                <MessageSquare size={18} />
-                                                Message
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Stats Row */}
-                                    <div className="flex flex-wrap gap-6 text-sm text-gray-600 pt-2">
-                                        <div className="flex items-center gap-2">
-                                            <div className="p-1.5 bg-yellow-50 text-yellow-600 rounded-lg">
-                                                <Star size={16} fill="currentColor" />
-                                            </div>
-                                            <div>
-                                                <span className="font-bold text-gray-900 block">4.9/5</span>
-                                                <span className="text-xs">Rating</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
-                                                <Building size={16} />
-                                            </div>
-                                            <div>
-                                                <span className="font-bold text-gray-900 block">{properties.length}</span>
-                                                <span className="text-xs">Active Listings</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="p-1.5 bg-green-50 text-green-600 rounded-lg">
-                                                <Award size={16} />
-                                            </div>
-                                            <div>
-                                                <span className="font-bold text-gray-900 block">{agent.experience_years || 2}+ Years</span>
-                                                <span className="text-xs">Experience</span>
-                                            </div>
-                                        </div>
-                                    </div>
+                                {/* Rating Badge (New) */}
+                                <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-white/50 shadow-sm">
+                                    <Star size={12} className="fill-yellow-400 text-yellow-400" />
+                                    <span className="text-xs font-bold text-gray-900">{agent.average_rating || "5.0"}</span>
+                                    <span className="text-[10px] text-gray-500">({agent.review_count || 12})</span>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Tabs */}
-                        <div className="flex border-t border-gray-100 px-8">
-                            <button
-                                onClick={() => setActiveTab('about')}
-                                className={`px-4 py-4 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'about' ? 'border-rose-500 text-rose-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                            >
-                                About
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('listings')}
-                                className={`px-4 py-4 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'listings' ? 'border-rose-500 text-rose-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                            >
-                                Listings ({properties.length})
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('reviews')}
-                                className={`px-4 py-4 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'reviews' ? 'border-rose-500 text-rose-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                            >
-                                Reviews
-                            </button>
+                            {/* Identity & Actions */}
+                            <div className="px-3 md:px-5 py-6">
+                                <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight mb-1">
+                                    {agent.first_name} {agent.last_name}
+                                </h1>
+                                <p className="text-gray-500 font-medium mb-8 flex items-center gap-2 text-sm">
+                                    {agent.agency_name || "Independent Design Agent"}
+                                    <BadgeCheck size={16} className="text-blue-500" />
+                                </p>
+
+                                <div className="space-y-3 mb-8">
+                                    <ActionBtn
+                                        icon={ArrowRight}
+                                        label="Hire Agent"
+                                        primary
+                                        fullWidth
+                                        onClick={() => setHireModalOpen(true)}
+                                    />
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <ActionBtn icon={MessageSquare} label="Message" onClick={() => toast("Chat coming soon")} fullWidth />
+                                        <ActionBtn icon={Share2} label="Share" onClick={() => toast("Copied to clipboard")} fullWidth />
+                                    </div>
+                                </div>
+
+                                {/* Contact Details */}
+                                <div className="space-y-1 pt-2">
+                                    <ContactRow icon={MapPin} label="Location" value={agent.city || agent.location || "Location not set"} />
+                                    <ContactRow icon={Mail} label="Email" value={agent.email || "Email Hidden"} href={agent.email ? `mailto:${agent.email}` : undefined} />
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Tab Content */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {/* Main Content Info */}
-                        <div className="lg:col-span-2 space-y-8">
-                            {activeTab === 'about' && (
-                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <section className="bg-white rounded-2xl p-6 border border-gray-100">
-                                        <h3 className="text-lg font-bold text-gray-900 mb-4">About {agent.first_name}</h3>
-                                        <p className="text-gray-600 leading-relaxed">
-                                            {agent.bio || `${agent.first_name} is a dedicated real estate professional with over ${agent.experience_years || 2} years of experience in the local market. Specializing in ${agent.specialty || "residential"} properties, they have helped hundreds of clients find their dream homes. Known for their integrity and attention to detail.`}
-                                        </p>
-                                    </section>
+                    {/* --- Right Column: The "Feed" --- */}
+                    <div className="lg:col-span-8 space-y-12 pt-2">
 
-                                    <section className="bg-white rounded-2xl p-6 border border-gray-100">
-                                        <h3 className="text-lg font-bold text-gray-900 mb-4">Specialties & Skills</h3>
-                                        <div className="flex flex-wrap gap-2">
-                                            {(agent.specialty || "Residential,Luxury,Commercial,Rentals").split(',').map((tag: string, i: number) => (
-                                                <span key={i} className="px-3 py-1.5 bg-gray-100 text-gray-700 font-medium text-sm rounded-lg">
-                                                    {tag.trim()}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </section>
-                                </div>
-                            )}
-
-                            {activeTab === 'listings' && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    {properties.length === 0 ? (
-                                        <div className="col-span-2 text-center py-12 text-gray-500 bg-white rounded-2xl border border-dashed">
-                                            No active listings found.
-                                        </div>
-                                    ) : (
-                                        properties.map(property => (
-                                            <PropertyCard key={property.id} data={property} />
-                                        ))
-                                    )}
-                                </div>
-                            )}
-
-                            {activeTab === 'reviews' && (
-                                <div className="bg-white rounded-2xl p-6 border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <div className="text-center py-12 text-gray-500">
-                                        <p>Reviews coming soon.</p>
-                                    </div>
-                                </div>
-                            )}
+                        {/* Stats Strip */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <StatCard label="Total Sales" value={agent.sales_count ?? 0} subtext="Properties sold" />
+                            <StatCard label="Experience" value={`${agent.experience_years ?? 0} Yrs`} />
+                            <StatCard label="Rating" value={agent.average_rating ?? "-"} subtext={`(${agent.review_count ?? 0} reviews)`} />
+                            <StatCard label="Commission" value={`${agent.commission_rate ?? 1.5}%`} subtext="Listing Fee" />
                         </div>
 
-                        {/* Sidebar Info */}
-                        <div className="space-y-6">
-                            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm sticky top-24">
-                                <h3 className="font-bold text-gray-900 mb-4">Contact Information</h3>
-                                <div className="space-y-4">
-                                    {agent.phone && (
-                                        <div className="flex items-center gap-3 text-gray-600">
-                                            <div className="p-2 bg-gray-50 rounded-lg">
-                                                <Phone size={18} />
-                                            </div>
-                                            <span className="font-medium">{agent.phone}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex items-center gap-3 text-gray-600">
-                                        <div className="p-2 bg-gray-50 rounded-lg">
-                                            <Mail size={18} />
-                                        </div>
-                                        <span className="font-medium">{agent.email || "Email Hidden"}</span>
-                                    </div>
-                                    <div className="flex items-center gap-3 text-gray-600">
-                                        <div className="p-2 bg-gray-50 rounded-lg">
-                                            <MapPin size={18} />
-                                        </div>
-                                        <span className="font-medium">Serves {agent.location || "Local Area"}</span>
-                                    </div>
-
-                                    <div className="pt-4 border-t border-gray-100">
-                                        <p className="text-xs text-gray-500 mb-2 font-semibold uppercase">License</p>
-                                        <p className="text-sm font-mono bg-gray-50 px-3 py-1.5 rounded-lg inline-block text-gray-700">
-                                            {agent.license_number || "RERA-PENDING"}
-                                        </p>
-                                    </div>
-                                </div>
+                        {/* About */}
+                        <section>
+                            <SectionTitle title="About" />
+                            <div className="prose prose-lg text-gray-600 leading-relaxed max-w-none">
+                                <p>
+                                    {agent.bio || `${agent.first_name} is a dedicated real estate professional with ${agent.experience_years ?? 0} years of experience.`}
+                                </p>
                             </div>
-                        </div>
+                        </section>
+
+                        {/* Specialties */}
+                        <section>
+                            <SectionTitle title="Expertise & Focus" />
+                            <div className="flex flex-wrap gap-3">
+                                {agent.specialty ? (
+                                    agent.specialty.split(',').map((tag: string, i: number) => (
+                                        <InfoChip key={i} text={tag.trim()} />
+                                    ))
+                                ) : (
+                                    <span className="text-gray-400 text-sm italic">No specialties listed</span>
+                                )}
+                            </div>
+                        </section>
+
+                        {/* Service Areas */}
+                        <section>
+                            <SectionTitle title="Service Areas" />
+                            <div className="flex flex-wrap gap-3">
+                                {agent.service_areas ? (
+                                    agent.service_areas.split(',').map((area: string, i: number) => (
+                                        <AreaChip key={i} text={area.trim()} />
+                                    ))
+                                ) : (
+                                    <span className="text-gray-400 text-sm italic">No service areas listed</span>
+                                )}
+                            </div>
+                        </section>
+
+                        {/* Active Listings */}
+                        <section>
+                            <SectionTitle
+                                title={`Active Listings (${properties.length})`}
+                                action={
+                                    <button className="text-sm font-bold text-gray-900 border-b border-gray-900 pb-0.5 hover:text-blue-600 hover:border-blue-600 transition-all">
+                                        View All Properties
+                                    </button>
+                                }
+                            />
+
+                            {properties.length > 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {properties.slice(0, 4).map(property => (
+                                        <PropertyCard key={property.id} data={property} />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center">
+                                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
+                                        <MapPin size={24} />
+                                    </div>
+                                    <h4 className="text-gray-900 font-bold mb-1">No active listings</h4>
+                                    <p className="text-gray-400 font-medium text-sm">This agent has no public listings at the moment.</p>
+                                </div>
+                            )}
+                        </section>
                     </div>
                 </div>
             </main>
 
-            {/* Hire Modal */}
+            {/* --- Hire Modal (Reused) --- */}
             {hireModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
-                        <h2 className="text-xl font-bold text-gray-900 mb-2">Hire {agent.first_name}</h2>
-                        <p className="text-sm text-gray-500 mb-4">
-                            Send a request to hire this agent. They will get back to you shortly.
-                        </p>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-in fade-in zoom-in duration-200">
+                    <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-md p-8 transform transition-all scale-100 border border-white/20 relative overflow-hidden">
+                        {/* Decorative bg blob */}
+                        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-gray-50 to-white -z-10" />
+
+                        <div className="text-center mb-8 pt-4">
+                            <div className="w-24 h-24 bg-white rounded-[24px] mx-auto mb-4 overflow-hidden border-4 border-white shadow-lg shadow-gray-200/50">
+                                {agent.avatar_url && <img src={agent.avatar_url} className="w-full h-full object-cover" />}
+                            </div>
+                            <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">Hire {agent.first_name}</h2>
+                            <p className="text-gray-500 mt-2 font-medium">What allow you looking for?</p>
+                        </div>
+
+                        {/* Service Type Selection */}
+                        <div className="grid grid-cols-4 gap-2 mb-4 p-1 bg-gray-100/50 rounded-xl border border-gray-100">
+                            {["Buying", "Selling", "Renting", "Other"].map((type) => (
+                                <button
+                                    key={type}
+                                    onClick={() => setServiceType(type as any)}
+                                    className={`py-2 text-xs font-bold rounded-lg transition-all ${serviceType === type
+                                        ? "bg-white text-gray-900 shadow-sm border border-gray-200"
+                                        : "text-gray-500 hover:text-gray-900"
+                                        }`}
+                                >
+                                    {type}
+                                </button>
+                            ))}
+                        </div>
 
                         <textarea
                             value={hireMessage}
                             onChange={(e) => setHireMessage(e.target.value)}
-                            placeholder="Hi, I'm interested in buying a property..."
-                            className="w-full p-4 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 min-h-[120px] mb-4"
+                            placeholder={`Hi, I'm interested in ${serviceType.toLowerCase()}...`}
+                            className="w-full p-5 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 min-h-[140px] mb-6 bg-gray-50/50 resize-none font-medium text-gray-700 placeholder:text-gray-400"
                         />
 
-                        <div className="flex gap-3">
+                        <div className="grid grid-cols-2 gap-4">
                             <button
                                 onClick={() => setHireModalOpen(false)}
-                                className="flex-1 py-2.5 border border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50"
+                                className="w-full h-14 rounded-2xl font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleHire}
-                                className="flex-1 py-2.5 bg-rose-500 text-white font-bold rounded-xl hover:bg-rose-600"
+                                className="w-full h-14 rounded-2xl font-bold text-white bg-gray-900 hover:bg-black transition-all shadow-xl shadow-gray-900/20 active:scale-95"
                             >
                                 Send Request
                             </button>

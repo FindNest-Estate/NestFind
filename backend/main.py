@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.database import engine
 import app.models as models
-from app.routers import auth, properties, bookings, dashboard, users, offers, messages, transactions, notifications, payments, admin, ai, agents
+from app.routers import auth, properties, bookings, dashboard, users, offers, messages, transactions, notifications, payments, admin, ai, agents, loans
 from app.tasks import start_scheduler
 from app.core.logger import logger
 import os
@@ -80,6 +80,7 @@ app.include_router(payments.router)
 app.include_router(admin.router)
 app.include_router(ai.router)
 app.include_router(agents.router)
+app.include_router(loans.router)
 
 @app.get("/")
 def read_root():

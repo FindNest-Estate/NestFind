@@ -246,17 +246,29 @@ export const api = {
     agents: {
         findNearby: (lat: number, lng: number, radius = 50) =>
             fetchAPI(`/agents/nearby?lat=${lat}&lng=${lng}&radius=${radius}`),
-        listAll: (params?: { skip?: number, limit?: number, specialty?: string, available_only?: boolean, max_commission?: number }) => {
+        listAll: (params?: { skip?: number, limit?: number, specialty?: string, available_only?: boolean, max_commission?: number, search?: string }) => {
             const query = new URLSearchParams();
             if (params?.skip) query.append('skip', String(params.skip));
             if (params?.limit) query.append('limit', String(params.limit));
             if (params?.specialty) query.append('specialty', params.specialty);
             if (params?.available_only) query.append('available_only', 'true');
             if (params?.max_commission) query.append('max_commission', String(params.max_commission));
+            if (params?.search) query.append('search', params.search);
             return fetchAPI(`/agents/all?${query.toString()}`);
         },
         get: (id: number) => fetchAPI(`/agents/${id}`),
-        hire: (agentId: number, message: string) => fetchAPI(`/agents/${agentId}/hire?message=${encodeURIComponent(message)}`, { method: 'POST' }),
+        hire: (agentId: number, data: { service_type: string, property_preferences?: any, initial_message: string }) => fetchAPI(`/agents/${agentId}/hire`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+            headers: { 'Content-Type': 'application/json' }
+        }),
+        getRequests: () => fetchAPI('/agents/client-requests'),
+        proposeTerms: (requestId: number, data: { commission_rate: number }) => fetchAPI(`/agents/client-requests/${requestId}/propose`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+            headers: { 'Content-Type': 'application/json' }
+        }),
+        acceptProposal: (requestId: number) => fetchAPI(`/agents/client-requests/${requestId}/accept`, { method: 'POST' }),
     },
     messages: {
         send: (data: { receiver_id: number, property_id?: number, message_text: string }) => fetchAPI('/messages/', {

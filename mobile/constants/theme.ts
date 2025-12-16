@@ -15,6 +15,12 @@ export const colors = {
     white: '#FFFFFF',
     success: '#22C55E',
     error: '#EF4444',
+    // Extended Palette
+    blue50: '#EFF6FF',
+    blue500: '#3B82F6',
+    green50: '#F0FDF4',
+    green500: '#22C55E',
+    red50: '#FEF2F2',
 };
 
 export const spacing = {
