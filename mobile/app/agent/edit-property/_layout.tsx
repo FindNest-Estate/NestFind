@@ -1,5 +1,0 @@
-import { Stack } from 'expo-router';
-
-export default function EditPropertyLayout() {
-    return <Stack screenOptions={{ headerShown: false }} />;
-}
