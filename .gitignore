@@ -1,7 +1,20 @@
+# IDE
 .vscode/
 .idea/
+
+# Logs
 *.log
+
+# Temp files
 tmp/
 temp/
 .DS_Store
 *.swp
+
+# Documentation archive (deprecated files)
+archive/
+
+# AI Assistant artifacts
+.gemini/
+.antigravity/
+brain/

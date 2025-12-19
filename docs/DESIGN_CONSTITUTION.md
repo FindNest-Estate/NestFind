@@ -562,7 +562,7 @@ Before shipping ANY feature, answer:
 | Document | Purpose |
 |----------|---------|
 | `db_ui_mapping.md` | Detailed feature-to-state-to-UI mappings |
-| `antigravity_enforcement_rules.md` | AI development guardrails |
+| `CODE_QUALITY_RULES.md` | Development quality guardrails |
 | `design_validation_checklist.md` | Pre-deployment QA checklist |
 | `system_design.md` | Full system architecture |
 
