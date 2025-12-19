@@ -1,0 +1,6 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- The Verified Check Logo - Monochrome Black -->
+  <path d="M12 36V12L30 36V12" stroke="#000000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M24 24L30 30" stroke="#000000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="35" cy="13" r="3.5" fill="#000000"/>
+</svg>
