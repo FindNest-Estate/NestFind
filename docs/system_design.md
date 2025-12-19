@@ -1,4 +1,4 @@
-# 📘 NESTFIND — SYSTEM DESIGN DOCUMENT
+# NESTFIND — SYSTEM DESIGN DOCUMENT
 
 **Version:** 1.0 | **Status:** Design Phase | **Last Updated:** December 18, 2024
 

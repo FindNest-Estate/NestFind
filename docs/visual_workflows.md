@@ -1,4 +1,4 @@
-# 📊 NESTFIND — VISUAL WORKFLOW DIAGRAMS
+# NESTFIND — VISUAL WORKFLOW DIAGRAMS
 
 *Complete visual representation of all business workflows and system flows*
 

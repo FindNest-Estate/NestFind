@@ -16,11 +16,11 @@
 *   **Text:** `Dark Gray` (`#111827`) - Body. `Medium Gray` (`#6B7280`) - Meta text.
 
 ### 1.2 Status Indicators (The "Truth" of the UI)
-*   🟢 **ACTIVE:** Verified, Live. (Emerald)
-*   🟠 **RESERVED:** Deposit paid, Locked. (Amber)
-*   ⚫ **SOLD:** Transaction closed. (Dark Gray)
-*   🟣 **UNDER_REVIEW:** Pending checks. (Muted Purple)
-*   🔴 **DECLINED:** Rejected. (Muted Red)
+*   **ACTIVE:** Verified, Live. (Emerald)
+*   **RESERVED:** Deposit paid, Locked. (Amber)
+*   **SOLD:** Transaction closed. (Dark Gray)
+*   **UNDER_REVIEW:** Pending checks. (Muted Purple)
+*   **DECLINED:** Rejected. (Muted Red)
 
 ### 1.3 Interaction Model
 *   **Explicit Actions:** No hidden menus. Buttons say what they do (e.g., "Request Visit" not just "Book").

@@ -1,4 +1,4 @@
-# 📘 NESTFIND — ADMIN SYSTEM DESIGN DOCUMENT
+# NESTFIND - ADMIN SYSTEM DESIGN DOCUMENT
 
 **Version:** 1.0  
 **Last Updated:** December 18, 2024  
@@ -29,7 +29,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    🛡️ ADMIN = TRUST AUTHORITY               │
+│                    ADMIN = TRUST AUTHORITY               │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │   ✅ Fraud Prevention         ✅ Rule Enforcement           │
@@ -43,7 +43,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    ❌ ADMIN IS NOT                          │
+│                    ADMIN IS NOT                          │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │   ❌ Customer Support          ❌ Deal Participant          │
