@@ -13,6 +13,8 @@ erDiagram
     USERS ||--o{ VISIT_REQUESTS : "requests as buyer"
     USERS ||--o{ OFFERS : "makes as buyer"
     USERS ||--o{ RESERVATIONS : "creates as buyer"
+    USERS ||--o{ SESSIONS : "has"
+    USERS ||--o{ EMAIL_OTP_VERIFICATIONS : "verifies"
     
     AGENT_PROFILES ||--o{ AGENT_ASSIGNMENTS : "receives"
     AGENT_PROFILES ||--o{ VISIT_REQUESTS : "manages"
@@ -45,6 +47,9 @@ erDiagram
         boolean email_verified
         enum status
         enum role
+        int login_attempts
+        timestamp login_locked_until
+        timestamp email_verified_at
         timestamp created_at
     }
     
@@ -139,6 +144,30 @@ erDiagram
         string ip_address
         jsonb details
     }
+    
+    SESSIONS {
+        uuid session_id PK
+        uuid user_id FK
+        string refresh_token_hash
+        timestamp expires_at
+        timestamp revoked_at
+        string device_fingerprint
+        string last_ip
+        uuid token_family_id
+        string parent_token_hash
+        timestamp created_at
+    }
+    
+    EMAIL_OTP_VERIFICATIONS {
+        uuid id PK
+        uuid user_id FK
+        string otp_hash
+        timestamp expires_at
+        int attempts
+        timestamp consumed_at
+        string consumed_by_ip
+        timestamp created_at
+    }
 ```
 
 ---
@@ -151,6 +180,7 @@ erDiagram
 |-------|---------|-------------|
 | `users` | All platform users | `id` (UUID) |
 | `email_otp_verifications` | OTP tracking | `id` |
+| `sessions` | JWT session tracking | `session_id` (UUID) |
 | `agent_profiles` | Agent-specific data | `user_id` (FK) |
 
 ### Property System

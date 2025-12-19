@@ -1,24 +1,20 @@
-import './landing.css';
+import './styles.css';
 
 export default function LandingPage() {
     return (
         <div className="landing-page">
+            {/* 1. STICKY NAVBAR */}
             <nav className="navbar">
                 <div className="navbar-container">
-                    <a href="/landing" className="logo" style={{ color: '#FF385C', fontWeight: 700, fontSize: '1.5rem' }}>
+                    <a href="/landing" className="logo">
+                        <div className="logo-icon">N</div>
                         NestFind
                     </a>
                     <ul className="nav-links">
-                        <li><a href="#sell">Sell</a></li>
-                        <li><a href="#buy">Buy</a></li>
-                        <li><a href="#rent">Rent</a></li>
-                        <li><a href="#loans">Loans</a></li>
-                        <li><a href="/find-agent">Find Agent</a></li>
+                        <li><a href="#browse">Browse</a></li>
+                        <li><a href="#how-it-works">How It Works</a></li>
+                        <li><a href="/login" className="nav-cta">Login / Register</a></li>
                     </ul>
-                    <div className="auth-buttons">
-                        <a href="/login" className="login-btn">Login</a>
-                        <a href="/register" className="signup-btn">Sign up</a>
-                    </div>
                 </div>
             </nav>
 
@@ -33,28 +29,6 @@ export default function LandingPage() {
                     <a href="#featured-properties" className="hero-cta">
                         Browse Properties
                     </a>
-                </div>
-            </section>
-
-            {/* TRUST STATISTICS BAR */}
-            <section className="trust-stats">
-                <div className="stats-container">
-                    <div className="stat-item">
-                        <div className="stat-number">2,500+</div>
-                        <div className="stat-label">Verified Properties</div>
-                    </div>
-                    <div className="stat-item">
-                        <div className="stat-number">15,000+</div>
-                        <div className="stat-label">Successful Visits</div>
-                    </div>
-                    <div className="stat-item">
-                        <div className="stat-number">500+</div>
-                        <div className="stat-label">Verified Agents</div>
-                    </div>
-                    <div className="stat-item">
-                        <div className="stat-number">1,200+</div>
-                        <div className="stat-label">Completed Transactions</div>
-                    </div>
                 </div>
             </section>
 
@@ -151,17 +125,10 @@ export default function LandingPage() {
                     <p className="properties-disclaimer">Sample listings for demonstration only</p>
                     <div className="properties-grid">
                         <div className="property-card">
-                            <div className="property-image-container">
-                                <span className="status-badge status-active">ACTIVE</span>
-                                <div className="property-image"></div>
+                            <div className="property-image">
+                                [Property Image Placeholder]
                             </div>
                             <div className="property-info">
-                                <div className="verification-badge">
-                                    <svg viewBox="0 0 24 24" fill="none">
-                                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="#16A34A" strokeWidth="2" />
-                                    </svg>
-                                    <span>Verified by Agent</span>
-                                </div>
                                 <div className="property-price">$750,000</div>
                                 <h3 className="property-title">Modern Family Home</h3>
                                 <p className="property-location">San Francisco, CA</p>
@@ -174,17 +141,10 @@ export default function LandingPage() {
                         </div>
 
                         <div className="property-card">
-                            <div className="property-image-container">
-                                <span className="status-badge status-reserved">RESERVED</span>
-                                <div className="property-image"></div>
+                            <div className="property-image">
+                                [Property Image Placeholder]
                             </div>
                             <div className="property-info">
-                                <div className="verification-badge">
-                                    <svg viewBox="0 0 24 24" fill="none">
-                                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="#16A34A" strokeWidth="2" />
-                                    </svg>
-                                    <span>Verified by Agent</span>
-                                </div>
                                 <div className="property-price">$525,000</div>
                                 <h3 className="property-title">Downtown Luxury Condo</h3>
                                 <p className="property-location">Austin, TX</p>
@@ -197,17 +157,10 @@ export default function LandingPage() {
                         </div>
 
                         <div className="property-card">
-                            <div className="property-image-container">
-                                <span className="status-badge status-active">ACTIVE</span>
-                                <div className="property-image"></div>
+                            <div className="property-image">
+                                [Property Image Placeholder]
                             </div>
                             <div className="property-info">
-                                <div className="verification-badge">
-                                    <svg viewBox="0 0 24 24" fill="none">
-                                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="#16A34A" strokeWidth="2" />
-                                    </svg>
-                                    <span>Verified by Agent</span>
-                                </div>
                                 <div className="property-price">$920,000</div>
                                 <h3 className="property-title">Waterfront Estate</h3>
                                 <p className="property-location">Seattle, WA</p>
@@ -220,17 +173,10 @@ export default function LandingPage() {
                         </div>
 
                         <div className="property-card">
-                            <div className="property-image-container">
-                                <span className="status-badge status-active">ACTIVE</span>
-                                <div className="property-image"></div>
+                            <div className="property-image">
+                                [Property Image Placeholder]
                             </div>
                             <div className="property-info">
-                                <div className="verification-badge">
-                                    <svg viewBox="0 0 24 24" fill="none">
-                                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="#16A34A" strokeWidth="2" />
-                                    </svg>
-                                    <span>Verified by Agent</span>
-                                </div>
                                 <div className="property-price">$425,000</div>
                                 <h3 className="property-title">Suburban Retreat</h3>
                                 <p className="property-location">Portland, OR</p>
@@ -241,24 +187,6 @@ export default function LandingPage() {
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* TRUST FOOTER BANNER */}
-            <section className="trust-footer-banner">
-                <div className="trust-banner-content">
-                    <div className="trust-banner-item">
-                        <strong>🔒 Secure Transactions</strong>
-                        <span>Bank-grade encryption on all communications</span>
-                    </div>
-                    <div className="trust-banner-item">
-                        <strong>✓ Fully Compliant</strong>
-                        <span>Licensed & regulated real estate marketplace</span>
-                    </div>
-                    <div className="trust-banner-item">
-                        <strong>🛡️ Trust Verified</strong>
-                        <span>Every agent undergoes rigorous background checks</span>
                     </div>
                 </div>
             </section>
@@ -309,6 +237,6 @@ export default function LandingPage() {
                     </div>
                 </div>
             </footer>
-        </div >
+        </div>
     );
 }

@@ -1,21 +1,35 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+import asyncpg
+from typing import Optional
 
-import os
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///D:/NestFind/backend/nestfind.db"
+# Global connection pool
+_pool: Optional[asyncpg.Pool] = None
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-Base = declarative_base()
+async def init_db_pool():
+    """Initialize database connection pool at startup."""
+    global _pool
+    _pool = await asyncpg.create_pool(
+        host="localhost",
+        port=5432,
+        user="postgres",
+        password="postgres",
+        database="nestfind",
+        min_size=5,
+        max_size=20
+    )
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+
+async def close_db_pool():
+    """Close database connection pool at shutdown."""
+    global _pool
+    if _pool:
+        await _pool.close()
+        _pool = None
+
+
+def get_db_pool() -> asyncpg.Pool:
+    """Get database connection pool dependency."""
+    if _pool is None:
+        raise RuntimeError("Database pool not initialized")
+    return _pool

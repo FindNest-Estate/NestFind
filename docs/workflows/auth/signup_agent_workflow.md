@@ -147,3 +147,11 @@ stateDiagram-v2
 - DECLINED agents can edit details and reapply
 - Old records are NEVER deleted (audit trail)
 - Service radius cannot exceed 100km
+
+---
+
+## Security Rules
+
+- Each OTP can only be used ONCE (single-use enforcement)
+- Email cannot be changed until account is verified
+- Password must be minimum 8 characters with 1 letter and 1 number

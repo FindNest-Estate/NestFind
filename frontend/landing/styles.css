@@ -1,23 +1,23 @@
-/* NestFind Landing Page Styles - Charcoal + Airbnb Red ONLY */
+/* NestFind Landing Page Styles - Charcoal + Emerald Only */
 /* This file is scoped to /landing/page.tsx ONLY - DO NOT import globally */
 
 :root {
-  /* Color Palette - ONLY 2 COLORS */
+  /* Color Palette - NO BLUE ALLOWED */
   --charcoal: #1F2933;
-  --red: #FF385C;
-  --red-hover: #E31C5F;
-  --red-soft: #FFF1F2;
-
+  --emerald: #1E8E5A;
+  --emerald-dark: #166943;
+  --emerald-light: #2AA76F;
+  
   /* Neutral Backgrounds */
   --bg-primary: #FFFFFF;
   --bg-secondary: #F5F7FA;
   --bg-tertiary: #E1E8ED;
-
+  
   /* Text Colors */
   --text-primary: #1F2933;
   --text-secondary: #52606D;
   --text-muted: #7B8794;
-
+  
   /* Spacing System */
   --spacing-xs: 8px;
   --spacing-sm: 16px;
@@ -26,7 +26,7 @@
   --spacing-xl: 48px;
   --spacing-2xl: 64px;
   --spacing-3xl: 80px;
-
+  
   /* Typography */
   --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -58,10 +58,9 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 var(--spacing-md);
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: var(--spacing-lg);
 }
 
 .logo {
@@ -72,13 +71,12 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
-  justify-self: start;
 }
 
 .logo-icon {
   width: 32px;
   height: 32px;
-  background: var(--red);
+  background: var(--emerald);
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -93,7 +91,6 @@
   gap: var(--spacing-lg);
   align-items: center;
   list-style: none;
-  justify-self: center;
 }
 
 .nav-links a {
@@ -105,63 +102,19 @@
 }
 
 .nav-links a:hover {
-  color: var(--red);
-}
-
-.login-btn,
-.signup-btn {
-  padding: 10px 24px;
-  border-radius: 8px;
-  font-weight: 500;
-  font-size: 14px;
-  text-decoration: none;
-  transition: all 0.2s ease;
-  cursor: pointer;
-  border: 1px solid transparent;
-  display: inline-block;
-  min-width: 120px;
-  text-align: center;
-}
-
-.login-btn {
-  background: var(--red);
-  color: white;
-}
-
-.login-btn:hover {
-  background: #e0304e;
-  transform: scale(1.02);
-}
-
-.signup-btn {
-  background: white;
-  color: var(--red);
-  border: 1px solid var(--red);
-}
-
-.signup-btn:hover {
-  background: #fff5f7;
-  transform: scale(1.02);
-}
-
-.auth-buttons {
-  justify-self: end;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  color: var(--emerald);
 }
 
 .nav-cta {
-  background: var(--red);
+  background: var(--emerald);
   color: white !important;
   padding: 10px 20px;
   border-radius: 6px;
   transition: background 0.2s;
-  justify-self: end;
 }
 
 .nav-cta:hover {
-  background: var(--red-hover);
+  background: var(--emerald-dark);
 }
 
 /* === HERO SECTION === */
@@ -193,7 +146,7 @@
 
 .hero-cta {
   display: inline-block;
-  background: var(--red);
+  background: var(--emerald);
   color: white;
   padding: 16px 40px;
   border-radius: 8px;
@@ -204,41 +157,7 @@
 }
 
 .hero-cta:hover {
-  background: var(--red-hover);
-}
-
-/* === TRUST STATISTICS BAR === */
-.trust-stats {
-  background: var(--charcoal);
-  padding: var(--spacing-xl) var(--spacing-md);
-  color: white;
-}
-
-.stats-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--spacing-lg);
-  text-align: center;
-}
-
-.stat-item {
-  padding: var(--spacing-sm);
-}
-
-.stat-number {
-  font-size: 36px;
-  font-weight: 700;
-  color: var(--red);
-  margin-bottom: var(--spacing-xs);
-}
-
-.stat-label {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.8);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  background: var(--emerald-dark);
 }
 
 /* === HOW IT WORKS === */
@@ -274,7 +193,7 @@
 .step-number {
   width: 64px;
   height: 64px;
-  background: var(--red);
+  background: var(--emerald);
   color: white;
   border-radius: 50%;
   display: flex;
@@ -320,7 +239,7 @@
 .trust-icon {
   width: 48px;
   height: 48px;
-  background: var(--red);
+  background: var(--emerald);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -378,84 +297,28 @@
 }
 
 .property-card:hover {
-  border-color: var(--red);
-  box-shadow: 0 4px 12px rgba(31, 41, 51, 0.1);
-}
-
-.property-image-container {
-  position: relative;
-  width: 100%;
-  height: 240px;
+  border-color: var(--emerald);
 }
 
 .property-image {
   width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #E1E8ED 0%, #F5F7FA 100%);
+  height: 240px;
+  background: var(--bg-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-}
-
-.property-image::before {
-  content: '🏠';
-  font-size: 48px;
-  opacity: 0.3;
-}
-
-.status-badge {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  z-index: 10;
-}
-
-.status-active {
-  background: #16A34A;
-  color: white;
-}
-
-.status-reserved {
-  background: #F59E0B;
-  color: white;
-}
-
-.status-sold {
-  background: #6B7280;
-  color: white;
+  color: var(--text-muted);
+  font-size: 14px;
 }
 
 .property-info {
   padding: var(--spacing-md);
 }
 
-.verification-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #16A34A;
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: var(--spacing-sm);
-}
-
-.verification-badge svg {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-}
-
 .property-price {
   font-size: 24px;
   font-weight: 700;
-  color: var(--charcoal);
+  color: var(--emerald);
   margin-bottom: var(--spacing-xs);
 }
 
@@ -483,39 +346,6 @@
   display: flex;
   align-items: center;
   gap: 4px;
-}
-
-/* === TRUST FOOTER BANNER === */
-.trust-footer-banner {
-  background: var(--bg-secondary);
-  padding: var(--spacing-2xl) var(--spacing-md);
-  border-top: 1px solid var(--bg-tertiary);
-}
-
-.trust-banner-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: var(--spacing-xl);
-}
-
-.trust-banner-item {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  text-align: center;
-}
-
-.trust-banner-item strong {
-  font-size: 18px;
-  color: var(--charcoal);
-  font-weight: 600;
-}
-
-.trust-banner-item span {
-  font-size: 14px;
-  color: var(--text-secondary);
 }
 
 /* === FOOTER === */
@@ -560,7 +390,7 @@
 }
 
 .footer-section a:hover {
-  color: var(--red);
+  color: var(--emerald-light);
 }
 
 .footer-bottom {
@@ -576,19 +406,19 @@
   .hero h1 {
     font-size: 36px;
   }
-
+  
   .hero p {
     font-size: 18px;
   }
-
+  
   .section-title {
     font-size: 28px;
   }
-
+  
   .nav-links {
     gap: var(--spacing-sm);
   }
-
+  
   .steps-grid,
   .trust-grid,
   .properties-grid {

@@ -131,3 +131,13 @@ stateDiagram-v2
 - Email OTP only (no SMS to minimize cost)
 - Maximum 3 OTP attempts before lockout
 - OTP expires after 10 minutes
+- Lockout duration: 30 minutes (automatic unlock)
+
+---
+
+## Security Rules
+
+- Each OTP can only be used ONCE (single-use enforcement)
+- Subsequent attempts with same OTP are rejected even if not expired
+- Email cannot be changed until account is verified (status=ACTIVE)
+- Password must be minimum 8 characters with 1 letter and 1 number
