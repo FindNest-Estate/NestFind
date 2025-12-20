@@ -99,6 +99,7 @@ export interface AuthResponse {
     success: boolean;
     message?: string;
     error?: string;
+    user_id?: string; // Returned on registration for OTP flow
 }
 
 export interface RefreshTokenRequest {

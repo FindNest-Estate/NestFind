@@ -1,4 +1,5 @@
 import bcrypt
+import json
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
@@ -111,11 +112,11 @@ class RegisterAgentService:
                     (user_id, action, entity_type, entity_id, ip_address, details)
                     VALUES ($1, 'AGENT_SIGNUP', 'users', $1, $2, $3)
                     """,
-                    user_id, ip_address, {
+                    user_id, ip_address, json.dumps({
                         'email': email,
                         'license_id': license_id,
                         'service_radius_km': service_radius_km
-                    }
+                    })
                 )
                 
                 return {

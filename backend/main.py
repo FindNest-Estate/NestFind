@@ -1,7 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+import os
 
-from app.routers import otp, login, session, refresh, register_user, register_agent, admin_agent_approval
+# Load environment variables
+load_dotenv()
+
+from app.routers import otp, login, session, refresh, register_user, register_agent, admin_agent_approval, user
 from app.core.database import init_db_pool, close_db_pool
 
 app = FastAPI(
@@ -36,6 +41,7 @@ app.include_router(refresh.router)
 app.include_router(register_user.router)
 app.include_router(register_agent.router)
 app.include_router(admin_agent_approval.router)
+app.include_router(user.router)
 
 @app.get("/")
 def read_root():

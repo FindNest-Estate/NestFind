@@ -1,4 +1,5 @@
 import bcrypt
+import json
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
@@ -99,7 +100,7 @@ class RegisterUserService:
                     (user_id, action, entity_type, entity_id, ip_address, details)
                     VALUES ($1, 'SIGNUP_INITIATED', 'users', $1, $2, $3)
                     """,
-                    user_id, ip_address, {'email': email}
+                    user_id, ip_address,json.dumps({'email': email})
                 )
                 
                 return {

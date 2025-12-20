@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
 from typing import Optional
+from uuid import UUID
 
 from ..services.register_agent_service import RegisterAgentService
 from ..services.otp_service import OTPService
@@ -21,6 +22,7 @@ class RegisterAgentRequest(BaseModel):
 
 class RegisterAgentResponse(BaseModel):
     message: str
+    user_id: UUID
 
 
 @router.post("/register/agent", response_model=RegisterAgentResponse, status_code=status.HTTP_202_ACCEPTED)
@@ -72,7 +74,8 @@ async def register_agent(
         )
         
         return RegisterAgentResponse(
-            message="Verification OTP sent to email"
+            message="Verification OTP sent to email",
+            user_id=result["user_id"]
         )
     
     except ValueError as e:

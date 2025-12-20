@@ -1,5 +1,6 @@
 import secrets
 import hashlib
+import json
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Tuple
 from uuid import UUID
@@ -43,7 +44,8 @@ class RefreshTokenService:
         """
         refresh_token = self._generate_refresh_token()
         refresh_token_hash = self._hash_token(refresh_token)
-        expires_at = datetime.now(timezone.utc) + timedelta(days=self.REFRESH_TOKEN_EXPIRY_DAYS)
+        # Use naive UTC datetime for DB TIMESTAMP columns
+        expires_at = datetime.utcnow() + timedelta(days=self.REFRESH_TOKEN_EXPIRY_DAYS)
         
         async with self.db.acquire() as conn:
             async with conn.transaction():
@@ -119,10 +121,10 @@ class RefreshTokenService:
                             (user_id, action, entity_type, entity_id, ip_address, details)
                             VALUES ($1, 'TOKEN_REVOKED', 'sessions', $2, $3, $4)
                             """,
-                            reused_session['user_id'], reused_session['session_id'], ip_address, {
+                            reused_session['user_id'], reused_session['session_id'], ip_address, json.dumps({
                                 'reason': 'refresh_token_reuse_detected',
                                 'token_family_id': str(reused_session['token_family_id'])
-                            }
+                            })
                         )
                         
                         return {
@@ -143,7 +145,7 @@ class RefreshTokenService:
                     }
                 
                 # Check if token is expired
-                if session['expires_at'] < datetime.now(timezone.utc):
+                if session['expires_at'] < datetime.utcnow():
                     return {
                         "success": False,
                         "error": "Refresh token expired"
@@ -152,7 +154,8 @@ class RefreshTokenService:
                 # Generate new refresh token
                 new_refresh_token = self._generate_refresh_token()
                 new_refresh_token_hash = self._hash_token(new_refresh_token)
-                new_expires_at = datetime.now(timezone.utc) + timedelta(days=self.REFRESH_TOKEN_EXPIRY_DAYS)
+                # Use naive UTC datetime for DB TIMESTAMP columns
+                new_expires_at = datetime.utcnow() + timedelta(days=self.REFRESH_TOKEN_EXPIRY_DAYS)
                 
                 # Rotate: update session with new token and set parent
                 await conn.execute(
@@ -172,9 +175,9 @@ class RefreshTokenService:
                     (user_id, action, entity_type, entity_id, ip_address, details)
                     VALUES ($1, 'TOKEN_REFRESHED', 'sessions', $2, $3, $4)
                     """,
-                    session['user_id'], session['session_id'], ip_address, {
+                    session['user_id'], session['session_id'], ip_address, json.dumps({
                         'session_id': str(session['session_id'])
-                    }
+                    })
                 )
                 
                 return {
@@ -227,10 +230,10 @@ class RefreshTokenService:
                         (user_id, action, entity_type, entity_id, ip_address, details)
                         VALUES ($1, 'TOKEN_REVOKED', 'sessions', $2, $3, $4)
                         """,
-                        user_id, session['session_id'], ip_address, {
+                        user_id, session['session_id'], ip_address, json.dumps({
                             'reason': reason,
                             'token_family_id': str(token_family_id)
-                        }
+                        })
                     )
                 
                 return len(sessions)

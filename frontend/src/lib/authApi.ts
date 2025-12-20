@@ -5,7 +5,7 @@
  * Based on frontend/docs/auth_contract.md
  */
 
-import { post } from './api';
+import { post, get } from './api';
 import type {
     RegisterUserRequest,
     RegisterAgentRequest,
@@ -149,7 +149,7 @@ export async function verifyOTP(
  * Never cache this data for authorization decisions.
  */
 export async function getCurrentUser(): Promise<AuthUser> {
-    return post<AuthUser>('/user/me');
+    return get<AuthUser>('/user/me');
 }
 
 // ============================================================================

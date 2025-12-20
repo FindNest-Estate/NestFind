@@ -1,4 +1,5 @@
 import bcrypt
+import json
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Tuple
 from uuid import UUID
@@ -45,7 +46,8 @@ class LoginService:
             "locked_until": Optional[datetime]
         }
         """
-        now = datetime.now(timezone.utc)
+        # Use naive UTC datetime for comparison with DB TIMESTAMP columns
+        now = datetime.utcnow()
         
         async with self.db.acquire() as conn:
             async with conn.transaction():
@@ -68,7 +70,7 @@ class LoginService:
                         (user_id, action, entity_type, entity_id, ip_address, details)
                         VALUES (NULL, 'LOGIN_FAILED', 'users', NULL, $1, $2)
                         """,
-                        ip_address, {'reason': 'invalid_credentials', 'email': email}
+                        ip_address, json.dumps({'reason': 'invalid_credentials', 'email': email})
                     )
                     return {
                         "success": False,
@@ -83,10 +85,10 @@ class LoginService:
                         (user_id, action, entity_type, entity_id, ip_address, details)
                         VALUES ($1, 'LOGIN_BLOCKED', 'users', $1, $2, $3)
                         """,
-                        user['id'], ip_address, {
+                        user['id'], ip_address, json.dumps({
                             'locked_until': user['login_locked_until'].isoformat(),
                             'reason': 'account_locked'
-                        }
+                        })
                     )
                     return {
                         "success": False,
@@ -102,7 +104,7 @@ class LoginService:
                         (user_id, action, entity_type, entity_id, ip_address, details)
                         VALUES ($1, 'LOGIN_BLOCKED', 'users', $1, $2, $3)
                         """,
-                        user['id'], ip_address, {'reason': 'suspended'}
+                        user['id'], ip_address, json.dumps({'reason': 'suspended'})
                     )
                     return {
                         "success": False,
@@ -117,13 +119,14 @@ class LoginService:
                     # Check if lockout threshold reached
                     if new_attempts >= self.MAX_LOGIN_ATTEMPTS:
                         lockout_until = now + timedelta(minutes=self.LOCKOUT_MINUTES)
+                        lockout_until_naive = lockout_until.replace(tzinfo=None)
                         await conn.execute(
                             """
                             UPDATE users
                             SET login_attempts = $1, login_locked_until = $2
                             WHERE id = $3
                             """,
-                            new_attempts, lockout_until, user['id']
+                            new_attempts, lockout_until_naive, user['id']
                         )
                         
                         await conn.execute(
@@ -132,11 +135,11 @@ class LoginService:
                             (user_id, action, entity_type, entity_id, ip_address, details)
                             VALUES ($1, 'LOGIN_BLOCKED', 'users', $1, $2, $3)
                             """,
-                            user['id'], ip_address, {
+                            user['id'], ip_address, json.dumps({
                                 'locked_until': lockout_until.isoformat(),
                                 'reason': 'max_login_attempts',
                                 'attempts': new_attempts
-                            }
+                            })
                         )
                         
                         return {
@@ -161,10 +164,10 @@ class LoginService:
                             (user_id, action, entity_type, entity_id, ip_address, details)
                             VALUES ($1, 'LOGIN_FAILED', 'users', $1, $2, $3)
                             """,
-                            user['id'], ip_address, {
+                            user['id'], ip_address, json.dumps({
                                 'attempts': new_attempts,
                                 'remaining': self.MAX_LOGIN_ATTEMPTS - new_attempts
-                            }
+                            })
                         )
                         
                         return {
@@ -188,7 +191,7 @@ class LoginService:
                     (user_id, action, entity_type, entity_id, ip_address, details)
                     VALUES ($1, 'LOGIN_SUCCESS', 'users', $1, $2, $3)
                     """,
-                    user['id'], ip_address, {'status': user['status']}
+                    user['id'], ip_address, json.dumps({'status': user['status']})
                 )
                 
                 return {

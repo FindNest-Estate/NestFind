@@ -1,6 +1,7 @@
 import os
 import asyncio
 import smtplib
+import json
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional
@@ -70,7 +71,7 @@ If you did not request this code, please ignore this email.
                     (user_id, action, entity_type, entity_id, ip_address, details)
                     VALUES ($1, 'EMAIL_OTP_SENT', 'email_otp_verifications', NULL, $2, $3)
                     """,
-                    user_id, ip_address, {'email': email}
+                    user_id, ip_address, json.dumps({'email': email})
                 )
     
     async def log_email_failed(self, user_id, email: str, ip_address: str):
@@ -83,5 +84,6 @@ If you did not request this code, please ignore this email.
                     (user_id, action, entity_type, entity_id, ip_address, details)
                     VALUES ($1, 'EMAIL_SEND_FAILED', 'email_otp_verifications', NULL, $2, $3)
                     """,
-                    user_id, ip_address, {'email': email}
+                    user_id, ip_address, json.dumps({'email': email})
                 )
+

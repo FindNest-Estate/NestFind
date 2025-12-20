@@ -118,11 +118,14 @@ async def get_current_user(
     )
 
 
-async def require_role(required_role: str):
+def require_role(required_role: str):
     """
-    Dependency to require specific role.
+    Dependency factory to require specific role.
     
     Usage: current_user: AuthenticatedUser = Depends(require_role("ADMIN"))
+    
+    Note: This is a sync factory that returns an async dependency.
+    The outer function MUST be sync so FastAPI receives a callable, not a coroutine.
     """
     async def role_checker(current_user: AuthenticatedUser = Depends(get_current_user)):
         if required_role not in current_user.roles:
@@ -133,3 +136,4 @@ async def require_role(required_role: str):
         return current_user
     
     return role_checker
+

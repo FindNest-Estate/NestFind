@@ -19,13 +19,21 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class UserInfo(BaseModel):
+    id: UUID
+    email: str
+    full_name: str
+    status: str
+    role: str
+
+
 class LoginResponse(BaseModel):
     success: bool
     message: str
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None
     token_type: Optional[str] = None
-    user_id: Optional[UUID] = None
+    user: Optional[UserInfo] = None
     locked_until: Optional[datetime] = None
 
 
@@ -67,6 +75,19 @@ async def login(
                 locked_until=auth_result.get("locked_until")
             )
         
+        # Fetch user details for response
+        async with db_pool.acquire() as conn:
+            user_data = await conn.fetchrow(
+                """
+                SELECT u.id, u.email, u.full_name, u.status, r.name as role
+                FROM users u
+                JOIN user_roles ur ON u.id = ur.user_id
+                JOIN roles r ON ur.role_id = r.id
+                WHERE u.id = $1
+                """,
+                auth_result["user_id"]
+            )
+        
         # Create session
         session = await session_service.create_session(
             user_id=auth_result["user_id"],
@@ -92,7 +113,13 @@ async def login(
             access_token=access_token,
             refresh_token=refresh_token,
             token_type="bearer",
-            user_id=auth_result["user_id"]
+            user=UserInfo(
+                id=user_data["id"],
+                email=user_data["email"],
+                full_name=user_data["full_name"],
+                status=user_data["status"],
+                role=user_data["role"]
+            )
         )
     
     except Exception as e:

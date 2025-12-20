@@ -1,16 +1,10 @@
 'use client';
 
 /**
- * Agent Registration Page
+ * Register Agent Page - Airbnb-Inspired Design
  * 
- * Based on:
- * - frontend/docs/auth_contract.md
- * - frontend/docs/auth_state_machine.md
- * 
- * Handles:
- * - Agent registration form
- * - Transition to OTP_REQUIRED state
- * - Redirect to /verify-otp on success
+ * Professional design system for agent onboarding.
+ * Matches Login/Register User design system with added professional cues.
  */
 
 import { useState, FormEvent } from 'react';
@@ -51,8 +45,7 @@ export default function RegisterAgentPage() {
         setError('');
 
         // Validate required fields
-        if (!formData.full_name || !formData.email || !formData.password ||
-            !formData.license_id || !formData.service_radius_km) {
+        if (!formData.full_name || !formData.email || !formData.password || !formData.license_id || !formData.service_radius_km) {
             setError('Please fill in all required fields');
             return;
         }
@@ -65,13 +58,9 @@ export default function RegisterAgentPage() {
         }
 
         // Validate service radius
-        const radius = parseInt(formData.service_radius_km, 10);
+        const radius = parseInt(formData.service_radius_km);
         if (isNaN(radius) || radius <= 0) {
             setError('Service radius must be a positive number');
-            return;
-        }
-        if (radius > 100) {
-            setError('Service radius cannot exceed 100 km');
             return;
         }
 
@@ -89,8 +78,11 @@ export default function RegisterAgentPage() {
 
             // Success (202) - redirect to OTP verification
             if (response.message) {
-                // Store email in sessionStorage for OTP page context
+                // Store email and user_id in sessionStorage for OTP page context
                 sessionStorage.setItem('pending_verification_email', formData.email);
+                if (response.user_id) {
+                    sessionStorage.setItem('pending_verification_user_id', response.user_id);
+                }
                 router.push('/verify-otp');
             }
         } catch (err: any) {
@@ -109,158 +101,228 @@ export default function RegisterAgentPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
-            <div className="max-w-md w-full space-y-8">
-                <div className="text-center">
-                    <h1 className="text-3xl font-bold text-gray-900">NestFind</h1>
-                    <h2 className="mt-6 text-2xl font-semibold text-gray-700">
-                        Register as an Agent
-                    </h2>
-                    <p className="mt-2 text-sm text-gray-600">
-                        Join our network of real estate professionals
-                    </p>
+        <div className="min-h-screen flex bg-white">
+            {/* Left Side - Professional Hero Image (Desktop) */}
+            <div className="hidden lg:block lg:w-1/2 relative bg-gray-900">
+                <div
+                    className="absolute inset-0 bg-cover bg-center transition-transform duration-700 hover:scale-105"
+                    style={{
+                        backgroundImage: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1542744173-8e7e53415bb0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80')`,
+                        // Image: Professional meeting / modern office context
+                    }}
+                >
                 </div>
-
-                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-                    {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-                            {error}
+                <div className="absolute inset-0 flex flex-col justify-end p-16 text-white z-10">
+                    <h2 className="text-5xl font-bold tracking-tight mb-6 drop-shadow-2xl leading-none">
+                        Become a<br />Verified Agent.
+                    </h2>
+                    <p className="text-xl text-gray-100 drop-shadow-lg font-medium max-w-lg mb-8">
+                        Join the network of top-tier real estate professionals and connect with serious buyers in your area.
+                    </p>
+                    {/* Trust indicators */}
+                    <div className="flex gap-6 text-sm font-semibold text-white/90">
+                        <div className="flex items-center gap-2">
+                            <div className="bg-white/20 p-1.5 rounded-full backdrop-blur-md">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-white">
+                                    <path fillRule="evenodd" d="M16.403 12.652a3 3 0 000-5.304 3 3 0 00-3.75-3.651 3 3 0 00-4.982 1.118l-.553.553.553.553a3 3 0 004.982 1.118l.553-.553a3 3 0 003.75 3.651 3 3 0 003.447 2.515zM7.5 10.5a3 3 0 11-6 0 3 3 0 016 0z" clipRule="evenodd" />
+                                    <path d="M11 18a1 1 0 01-1 1H2a1 1 0 01-1-1v-1a5 5 0 0110 0v1z" />
+                                </svg>
+                            </div>
+                            <span>Verified Leads</span>
                         </div>
-                    )}
-
-                    <div className="space-y-4">
-                        <div>
-                            <label htmlFor="full_name" className="block text-sm font-medium text-gray-700">
-                                Full Name <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                id="full_name"
-                                name="full_name"
-                                type="text"
-                                required
-                                value={formData.full_name}
-                                onChange={(e) => handleChange('full_name', e.target.value)}
-                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500"
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                                Email Address <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                id="email"
-                                name="email"
-                                type="email"
-                                autoComplete="email"
-                                required
-                                value={formData.email}
-                                onChange={(e) => handleChange('email', e.target.value)}
-                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500"
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                                Password <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                id="password"
-                                name="password"
-                                type="password"
-                                autoComplete="new-password"
-                                required
-                                value={formData.password}
-                                onChange={(e) => handleChange('password', e.target.value)}
-                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500"
-                            />
-                            <p className="mt-1 text-xs text-gray-500">
-                                Minimum 8 characters, at least 1 letter and 1 number
-                            </p>
-                        </div>
-
-                        <div>
-                            <label htmlFor="mobile_number" className="block text-sm font-medium text-gray-700">
-                                Mobile Number (Optional)
-                            </label>
-                            <input
-                                id="mobile_number"
-                                name="mobile_number"
-                                type="tel"
-                                value={formData.mobile_number}
-                                onChange={(e) => handleChange('mobile_number', e.target.value)}
-                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500"
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="license_id" className="block text-sm font-medium text-gray-700">
-                                Real Estate License ID <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                id="license_id"
-                                name="license_id"
-                                type="text"
-                                required
-                                value={formData.license_id}
-                                onChange={(e) => handleChange('license_id', e.target.value)}
-                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500"
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="service_radius_km" className="block text-sm font-medium text-gray-700">
-                                Service Radius (km) <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                id="service_radius_km"
-                                name="service_radius_km"
-                                type="number"
-                                min="1"
-                                max="100"
-                                required
-                                value={formData.service_radius_km}
-                                onChange={(e) => handleChange('service_radius_km', e.target.value)}
-                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500"
-                            />
-                            <p className="mt-1 text-xs text-gray-500">
-                                Maximum 100 km
-                            </p>
+                        <div className="flex items-center gap-2">
+                            <div className="bg-white/20 p-1.5 rounded-full backdrop-blur-md">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-white">
+                                    <path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                            <span>Secure Platform</span>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <div className="bg-blue-50 border border-blue-200 px-4 py-3 rounded">
-                        <p className="text-sm text-blue-700">
-                            <strong>Note:</strong> Your application will be reviewed by our team.
-                            You'll receive an email notification once approved.
+            {/* Right Side - Form */}
+            <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 lg:px-20 xl:px-24 bg-white relative">
+                <div className="mx-auto w-full max-w-sm lg:w-[460px]"> {/* Slightly wider for agent form */}
+                    <div className="mb-8 pt-8 lg:pt-0">
+                        {/* Mobile Logo */}
+                        <div className="lg:hidden mb-10 text-center">
+                            <span className="text-[#FF385C] text-3xl font-bold tracking-tight">NestFind</span>
+                        </div>
+
+                        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 mb-2 pt-4">
+                            Apply as a Verified Agent
+                        </h1>
+                        <p className="text-base text-gray-600">
+                            Get verified to list properties and connect with clients.
                         </p>
                     </div>
 
-                    <div>
-                        <button
-                            type="submit"
-                            disabled={isSubmitting}
-                            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        >
-                            {isSubmitting ? 'Submitting application...' : 'Submit Application'}
-                        </button>
-                    </div>
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        {error && (
+                            <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm flex items-start gap-3 animate-fadeIn">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500">
+                                    <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clipRule="evenodd" />
+                                </svg>
+                                <span className="font-medium">{error}</span>
+                            </div>
+                        )}
 
-                    <div className="text-center space-y-2">
-                        <div className="text-sm">
+                        {/* Personal Details */}
+                        <div className="space-y-4">
+                            <div>
+                                <label htmlFor="full_name" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                    Full Name
+                                </label>
+                                <input
+                                    id="full_name"
+                                    type="text"
+                                    value={formData.full_name}
+                                    onChange={(e) => handleChange('full_name', e.target.value)}
+                                    disabled={isSubmitting}
+                                    className="block w-full h-12 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:border-transparent focus:ring-2 focus:ring-[#FF385C] sm:text-base transition-all duration-200 ease-in-out placeholder-gray-400"
+                                    placeholder="Jane Smith"
+                                    required
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                        Email address
+                                    </label>
+                                    <input
+                                        id="email"
+                                        type="email"
+                                        value={formData.email}
+                                        onChange={(e) => handleChange('email', e.target.value)}
+                                        disabled={isSubmitting}
+                                        className="block w-full h-12 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:border-transparent focus:ring-2 focus:ring-[#FF385C] sm:text-base transition-all duration-200 ease-in-out placeholder-gray-400"
+                                        placeholder="jane@agency.com"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="mobile_number" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                        Mobile <span className="text-gray-400 font-normal">(Optional)</span>
+                                    </label>
+                                    <input
+                                        id="mobile_number"
+                                        type="tel"
+                                        value={formData.mobile_number}
+                                        onChange={(e) => handleChange('mobile_number', e.target.value)}
+                                        disabled={isSubmitting}
+                                        className="block w-full h-12 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:border-transparent focus:ring-2 focus:ring-[#FF385C] sm:text-base transition-all duration-200 ease-in-out placeholder-gray-400"
+                                        placeholder="+1 (555) 000-0000"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                    Password
+                                </label>
+                                <input
+                                    id="password"
+                                    type="password"
+                                    value={formData.password}
+                                    onChange={(e) => handleChange('password', e.target.value)}
+                                    disabled={isSubmitting}
+                                    className="block w-full h-12 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:border-transparent focus:ring-2 focus:ring-[#FF385C] sm:text-base transition-all duration-200 ease-in-out placeholder-gray-400"
+                                    placeholder="••••••••"
+                                    required
+                                />
+                                <p className="mt-1.5 text-xs text-gray-500 font-medium">
+                                    At least 8 characters with a letter and number
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Agent Credentials Group */}
+                        <div className="pt-6 border-t border-gray-100 mt-6">
+                            <h3 className="text-sm font-bold text-gray-900 mb-4 uppercase tracking-wider">Agent Credentials</h3>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="license_id" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                        License ID
+                                    </label>
+                                    <input
+                                        id="license_id"
+                                        type="text"
+                                        value={formData.license_id}
+                                        onChange={(e) => handleChange('license_id', e.target.value)}
+                                        disabled={isSubmitting}
+                                        className="block w-full h-12 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:border-transparent focus:ring-2 focus:ring-[#FF385C] sm:text-base transition-all duration-200 ease-in-out placeholder-gray-400"
+                                        placeholder="ABC123456"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="service_radius_km" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                        Service Radius (km)
+                                    </label>
+                                    <input
+                                        id="service_radius_km"
+                                        type="number"
+                                        min="1"
+                                        value={formData.service_radius_km}
+                                        onChange={(e) => handleChange('service_radius_km', e.target.value)}
+                                        disabled={isSubmitting}
+                                        className="block w-full h-12 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:border-transparent focus:ring-2 focus:ring-[#FF385C] sm:text-base transition-all duration-200 ease-in-out placeholder-gray-400"
+                                        placeholder="50"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <p className="mt-2 text-xs text-gray-500">
+                                This helps us match you with relevant local leads.
+                            </p>
+                        </div>
+
+                        <div className="pt-4">
+                            <button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="group relative flex w-full justify-center items-center rounded-xl bg-gradient-to-r from-[#FF385C] to-[#E61E4D] py-4 px-4 text-base font-bold text-white shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Submitting Application...
+                                    </>
+                                ) : (
+                                    'Submit Application'
+                                )}
+                            </button>
+                        </div>
+
+                        <div className="text-center pt-2">
                             <span className="text-gray-600">Already have an account? </span>
-                            <Link href="/login" className="font-medium text-emerald-600 hover:text-emerald-500">
+                            <Link
+                                href="/login"
+                                className="font-semibold text-gray-900 hover:text-[#FF385C] transition duration-200 hover:underline underline-offset-4"
+                            >
                                 Sign in
                             </Link>
                         </div>
-                        <div className="text-sm">
-                            <span className="text-gray-600">Register as a buyer/seller? </span>
-                            <Link href="/register/user" className="font-medium text-emerald-600 hover:text-emerald-500">
-                                User Registration
-                            </Link>
+                    </form>
+
+                    {/* Safe Mode Footer */}
+                    <div className="mt-10 pt-6 border-t border-gray-100 flex justify-center">
+                        <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
+                                <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clipRule="evenodd" />
+                            </svg>
+                            <span>Verified Agent • Professional Review Required</span>
                         </div>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     );

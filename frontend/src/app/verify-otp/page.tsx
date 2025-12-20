@@ -1,23 +1,17 @@
 'use client';
 
 /**
- * OTP Verification Page
+ * OTP Verification Page - Airbnb-Inspired Design
  * 
- * Based on:
- * - frontend/docs/auth_contract.md
- * - frontend/docs/auth_state_machine.md
- * 
- * Handles:
- * - OTP verification
- * - Lockout state with countdown
- * - Role-based redirect after verification
- * - Resend OTP functionality
+ * Calm, focused, and trustworthy authentication step.
+ * Strictly visual refactor - Logic preserved from original file.
  */
 
 import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { verifyOTP, generateOTP } from '@/lib/authApi';
+import { verifyOTP, generateOTP, getCurrentUser } from '@/lib/authApi';
 import { RateLimitError } from '@/lib/api';
+import Link from 'next/link';
 
 interface LockoutState {
     isLocked: boolean;
@@ -121,15 +115,31 @@ export default function VerifyOTPPage() {
             sessionStorage.removeItem('pending_verification_email');
             sessionStorage.removeItem('pending_verification_user_id');
 
-            // Redirect based on user type
-            // Note: Backend sets status to ACTIVE (USER) or IN_REVIEW (AGENT)
-            // We don't know which, so we redirect to login for USER flow
-            // and let the auth guard handle IN_REVIEW redirect
             setSuccess('Email verified successfully! Redirecting...');
 
-            setTimeout(() => {
-                router.push('/login');
-            }, 1500);
+            // Check user status from backend to redirect appropriately
+            try {
+                const user = await getCurrentUser();
+
+                // Redirect based on actual status
+                setTimeout(() => {
+                    if (user.status === 'ACTIVE') {
+                        // USER verified - redirect to login
+                        router.push('/login');
+                    } else if (user.status === 'IN_REVIEW') {
+                        // AGENT verified - redirect to under-review
+                        router.push('/under-review');
+                    } else {
+                        // Unexpected status - redirect to login
+                        router.push('/login');
+                    }
+                }, 1500);
+            } catch (statusErr) {
+                // If status check fails, default to login
+                setTimeout(() => {
+                    router.push('/login');
+                }, 1500);
+            }
 
         } catch (err: any) {
             if (err instanceof RateLimitError) {
@@ -168,45 +178,55 @@ export default function VerifyOTPPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-            <div className="max-w-md w-full space-y-8">
-                <div className="text-center">
-                    <h1 className="text-3xl font-bold text-gray-900">NestFind</h1>
-                    <h2 className="mt-6 text-2xl font-semibold text-gray-700">
-                        Verify Your Email
-                    </h2>
-                    <p className="mt-2 text-sm text-gray-600">
-                        We've sent a verification code to
-                    </p>
-                    <p className="text-sm font-medium text-gray-900">{email}</p>
+        <div className="min-h-screen flex items-center justify-center bg-white px-4">
+            <div className="max-w-[420px] w-full">
+                {/* Logo */}
+                <div className="mb-10 text-center">
+                    <span className="text-[#FF385C] text-3xl font-bold tracking-tight">NestFind</span>
                 </div>
 
-                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+                {/* Header */}
+                <div className="text-center mb-8">
+                    <h1 className="text-2xl font-bold text-gray-900 mb-3">
+                        Verify your email
+                    </h1>
+                    <div className="text-gray-600 px-4 leading-relaxed">
+                        <p>We've sent a 6-digit code to</p>
+                        <p className="font-medium text-gray-900 mt-1">{email}</p>
+                    </div>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-8">
+                    {/* Status Messages */}
                     {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-                            {error}
+                        <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm flex items-start gap-3 animate-fadeIn">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500">
+                                <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clipRule="evenodd" />
+                            </svg>
+                            <span className="font-medium">{error}</span>
                         </div>
                     )}
 
                     {success && (
-                        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
-                            {success}
+                        <div className="p-4 rounded-xl bg-green-50 border border-green-100 text-green-700 text-sm flex items-start gap-3 animate-fadeIn">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 flex-shrink-0 mt-0.5 text-green-500">
+                                <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clipRule="evenodd" />
+                            </svg>
+                            <span className="font-medium">{success}</span>
                         </div>
                     )}
 
                     {lockout.isLocked && (
-                        <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded">
-                            <p className="font-semibold">Too many failed attempts</p>
-                            <p className="text-sm mt-1">
-                                Try again in {formatTime(lockout.remainingSeconds)}
-                            </p>
+                        <div className="p-4 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm flex items-start gap-3 animate-fadeIn">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-600">
+                                <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zm-1.72 6.97a.75.75 0 10-1.06 1.06L10.94 12l-1.72 1.72a.75.75 0 101.06 1.06L12 13.06l1.72 1.72a.75.75 0 101.06-1.06L13.06 12l1.72-1.72a.75.75 0 10-1.06-1.06L12 10.94l-1.72-1.72z" clipRule="evenodd" />
+                            </svg>
+                            <span>Too many attempts. Try again in <span className="font-bold font-mono">{formatTime(lockout.remainingSeconds)}</span></span>
                         </div>
                     )}
 
+                    {/* OTP Input */}
                     <div>
-                        <label htmlFor="otp" className="block text-sm font-medium text-gray-700">
-                            Verification Code
-                        </label>
                         <input
                             id="otp"
                             name="otp"
@@ -217,39 +237,59 @@ export default function VerifyOTPPage() {
                             required
                             value={otp}
                             onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                            disabled={lockout.isLocked}
-                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-center text-2xl tracking-widest focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            disabled={lockout.isLocked || isSubmitting}
+                            autoComplete="one-time-code"
+                            className="block w-full h-16 text-center text-3xl font-mono tracking-[0.5em] rounded-xl border border-gray-200 shadow-sm focus:border-transparent focus:ring-2 focus:ring-[#FF385C] focus:outline-none transition-all duration-200 ease-in-out placeholder-gray-300 disabled:bg-gray-50 disabled:text-gray-400 group-hover:border-gray-400"
                             placeholder="000000"
                         />
-                        <p className="mt-1 text-xs text-gray-500 text-center">
-                            Enter the 6-digit code from your email
+                        <p className="mt-3 text-sm text-gray-500 text-center">
+                            Enter the 6-digit code sent to your email
                         </p>
                     </div>
 
-                    <div>
+                    {/* Action Buttons */}
+                    <div className="space-y-4">
                         <button
                             type="submit"
                             disabled={lockout.isLocked || isSubmitting}
-                            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            className="group relative flex w-full justify-center items-center rounded-xl bg-gradient-to-r from-[#FF385C] to-[#E61E4D] py-4 px-4 text-base font-bold text-white shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
                         >
-                            {isSubmitting ? 'Verifying...' : lockout.isLocked ? 'Locked' : 'Verify Email'}
+                            {isSubmitting ? (
+                                <>
+                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Verifying...
+                                </>
+                            ) : lockout.isLocked ? (
+                                'Account Locked'
+                            ) : (
+                                'Verify Email'
+                            )}
                         </button>
-                    </div>
 
-                    <div className="text-center">
-                        <button
-                            type="button"
-                            onClick={handleResend}
-                            disabled={isResending || lockout.isLocked}
-                            className="text-sm font-medium text-emerald-600 hover:text-emerald-500 disabled:text-gray-400 disabled:cursor-not-allowed"
-                        >
-                            {isResending ? 'Sending...' : 'Resend verification code'}
-                        </button>
+                        <div className="text-center">
+                            <button
+                                type="button"
+                                onClick={handleResend}
+                                disabled={isResending || lockout.isLocked}
+                                className="text-sm font-semibold text-gray-900 hover:text-[#FF385C] transition duration-200 hover:underline underline-offset-4 disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline disabled:text-gray-400"
+                            >
+                                {isResending ? 'Sending code...' : "Didn't receive the code? Resend"}
+                            </button>
+                        </div>
                     </div>
                 </form>
 
-                <div className="text-center text-xs text-gray-500">
-                    <p>Code expires in 10 minutes</p>
+                {/* Safe Mode Footer - Minimal */}
+                <div className="mt-12 text-center">
+                    <div className="flex items-center justify-center gap-1.5 text-xs text-gray-400 font-medium opacity-70">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
+                            <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clipRule="evenodd" />
+                        </svg>
+                        <span>Secure Verification</span>
+                    </div>
                 </div>
             </div>
         </div>

@@ -51,8 +51,9 @@ async function getAuthUser(): Promise<UserResponse | null> {
         }
 
         return await response.json();
-    } catch (error) {
-        console.error('[ProtectedLayout] Auth check failed:', error);
+    } catch {
+        // Do not log error object to avoid leaking sensitive data
+        console.error('[ProtectedLayout] Auth check failed');
         return null;
     }
 }
@@ -83,6 +84,10 @@ export default async function ProtectedLayout({
 }: {
     children: ReactNode;
 }) {
+    // Show loading state while checking auth
+    // Note: This is a Server Component, so this won't actually render
+    // a loading spinner, but demonstrates the pattern for Client Components
+
     const user = await getAuthUser();
 
     // No user - redirect to login

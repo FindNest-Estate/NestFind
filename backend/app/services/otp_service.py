@@ -1,5 +1,6 @@
 import secrets
 import hashlib
+import json
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Tuple
 from uuid import UUID
@@ -45,7 +46,8 @@ class OTPService:
         """
         otp = self._generate_otp()
         otp_hash = self._hash_otp(otp)
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=self.OTP_EXPIRY_MINUTES)
+        # Use naive UTC datetime for DB TIMESTAMP columns
+        expires_at = datetime.utcnow() + timedelta(minutes=self.OTP_EXPIRY_MINUTES)
         
         async with self.db.acquire() as conn:
             # Verify user exists and get email
@@ -73,12 +75,15 @@ class OTPService:
                 (user_id, action, entity_type, entity_id, ip_address, details)
                 VALUES ($1, 'OTP_GENERATED', 'email_otp_verifications', $2, $3, $4)
                 """,
-                user_id, otp_id, ip_address, {'expires_at': expires_at.isoformat()}
+                user_id, otp_id, ip_address, json.dumps({'expires_at': expires_at.isoformat()})
             )
         
         # Send OTP via email (async, non-blocking)
         from .email_service import EmailService
         email_service = EmailService(self.db)
+        
+        # [DEV MODE] Print OTP to console for testing (remove in production)
+        print(f"[DEV] OTP for {user['email']}: {otp}")
         
         email_sent = await email_service.send_otp_email(user['email'], otp)
         
@@ -108,7 +113,8 @@ class OTPService:
         }
         """
         otp_hash = self._hash_otp(otp)
-        now = datetime.now(timezone.utc)
+        # Use naive UTC datetime for comparison with DB TIMESTAMP columns
+        now = datetime.utcnow()
         
         async with self.db.acquire() as conn:
             # Start transaction for atomic verification
@@ -126,7 +132,7 @@ class OTPService:
                         (user_id, action, entity_type, entity_id, ip_address, details)
                         VALUES ($1, 'OTP_LOCKED', 'users', $1, $2, $3)
                         """,
-                        user_id, ip_address, {'locked_until': user['login_locked_until'].isoformat()}
+                        user_id, ip_address, json.dumps({'locked_until': user['login_locked_until'].isoformat()})
                     )
                     return {
                         "success": False,
@@ -166,7 +172,7 @@ class OTPService:
                         (user_id, action, entity_type, entity_id, ip_address, details)
                         VALUES ($1, 'OTP_REUSE_BLOCKED', 'email_otp_verifications', $2, $3, $4)
                         """,
-                        user_id, otp_record['id'], ip_address, {'otp_id': str(otp_record['id'])}
+                        user_id, otp_record['id'], ip_address, json.dumps({'otp_id': str(otp_record['id'])})
                     )
                     return {"success": False, "error": "OTP already used"}
                 
@@ -178,7 +184,7 @@ class OTPService:
                         (user_id, action, entity_type, entity_id, ip_address, details)
                         VALUES ($1, 'OTP_EXPIRED', 'email_otp_verifications', $2, $3, $4)
                         """,
-                        user_id, otp_record['id'], ip_address, {'otp_id': str(otp_record['id'])}
+                        user_id, otp_record['id'], ip_address, json.dumps({'otp_id': str(otp_record['id'])})
                     )
                     return {"success": False, "error": "OTP expired"}
                 
@@ -198,13 +204,14 @@ class OTPService:
                     # Check if lockout threshold reached (USER-LEVEL LOCKOUT)
                     if new_attempts >= self.MAX_ATTEMPTS:
                         lockout_until = now + timedelta(minutes=self.LOCKOUT_MINUTES)
+                        lockout_until_naive = lockout_until.replace(tzinfo=None)
                         await conn.execute(
                             """
                             UPDATE users
                             SET login_locked_until = $1
                             WHERE id = $2
                             """,
-                            lockout_until, user_id
+                            lockout_until_naive, user_id
                         )
                         
                         await conn.execute(
@@ -213,11 +220,11 @@ class OTPService:
                             (user_id, action, entity_type, entity_id, ip_address, details)
                             VALUES ($1, 'OTP_LOCKED', 'users', $1, $2, $3)
                             """,
-                            user_id, ip_address, {
+                            user_id, ip_address, json.dumps({
                                 'locked_until': lockout_until.isoformat(),
                                 'reason': 'max_otp_attempts',
                                 'otp_id': str(otp_record['id'])
-                            }
+                            })
                         )
                         
                         return {
@@ -232,11 +239,11 @@ class OTPService:
                         (user_id, action, entity_type, entity_id, ip_address, details)
                         VALUES ($1, 'OTP_FAILED', 'email_otp_verifications', $2, $3, $4)
                         """,
-                        user_id, otp_record['id'], ip_address, {
+                        user_id, otp_record['id'], ip_address, json.dumps({
                             'attempts': new_attempts,
                             'remaining': self.MAX_ATTEMPTS - new_attempts,
                             'otp_id': str(otp_record['id'])
-                        }
+                        })
                     )
                     
                     return {
@@ -301,11 +308,11 @@ class OTPService:
                             (user_id, action, entity_type, entity_id, ip_address, details)
                             VALUES ($1, 'EMAIL_VERIFIED', 'users', $1, $2, $3)
                             """,
-                            user_id, ip_address, {
+                            user_id, ip_address, json.dumps({
                                 'role': user_data['role_name'],
                                 'new_status': new_status,
                                 'otp_id': str(otp_record['id'])
-                            }
+                            })
                         )
                 
                 await conn.execute(
@@ -314,7 +321,7 @@ class OTPService:
                     (user_id, action, entity_type, entity_id, ip_address, details)
                     VALUES ($1, 'OTP_VERIFIED', 'email_otp_verifications', $2, $3, $4)
                     """,
-                    user_id, otp_record['id'], ip_address, {'otp_id': str(otp_record['id'])}
+                    user_id, otp_record['id'], ip_address, json.dumps({'otp_id': str(otp_record['id'])})
                 )
                 
                 return {"success": True}

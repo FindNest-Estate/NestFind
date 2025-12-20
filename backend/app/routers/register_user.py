@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
 from typing import Optional
+from uuid import UUID
 
 from ..services.register_user_service import RegisterUserService
 from ..services.otp_service import OTPService
@@ -19,6 +20,7 @@ class RegisterUserRequest(BaseModel):
 
 class RegisterUserResponse(BaseModel):
     message: str
+    user_id: UUID
 
 
 @router.post("/register/user", response_model=RegisterUserResponse, status_code=status.HTTP_202_ACCEPTED)
@@ -66,13 +68,18 @@ async def register_user(
         )
         
         return RegisterUserResponse(
-            message="Verification OTP sent to email"
+            message="Verification OTP sent to email",
+            user_id=result["user_id"]
         )
     
     except ValueError as e:
+        print(f"[REGISTER] ValueError: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
     except Exception as e:
+        print(f"[REGISTER] Exception: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,4 +1,5 @@
 import hashlib
+import json
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from uuid import UUID, uuid4
@@ -43,7 +44,8 @@ class SessionService:
         session_id = uuid4()
         token_family_id = uuid4()
         device_fingerprint = self._hash_user_agent(user_agent)
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=self.SESSION_EXPIRY_MINUTES)
+        # Use naive UTC datetime for DB TIMESTAMP columns
+        expires_at = datetime.utcnow() + timedelta(minutes=self.SESSION_EXPIRY_MINUTES)
         
         async with self.db.acquire() as conn:
             async with conn.transaction():
@@ -88,7 +90,7 @@ class SessionService:
                 return None
             
             # Check if expired
-            if session['expires_at'] < datetime.now(timezone.utc):
+            if session['expires_at'] < datetime.utcnow():
                 return None
             
             return {
@@ -137,10 +139,10 @@ class SessionService:
                     (user_id, action, entity_type, entity_id, ip_address, details)
                     VALUES ($1, 'TOKEN_REVOKED', 'sessions', $2, $3, $4)
                     """,
-                    session['user_id'], session_id, ip_address, {
+                    session['user_id'], session_id, ip_address, json.dumps({
                         'session_id': str(session_id),
                         'revoked_by': str(revoked_by_user_id) if revoked_by_user_id else 'self'
-                    }
+                    })
                 )
                 
                 return True
@@ -187,11 +189,11 @@ class SessionService:
                         (user_id, action, entity_type, entity_id, ip_address, details)
                         VALUES ($1, 'TOKEN_REVOKED', 'sessions', $2, $3, $4)
                         """,
-                        user_id, session['session_id'], ip_address, {
+                        user_id, session['session_id'], ip_address, json.dumps({
                             'session_id': str(session['session_id']),
                             'revoked_by_admin': str(revoked_by_admin_id),
                             'reason': 'admin_revoke_all'
-                        }
+                        })
                     )
                 
                 return len(sessions)
