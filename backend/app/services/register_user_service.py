@@ -33,7 +33,7 @@ class RegisterUserService:
         full_name: str,
         email: str,
         password: str,
-        mobile_number: Optional[str],
+        mobile_number: str,
         ip_address: str
     ) -> dict:
         """
@@ -69,7 +69,7 @@ class RegisterUserService:
                         "error": "Registration failed"
                     }
                 
-                # Create user
+                # Create user (location not required for users)
                 user_id = await conn.fetchval(
                     """
                     INSERT INTO users 

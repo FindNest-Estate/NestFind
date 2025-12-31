@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { login } from '@/lib/authApi';
 import { RateLimitError } from '@/lib/api';
+import PasswordInput from '@/components/PasswordInput';
 
 interface LockoutState {
     isLocked: boolean;
@@ -98,9 +99,11 @@ export default function LoginPage() {
             // Success - has access_token
             if ('access_token' in response) {
                 // Tokens are set via HTTP-only cookies by backend
-                // Redirect based on user status
+                // Redirect based on user status ONLY
+                // Role-based routing is handled by Server Component in protected layout
                 if (response.user.status === 'ACTIVE') {
-                    router.push(returnUrl);
+                    // Navigate to protected area - Server Component handles role routing
+                    router.push('/dashboard');
                 } else if (response.user.status === 'PENDING_VERIFICATION') {
                     router.push('/verify-otp');
                 } else if (response.user.status === 'IN_REVIEW') {
@@ -236,15 +239,12 @@ export default function LoginPage() {
                                         Forgot password?
                                     </Link>
                                 </div>
-                                <input
-                                    type="password"
-                                    name="password"
+                                <PasswordInput
                                     id="password"
-                                    className="block w-full h-12 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:border-transparent focus:ring-2 focus:ring-[#FF385C] sm:text-base transition-all duration-200 ease-in-out placeholder-gray-400"
-                                    placeholder="••••••••"
                                     value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
+                                    onChange={setPassword}
                                     disabled={isSubmitting || lockout.isLocked}
+                                    className="h-12 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:border-transparent focus:ring-2 focus:ring-[#FF385C] sm:text-base transition-all duration-200 ease-in-out placeholder-gray-400"
                                 />
                             </div>
                         </div>

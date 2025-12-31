@@ -72,7 +72,7 @@ function isStatusRoute(pathname: string): boolean {
 
 function shouldSkip(pathname: string): boolean {
     return SKIP_PATTERNS.some(pattern => pathname.startsWith(pattern)) ||
-        pathname.match(/\.(svg|png|jpg|jpeg|gif|webp|ico|css|js)$/);
+        !!pathname.match(/\.(svg|png|jpg|jpeg|gif|webp|ico|css|js)$/);
 }
 
 // ============================================================================

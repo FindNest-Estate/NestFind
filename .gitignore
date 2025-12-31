@@ -18,3 +18,11 @@ archive/
 .gemini/
 .antigravity/
 brain/
+
+# Exclude documentation folders
+docs/
+backend/docs/
+frontend/docs/
+
+# Mobile (not ready for production)
+mobile/

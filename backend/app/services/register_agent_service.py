@@ -11,6 +11,9 @@ class RegisterAgentService:
     Agent registration service implementing AUTH_SIGNUP_AGENT workflow.
     
     Creates agent user in PENDING_VERIFICATION state and triggers OTP.
+    After OTP verification, agent transitions to IN_REVIEW.
+    
+    Agent-specific data (PAN, Aadhaar, service_radius) stored in agent_profiles table.
     """
     
     MAX_SERVICE_RADIUS_KM = 100
@@ -35,13 +38,19 @@ class RegisterAgentService:
         full_name: str,
         email: str,
         password: str,
-        mobile_number: Optional[str],
-        license_id: str,
+        mobile_number: str,
+        latitude: float,
+        longitude: float,
+        address: Optional[str],
+        pan_number: str,
+        aadhaar_number: str,
         service_radius_km: int,
         ip_address: str
     ) -> dict:
         """
         Register new agent.
+        
+        Creates user record and agent_profiles record.
         
         Returns:
         {
@@ -85,11 +94,13 @@ class RegisterAgentService:
                 user_id = await conn.fetchval(
                     """
                     INSERT INTO users 
-                    (full_name, email, mobile_number, password_hash, status, created_at)
-                    VALUES ($1, $2, $3, $4, 'PENDING_VERIFICATION', NOW())
+                    (full_name, email, mobile_number, password_hash, status,
+                     latitude, longitude, address, created_at)
+                    VALUES ($1, $2, $3, $4, 'PENDING_VERIFICATION', $5, $6, $7, NOW())
                     RETURNING id
                     """,
-                    full_name, email, mobile_number, password_hash
+                    full_name, email, mobile_number, password_hash,
+                    latitude, longitude, address
                 )
                 
                 # Assign AGENT role
@@ -105,6 +116,16 @@ class RegisterAgentService:
                     user_id, agent_role_id
                 )
                 
+                # Create agent profile with PAN/Aadhaar
+                await conn.execute(
+                    """
+                    INSERT INTO agent_profiles 
+                    (user_id, pan_number, aadhaar_number, service_radius_km, created_at)
+                    VALUES ($1, $2, $3, $4, NOW())
+                    """,
+                    user_id, pan_number, aadhaar_number, service_radius_km
+                )
+                
                 # Audit: AGENT_SIGNUP
                 await conn.execute(
                     """
@@ -114,7 +135,8 @@ class RegisterAgentService:
                     """,
                     user_id, ip_address, json.dumps({
                         'email': email,
-                        'license_id': license_id,
+                        'pan_number_masked': pan_number[:5] + '****' + pan_number[-1],
+                        'aadhaar_masked': '****' + aadhaar_number[-4:],
                         'service_radius_km': service_radius_km
                     })
                 )

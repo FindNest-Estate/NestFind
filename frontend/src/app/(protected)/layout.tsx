@@ -29,7 +29,7 @@ interface UserResponse {
  * Server-side auth check
  */
 async function getAuthUser(): Promise<UserResponse | null> {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const accessToken = cookieStore.get('access_token')?.value;
 
     if (!accessToken) {
@@ -84,10 +84,6 @@ export default async function ProtectedLayout({
 }: {
     children: ReactNode;
 }) {
-    // Show loading state while checking auth
-    // Note: This is a Server Component, so this won't actually render
-    // a loading spinner, but demonstrates the pattern for Client Components
-
     const user = await getAuthUser();
 
     // No user - redirect to login
@@ -105,3 +101,4 @@ export default async function ProtectedLayout({
         </div>
     );
 }
+

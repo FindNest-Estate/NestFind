@@ -1,11 +1,18 @@
 # PostgreSQL Integration Setup
 
-## Migration Command
+## Migration Commands
 
-Apply the auth schema to your local PostgreSQL database:
+Apply migrations in order to your local PostgreSQL database:
 
 ```bash
+# Migration 001: Auth Schema (users, sessions, OTP, audit logs)
 psql -U nestfind_user -d nestfind_auth -f migrations/001_auth_schema.sql
+
+# Migration 002: Registration Fields (agent profiles, location)
+psql -U nestfind_user -d nestfind_auth -f migrations/002_registration_fields.sql
+
+# Migration 003: Property Schema (properties, media, assignments, verifications)
+psql -U nestfind_user -d nestfind_auth -f migrations/003_property_schema.sql
 ```
 
 ## Smoke Test

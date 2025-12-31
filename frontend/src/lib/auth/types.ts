@@ -60,12 +60,23 @@ export interface RegisterUserRequest {
     full_name: string;
     email: string;
     password: string;
-    mobile_number?: string;
+    confirm_password: string;
+    mobile_number: string;  // Mandatory, +91 format
+    // Location NOT required for users
 }
 
-export interface RegisterAgentRequest extends RegisterUserRequest {
-    license_id: string;
-    service_radius_km: number;
+export interface RegisterAgentRequest {
+    full_name: string;
+    email: string;
+    password: string;
+    confirm_password: string;
+    mobile_number: string;      // Mandatory, +91 format
+    latitude: number;           // Mandatory
+    longitude: number;          // Mandatory
+    address?: string;           // Optional
+    pan_number: string;         // Mandatory, format: ABCDE1234F
+    aadhaar_number: string;     // Mandatory, 12 digits
+    service_radius_km: number;  // Mandatory, <= 100
 }
 
 export interface LoginRequest {

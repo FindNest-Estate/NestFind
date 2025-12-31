@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from uuid import UUID
 
-from ..middleware.auth_middleware import get_current_user
+from ..middleware.auth_middleware import get_current_user_any_status
 from ..core.database import get_db_pool
 
 
@@ -19,7 +19,7 @@ class UserResponse(BaseModel):
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(
-    current_user = Depends(get_current_user),
+    current_user = Depends(get_current_user_any_status),
     db_pool = Depends(get_db_pool)
 ):
     """
@@ -27,12 +27,16 @@ async def get_me(
     
     Returns user's id, email, full_name, status, and role.
     This is the source of truth for frontend auth state.
+    
+    NOTE: This endpoint works for ANY authenticated user status,
+    not just ACTIVE users. This allows users to check their own
+    status (IN_REVIEW, DECLINED, SUSPENDED, etc.)
     """
     try:
         async with db_pool.acquire() as conn:
             user_data = await conn.fetchrow(
                 """
-                SELECT u.id, u.email, u.full_name, u.status, r.name as role
+                SELECT u.id, u.email, u.full_name, u.status::text, r.name::text as role
                 FROM users u
                 JOIN user_roles ur ON u.id = ur.user_id
                 JOIN roles r ON ur.role_id = r.id

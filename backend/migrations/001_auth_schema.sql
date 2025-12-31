@@ -52,7 +52,7 @@ CREATE INDEX idx_user_roles_role_id ON user_roles(role_id);
 CREATE TABLE sessions (
     session_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    refresh_token_hash TEXT NOT NULL,
+    refresh_token_hash TEXT,  -- Can be NULL initially, set when refresh token issued
     expires_at TIMESTAMP NOT NULL,
     revoked_at TIMESTAMP NULL,
     device_fingerprint TEXT,

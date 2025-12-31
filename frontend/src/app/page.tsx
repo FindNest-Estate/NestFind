@@ -1,26 +1,10 @@
 import './landing.css';
+import Navbar from '@/components/Navbar';
 
 export default function LandingPage() {
     return (
         <div className="landing-page">
-            <nav className="navbar">
-                <div className="navbar-container">
-                    <a href="/landing" className="logo" style={{ color: '#FF385C', fontWeight: 700, fontSize: '1.5rem' }}>
-                        NestFind
-                    </a>
-                    <ul className="nav-links">
-                        <li><a href="#sell">Sell</a></li>
-                        <li><a href="#buy">Buy</a></li>
-                        <li><a href="#rent">Rent</a></li>
-                        <li><a href="#loans">Loans</a></li>
-                        <li><a href="/find-agent">Find Agent</a></li>
-                    </ul>
-                    <div className="auth-buttons">
-                        <a href="/login" className="login-btn">Login</a>
-                        <a href="/register" className="signup-btn">Sign up</a>
-                    </div>
-                </div>
-            </nav>
+            <Navbar />
 
             {/* 2. HERO SECTION */}
             <section className="hero">

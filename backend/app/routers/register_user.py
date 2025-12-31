@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator, model_validator
 from typing import Optional
 from uuid import UUID
+import re
 
 from ..services.register_user_service import RegisterUserService
 from ..services.otp_service import OTPService
@@ -15,7 +16,23 @@ class RegisterUserRequest(BaseModel):
     full_name: str
     email: EmailStr
     password: str
-    mobile_number: Optional[str] = None
+    confirm_password: str
+    mobile_number: str  # Mandatory, +91 format
+    # Location NOT required for users (only for agents)
+    
+    @field_validator('mobile_number')
+    @classmethod
+    def validate_mobile(cls, v: str) -> str:
+        pattern = r'^\+91[6-9]\d{9}$'
+        if not re.match(pattern, v):
+            raise ValueError('Mobile number must be in +91XXXXXXXXXX format (10 digits starting with 6-9)')
+        return v
+    
+    @model_validator(mode='after')
+    def validate_passwords_match(self):
+        if self.password != self.confirm_password:
+            raise ValueError('Passwords do not match')
+        return self
 
 
 class RegisterUserResponse(BaseModel):

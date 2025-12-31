@@ -25,6 +25,7 @@ export default function UnderReviewPage() {
     useEffect(() => {
         let pollTimer: NodeJS.Timeout;
         let isActive = true;
+        let isFirstCheck = true;
 
         const checkStatus = async () => {
             if (!isActive) return;
@@ -39,26 +40,31 @@ export default function UnderReviewPage() {
                     router.push('/declined');
                 } else if (user.status === 'SUSPENDED') {
                     router.push('/suspended');
-                } else if (user.status !== 'IN_REVIEW') {
-                    // Unexpected status - redirect to login
-                    router.push('/login');
                 }
+                // If still IN_REVIEW, stay on this page (don't redirect)
             } catch (error) {
                 console.error('Status check failed:', error);
-                // If auth fails, redirect to login
-                router.push('/login');
+                // Only redirect to login if NOT the first check
+                // First check might fail due to cookie timing issues
+                if (!isFirstCheck) {
+                    router.push('/login');
+                }
             }
+            isFirstCheck = false;
         };
 
-        // Initial check
-        checkStatus();
+        // Delay initial check to allow cookies to settle
+        const initialCheckTimer = setTimeout(() => {
+            checkStatus();
+        }, 1000);
 
-        // Set up polling
+        // Set up polling (starts after 30s)
         pollTimer = setInterval(checkStatus, POLL_INTERVAL);
 
         // Cleanup
         return () => {
             isActive = false;
+            clearTimeout(initialCheckTimer);
             clearInterval(pollTimer);
         };
     }, [router]);

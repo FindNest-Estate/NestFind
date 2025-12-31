@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr
 from uuid import UUID
 from typing import Optional
@@ -41,6 +41,7 @@ class LoginResponse(BaseModel):
 async def login(
     request: LoginRequest,
     http_request: Request,
+    response: Response,
     db_pool = Depends(get_db_pool)
 ):
     """
@@ -52,6 +53,7 @@ async def login(
     - Session creation
     - JWT issuance with session binding
     - Refresh token issuance
+    - Sets HTTP-only cookies for tokens
     """
     ip_address = http_request.client.host
     user_agent = http_request.headers.get("user-agent", "unknown")
@@ -79,7 +81,7 @@ async def login(
         async with db_pool.acquire() as conn:
             user_data = await conn.fetchrow(
                 """
-                SELECT u.id, u.email, u.full_name, u.status, r.name as role
+                SELECT u.id, u.email, u.full_name, u.status::text, r.name::text as role
                 FROM users u
                 JOIN user_roles ur ON u.id = ur.user_id
                 JOIN roles r ON ur.role_id = r.id
@@ -87,6 +89,9 @@ async def login(
                 """,
                 auth_result["user_id"]
             )
+        
+        if not user_data:
+            raise HTTPException(status_code=500, detail="User data not found after authentication")
         
         # Create session
         session = await session_service.create_session(
@@ -107,6 +112,26 @@ async def login(
             ip_address=ip_address
         )
         
+        # Set HTTP-only cookies for tokens
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=False,  # Set to True in production with HTTPS
+            samesite="lax",
+            max_age=15 * 60,  # 15 minutes
+            path="/"
+        )
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            secure=False,  # Set to True in production with HTTPS
+            samesite="lax",
+            max_age=7 * 24 * 60 * 60,  # 7 days
+            path="/"
+        )
+        
         return LoginResponse(
             success=True,
             message="Login successful",
@@ -122,5 +147,10 @@ async def login(
             )
         )
     
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        print(f"[LOGIN ERROR] {type(e).__name__}: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")

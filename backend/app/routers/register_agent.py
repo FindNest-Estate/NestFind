@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator, model_validator
 from typing import Optional
 from uuid import UUID
+import re
 
 from ..services.register_agent_service import RegisterAgentService
 from ..services.otp_service import OTPService
@@ -15,9 +16,51 @@ class RegisterAgentRequest(BaseModel):
     full_name: str
     email: EmailStr
     password: str
-    mobile_number: Optional[str] = None
-    license_id: str
-    service_radius_km: int
+    confirm_password: str
+    mobile_number: str      # Mandatory, +91 format
+    latitude: float         # Mandatory
+    longitude: float        # Mandatory
+    address: Optional[str] = None
+    pan_number: str         # Mandatory
+    aadhaar_number: str     # Mandatory
+    service_radius_km: int  # Mandatory, <= 100
+    
+    @field_validator('mobile_number')
+    @classmethod
+    def validate_mobile(cls, v: str) -> str:
+        pattern = r'^\+91[6-9]\d{9}$'
+        if not re.match(pattern, v):
+            raise ValueError('Mobile number must be in +91XXXXXXXXXX format')
+        return v
+    
+    @field_validator('pan_number')
+    @classmethod
+    def validate_pan(cls, v: str) -> str:
+        pattern = r'^[A-Z]{5}[0-9]{4}[A-Z]$'
+        if not re.match(pattern, v):
+            raise ValueError('PAN must be in format ABCDE1234F')
+        return v
+    
+    @field_validator('aadhaar_number')
+    @classmethod
+    def validate_aadhaar(cls, v: str) -> str:
+        pattern = r'^\d{12}$'
+        if not re.match(pattern, v):
+            raise ValueError('Aadhaar must be 12 digits')
+        return v
+    
+    @field_validator('service_radius_km')
+    @classmethod
+    def validate_radius(cls, v: int) -> int:
+        if v <= 0 or v > 100:
+            raise ValueError('Service radius must be between 1 and 100 km')
+        return v
+    
+    @model_validator(mode='after')
+    def validate_passwords_match(self):
+        if self.password != self.confirm_password:
+            raise ValueError('Passwords do not match')
+        return self
 
 
 class RegisterAgentResponse(BaseModel):
@@ -56,7 +99,11 @@ async def register_agent(
             email=request.email,
             password=request.password,
             mobile_number=request.mobile_number,
-            license_id=request.license_id,
+            latitude=request.latitude,
+            longitude=request.longitude,
+            address=request.address,
+            pan_number=request.pan_number,
+            aadhaar_number=request.aadhaar_number,
             service_radius_km=request.service_radius_km,
             ip_address=ip_address
         )

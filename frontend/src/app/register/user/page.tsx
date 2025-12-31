@@ -3,7 +3,12 @@
 /**
  * Register User Page - Airbnb-Inspired Design
  * 
- * Matches Login screen design system
+ * Enhanced registration with:
+ * - Confirm password
+ * - Mandatory mobile number (+91 format)
+ * - Beautiful hero image (split-screen layout)
+ * 
+ * NOTE: Location is NOT required for users (only for agents)
  */
 
 import { useState, FormEvent } from 'react';
@@ -11,6 +16,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { registerUser } from '@/lib/authApi';
 import { RateLimitError } from '@/lib/api';
+import PasswordInput from '@/components/PasswordInput';
 
 export default function RegisterUserPage() {
     const router = useRouter();
@@ -19,6 +25,7 @@ export default function RegisterUserPage() {
         full_name: '',
         email: '',
         password: '',
+        confirm_password: '',
         mobile_number: '',
     });
     const [error, setError] = useState('');
@@ -37,20 +44,37 @@ export default function RegisterUserPage() {
         return null;
     };
 
+    const validateMobile = (mobile: string): string | null => {
+        const pattern = /^\+91[6-9]\d{9}$/;
+        if (!pattern.test(mobile)) {
+            return 'Mobile must be in +91XXXXXXXXXX format';
+        }
+        return null;
+    };
+
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setError('');
 
-        // Validate required fields
-        if (!formData.full_name || !formData.email || !formData.password) {
+        if (!formData.full_name || !formData.email || !formData.password || !formData.confirm_password || !formData.mobile_number) {
             setError('Please fill in all required fields');
             return;
         }
 
-        // Validate password
         const passwordError = validatePassword(formData.password);
         if (passwordError) {
             setError(passwordError);
+            return;
+        }
+
+        if (formData.password !== formData.confirm_password) {
+            setError('Passwords do not match');
+            return;
+        }
+
+        const mobileError = validateMobile(formData.mobile_number);
+        if (mobileError) {
+            setError(mobileError);
             return;
         }
 
@@ -61,12 +85,11 @@ export default function RegisterUserPage() {
                 full_name: formData.full_name,
                 email: formData.email,
                 password: formData.password,
-                mobile_number: formData.mobile_number || undefined,
+                confirm_password: formData.confirm_password,
+                mobile_number: formData.mobile_number,
             });
 
-            // Success (202) - redirect to OTP verification
             if (response.message) {
-                // Store email and user_id in sessionStorage for OTP page context
                 sessionStorage.setItem('pending_verification_email', formData.email);
                 if (response.user_id) {
                     sessionStorage.setItem('pending_verification_user_id', response.user_id);
@@ -97,10 +120,9 @@ export default function RegisterUserPage() {
                     style={{
                         backgroundImage: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.6)), url('https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80')`,
                     }}
-                >
-                </div>
+                />
                 <div className="absolute inset-0 flex flex-col justify-end p-16 text-white z-10">
-                    <h2 className="text-5xl font-bold tracking-tight mb-6 drop-shadow-2xl leading-none">
+                    <h2 className="text-5xl font-bold tracking-tight mb-6 drop-shadow-2xl leading-tight">
                         Start your<br />journey today.
                     </h2>
                     <p className="text-xl text-gray-100 drop-shadow-lg font-medium max-w-lg mb-8">
@@ -129,15 +151,16 @@ export default function RegisterUserPage() {
             </div>
 
             {/* Right Side - Form */}
-            <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 lg:px-20 xl:px-24 bg-white relative">
-                <div className="mx-auto w-full max-w-sm lg:w-[420px]">
-                    <div className="mb-8">
-                        {/* Mobile Logo */}
-                        <div className="lg:hidden mb-10 text-center">
-                            <span className="text-[#FF385C] text-3xl font-bold tracking-tight">NestFind</span>
-                        </div>
+            <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 lg:px-16 xl:px-20 bg-white relative overflow-y-auto py-8">
+                <div className="mx-auto w-full max-w-md">
+                    {/* Mobile Logo */}
+                    <div className="lg:hidden mb-8 text-center">
+                        <span className="text-[#FF385C] text-3xl font-bold tracking-tight">NestFind</span>
+                    </div>
 
-                        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 mb-2 pt-4">
+                    {/* Header */}
+                    <div className="mb-6">
+                        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 mb-2">
                             Create your account
                         </h1>
                         <p className="text-base text-gray-600">
@@ -145,9 +168,9 @@ export default function RegisterUserPage() {
                         </p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-5">
+                    <form onSubmit={handleSubmit} className="space-y-4">
                         {error && (
-                            <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm flex items-start gap-3 animate-fadeIn">
+                            <div className="p-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm flex items-start gap-3">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500">
                                     <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clipRule="evenodd" />
                                 </svg>
@@ -155,10 +178,11 @@ export default function RegisterUserPage() {
                             </div>
                         )}
 
-                        <div className="space-y-4">
+                        <div className="space-y-3">
+                            {/* Full Name */}
                             <div>
-                                <label htmlFor="full_name" className="block text-sm font-semibold text-gray-700 mb-1.5">
-                                    Full Name
+                                <label htmlFor="full_name" className="block text-sm font-semibold text-gray-700 mb-1">
+                                    Full Name <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     id="full_name"
@@ -166,15 +190,16 @@ export default function RegisterUserPage() {
                                     value={formData.full_name}
                                     onChange={(e) => handleChange('full_name', e.target.value)}
                                     disabled={isSubmitting}
-                                    className="block w-full h-12 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:border-transparent focus:ring-2 focus:ring-[#FF385C] sm:text-base transition-all duration-200 ease-in-out placeholder-gray-400"
+                                    className="block w-full h-11 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:ring-2 focus:ring-[#FF385C] transition-all"
                                     placeholder="John Doe"
                                     required
                                 />
                             </div>
 
+                            {/* Email */}
                             <div>
-                                <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-1.5">
-                                    Email address
+                                <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-1">
+                                    Email <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     id="email"
@@ -182,34 +207,16 @@ export default function RegisterUserPage() {
                                     value={formData.email}
                                     onChange={(e) => handleChange('email', e.target.value)}
                                     disabled={isSubmitting}
-                                    className="block w-full h-12 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:border-transparent focus:ring-2 focus:ring-[#FF385C] sm:text-base transition-all duration-200 ease-in-out placeholder-gray-400"
+                                    className="block w-full h-11 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:ring-2 focus:ring-[#FF385C] transition-all"
                                     placeholder="you@example.com"
                                     required
                                 />
                             </div>
 
+                            {/* Mobile Number */}
                             <div>
-                                <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-1.5">
-                                    Password
-                                </label>
-                                <input
-                                    id="password"
-                                    type="password"
-                                    value={formData.password}
-                                    onChange={(e) => handleChange('password', e.target.value)}
-                                    disabled={isSubmitting}
-                                    className="block w-full h-12 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:border-transparent focus:ring-2 focus:ring-[#FF385C] sm:text-base transition-all duration-200 ease-in-out placeholder-gray-400"
-                                    placeholder="••••••••"
-                                    required
-                                />
-                                <p className="mt-1.5 text-xs text-gray-500 font-medium">
-                                    At least 8 characters with a letter and number
-                                </p>
-                            </div>
-
-                            <div>
-                                <label htmlFor="mobile_number" className="block text-sm font-semibold text-gray-700 mb-1.5">
-                                    Mobile Number <span className="text-gray-400 font-normal">(Optional)</span>
+                                <label htmlFor="mobile_number" className="block text-sm font-semibold text-gray-700 mb-1">
+                                    Mobile Number <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     id="mobile_number"
@@ -217,21 +224,52 @@ export default function RegisterUserPage() {
                                     value={formData.mobile_number}
                                     onChange={(e) => handleChange('mobile_number', e.target.value)}
                                     disabled={isSubmitting}
-                                    className="block w-full h-12 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:border-transparent focus:ring-2 focus:ring-[#FF385C] sm:text-base transition-all duration-200 ease-in-out placeholder-gray-400"
-                                    placeholder="+1 (555) 000-0000"
+                                    className="block w-full h-11 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:ring-2 focus:ring-[#FF385C] transition-all"
+                                    placeholder="+919876543210"
+                                    required
                                 />
+                                <p className="mt-1 text-xs text-gray-500">Format: +91XXXXXXXXXX</p>
                             </div>
+
+                            {/* Password Row */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-1">
+                                        Password <span className="text-red-500">*</span>
+                                    </label>
+                                    <PasswordInput
+                                        id="password"
+                                        value={formData.password}
+                                        onChange={(val) => handleChange('password', val)}
+                                        disabled={isSubmitting}
+                                        className="h-11 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:ring-2 focus:ring-[#FF385C] transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="confirm_password" className="block text-sm font-semibold text-gray-700 mb-1">
+                                        Confirm <span className="text-red-500">*</span>
+                                    </label>
+                                    <PasswordInput
+                                        id="confirm_password"
+                                        value={formData.confirm_password}
+                                        onChange={(val) => handleChange('confirm_password', val)}
+                                        disabled={isSubmitting}
+                                        className="h-11 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:ring-2 focus:ring-[#FF385C] transition-all"
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-xs text-gray-500">Min 8 characters with a letter and number</p>
                         </div>
 
-                        <div className="pt-2">
+                        <div className="pt-3">
                             <button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="group relative flex w-full justify-center items-center rounded-xl bg-gradient-to-r from-[#FF385C] to-[#E61E4D] py-4 px-4 text-base font-bold text-white shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
+                                className="flex w-full justify-center items-center rounded-xl bg-gradient-to-r from-[#FF385C] to-[#E61E4D] py-3.5 px-4 text-base font-bold text-white shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isSubmitting ? (
                                     <>
-                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
@@ -243,19 +281,16 @@ export default function RegisterUserPage() {
                             </button>
                         </div>
 
-                        <div className="text-center pt-2">
+                        <div className="text-center">
                             <span className="text-gray-600">Already have an account? </span>
-                            <Link
-                                href="/login"
-                                className="font-semibold text-gray-900 hover:text-[#FF385C] transition duration-200 hover:underline underline-offset-4"
-                            >
-                                Sig in
+                            <Link href="/login" className="font-semibold text-gray-900 hover:text-[#FF385C] transition hover:underline underline-offset-4">
+                                Sign in
                             </Link>
                         </div>
                     </form>
 
-                    {/* Safe Mode Footer */}
-                    <div className="mt-10 pt-6 border-t border-gray-100 flex justify-center">
+                    {/* Footer */}
+                    <div className="mt-6 pt-4 border-t border-gray-100 flex justify-center">
                         <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
                                 <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clipRule="evenodd" />
