@@ -96,7 +96,7 @@ class PropertyService:
         property_type = property_data.get("type")
         
         # Required fields by property type
-        COMMON_REQUIRED = ["title", "type", "city", "latitude", "longitude", "price"]
+        COMMON_REQUIRED = ["title", "description", "type", "city", "latitude", "longitude", "price"]
         
         TYPE_SPECIFIC_REQUIRED = {
             "LAND": ["area_sqft"],
@@ -118,6 +118,7 @@ class PropertyService:
                 # Map DB field names to human-readable labels
                 field_labels = {
                     "title": "Property Title",
+                    "description": "Description",
                     "type": "Property Type",
                     "city": "City",
                     "latitude": "Location",
@@ -183,6 +184,23 @@ class PropertyService:
         """
         async with self.db.acquire() as conn:
             async with conn.transaction():
+                # Check if user already has a DRAFT property
+                existing_draft = await conn.fetchval(
+                    """
+                    SELECT id FROM properties 
+                    WHERE seller_id = $1 AND status = 'DRAFT' AND deleted_at IS NULL
+                    LIMIT 1
+                    """,
+                    seller_id
+                )
+                
+                if existing_draft:
+                    return {
+                        "success": False,
+                        "error": "You already have a draft property. Please complete or delete it before creating a new one.",
+                        "existing_draft_id": str(existing_draft)
+                    }
+                
                 # Create property
                 property_id = await conn.fetchval(
                     """
@@ -376,6 +394,8 @@ class PropertyService:
                 "longitude": row["longitude"],
                 "address": row["address"],
                 "city": row["city"],
+                "state": row["state"],
+                "pincode": row["pincode"],
                 "bedrooms": row["bedrooms"],
                 "bathrooms": row["bathrooms"],
                 "area_sqft": float(row["area_sqft"]) if row["area_sqft"] else None,
@@ -385,6 +405,8 @@ class PropertyService:
                 "visibility": self._compute_visibility(status),
                 "agent": agent,
                 "media": [dict(m) for m in media],
+                "highlights": [dict(h) for h in highlights],
+                "price_history": [dict(ph) for ph in price_history],
                 "created_at": row["created_at"].isoformat(),
                 "updated_at": row["updated_at"].isoformat(),
                 "has_media": len(media) > 0
@@ -445,7 +467,7 @@ class PropertyService:
                 
                 allowed_fields = [
                     "title", "description", "type", "price", 
-                    "latitude", "longitude", "address", "city",
+                    "latitude", "longitude", "address", "city", "state", "pincode",
                     "bedrooms", "bathrooms", "area_sqft"
                 ]
                 
@@ -454,6 +476,7 @@ class PropertyService:
                         update_fields.append(f"{field} = ${param_idx}")
                         values.append(updates[field])
                         param_idx += 1
+                        print(f"[PropertyService] Updating field: {field} = {updates[field]}")
                 
                 if not update_fields:
                     return {"success": False, "error": "No valid fields to update", "code": 400}
@@ -574,3 +597,422 @@ class PropertyService:
                     "success": True,
                     "message": "Property deleted successfully"
                 }
+    
+    # ========================================================================
+    # PUBLIC BROWSING METHODS (No auth required)
+    # ========================================================================
+    
+    async def get_public_properties(
+        self,
+        page: int = 1,
+        per_page: int = 12,
+        city: Optional[str] = None,
+        property_type: Optional[str] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+        bedrooms: Optional[int] = None,
+        bathrooms: Optional[int] = None,
+        min_area: Optional[float] = None,
+        max_area: Optional[float] = None,
+        keyword: Optional[str] = None,
+        sort_by: Optional[str] = None  # price_asc, price_desc, newest, area_desc
+    ) -> Dict[str, Any]:
+        """
+        Get paginated list of ACTIVE properties for public browsing.
+        
+        Only shows verified, live properties. No seller info exposed.
+        
+        Filters:
+        - city: Partial match on city name
+        - property_type: Exact match (LAND, HOUSE, APARTMENT, COMMERCIAL)
+        - min_price/max_price: Price range
+        - bedrooms: Minimum bedrooms
+        - bathrooms: Minimum bathrooms
+        - min_area/max_area: Area range in sqft
+        - keyword: Search in title, description, address
+        - sort_by: price_asc, price_desc, newest (default), area_desc
+        """
+        offset = (page - 1) * per_page
+        
+        async with self.db.acquire() as conn:
+            # Build WHERE clause dynamically
+            conditions = ["p.status = 'ACTIVE'", "p.deleted_at IS NULL"]
+            params = []
+            param_idx = 1
+            
+            if city:
+                conditions.append(f"LOWER(p.city) LIKE LOWER(${param_idx})")
+                params.append(f"%{city}%")
+                param_idx += 1
+            
+            if property_type:
+                conditions.append(f"p.type = ${param_idx}")
+                params.append(property_type)
+                param_idx += 1
+            
+            if min_price is not None:
+                conditions.append(f"p.price >= ${param_idx}")
+                params.append(min_price)
+                param_idx += 1
+            
+            if max_price is not None:
+                conditions.append(f"p.price <= ${param_idx}")
+                params.append(max_price)
+                param_idx += 1
+            
+            if bedrooms is not None:
+                conditions.append(f"p.bedrooms >= ${param_idx}")
+                params.append(bedrooms)
+                param_idx += 1
+            
+            if bathrooms is not None:
+                conditions.append(f"p.bathrooms >= ${param_idx}")
+                params.append(bathrooms)
+                param_idx += 1
+            
+            if min_area is not None:
+                conditions.append(f"p.area_sqft >= ${param_idx}")
+                params.append(min_area)
+                param_idx += 1
+            
+            if max_area is not None:
+                conditions.append(f"p.area_sqft <= ${param_idx}")
+                params.append(max_area)
+                param_idx += 1
+            
+            if keyword:
+                # Search in title, description, address, and city
+                conditions.append(f"""(
+                    LOWER(p.title) LIKE LOWER(${param_idx}) OR
+                    LOWER(p.description) LIKE LOWER(${param_idx}) OR
+                    LOWER(p.address) LIKE LOWER(${param_idx}) OR
+                    LOWER(p.city) LIKE LOWER(${param_idx})
+                )""")
+                params.append(f"%{keyword}%")
+                param_idx += 1
+            
+            where_clause = " AND ".join(conditions)
+            
+            # Determine sort order
+            sort_options = {
+                "price_asc": "p.price ASC NULLS LAST",
+                "price_desc": "p.price DESC NULLS LAST",
+                "newest": "p.created_at DESC",
+                "area_desc": "p.area_sqft DESC NULLS LAST",
+                "area_asc": "p.area_sqft ASC NULLS LAST"
+            }
+            order_by = sort_options.get(sort_by, "p.created_at DESC")
+            
+            # Get total count
+            count_query = f"""
+                SELECT COUNT(*) FROM properties p
+                WHERE {where_clause}
+            """
+            total = await conn.fetchval(count_query, *params)
+            
+            # Get properties
+            params.extend([per_page, offset])
+            query = f"""
+                SELECT 
+                    p.id, p.title, p.type::text, p.price, p.city, p.state,
+                    p.bedrooms, p.bathrooms, p.area_sqft,
+                    p.latitude, p.longitude,
+                    p.created_at,
+                    (SELECT file_url FROM property_media 
+                     WHERE property_id = p.id AND is_primary = true AND deleted_at IS NULL 
+                     LIMIT 1) as thumbnail_url,
+                    u.full_name as agent_name
+                FROM properties p
+                LEFT JOIN agent_assignments aa ON p.id = aa.property_id 
+                    AND aa.status = 'ACCEPTED'
+                LEFT JOIN users u ON aa.agent_id = u.id
+                WHERE {where_clause}
+                ORDER BY {order_by}
+                LIMIT ${param_idx} OFFSET ${param_idx + 1}
+            """
+            rows = await conn.fetch(query, *params)
+            
+            properties = []
+            for row in rows:
+                properties.append({
+                    "id": str(row["id"]),
+                    "title": row["title"],
+                    "type": row["type"],
+                    "price": float(row["price"]) if row["price"] else None,
+                    "city": row["city"],
+                    "state": row["state"],
+                    "bedrooms": row["bedrooms"],
+                    "bathrooms": row["bathrooms"],
+                    "area_sqft": float(row["area_sqft"]) if row["area_sqft"] else None,
+                    "latitude": row["latitude"],
+                    "longitude": row["longitude"],
+                    "thumbnail_url": row["thumbnail_url"],
+                    "agent_name": row["agent_name"],
+                    "created_at": row["created_at"].isoformat()
+                })
+            
+            return {
+                "success": True,
+                "properties": properties,
+                "pagination": {
+                    "page": page,
+                    "per_page": per_page,
+                    "total": total,
+                    "total_pages": (total + per_page - 1) // per_page if total > 0 else 0,
+                    "has_more": (page * per_page) < total
+                },
+                "filters_applied": {
+                    "city": city,
+                    "type": property_type,
+                    "min_price": min_price,
+                    "max_price": max_price,
+                    "bedrooms": bedrooms,
+                    "bathrooms": bathrooms,
+                    "min_area": min_area,
+                    "max_area": max_area,
+                    "keyword": keyword,
+                    "sort_by": sort_by or "newest"
+                }
+            }
+    
+    async def get_public_property_by_id(
+        self,
+        property_id: UUID,
+        viewer_id: Optional[UUID] = None
+    ) -> Dict[str, Any]:
+        """
+        Get single property for public view.
+        
+        Only ACTIVE properties are viewable. No seller info exposed.
+        Agent contact info is shown.
+        
+        If viewer_id is provided, returns viewer context with is_owner and is_agent flags.
+        """
+        async with self.db.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT 
+                    p.id, p.title, p.description, p.type::text, p.price,
+                    p.city, p.state, p.pincode, p.address,
+                    p.latitude, p.longitude,
+                    p.bedrooms, p.bathrooms, p.area_sqft,
+                    p.status::text,
+                    p.seller_id,
+                    p.created_at, p.updated_at,
+                    u.id as agent_id, u.full_name as agent_name, u.email as agent_email
+                FROM properties p
+                LEFT JOIN agent_assignments aa ON p.id = aa.property_id 
+                    AND aa.status = 'ACCEPTED'
+                LEFT JOIN users u ON aa.agent_id = u.id
+                WHERE p.id = $1 AND p.deleted_at IS NULL
+                """,
+                property_id
+            )
+            
+            if not row:
+                return {"success": False, "error": "Property not found", "code": 404}
+            
+            if row["status"] != "ACTIVE":
+                return {"success": False, "error": "Property not available", "code": 404}
+            
+            # Get all media
+            media = await conn.fetch(
+                """
+                SELECT id, media_type::text, file_url, display_order, is_primary
+                FROM property_media
+                WHERE property_id = $1 AND deleted_at IS NULL
+                ORDER BY is_primary DESC, display_order ASC
+                """,
+                property_id
+            )
+            
+            # Build agent info (public contact)
+            agent = None
+            if row["agent_id"]:
+                agent = {
+                    "id": str(row["agent_id"]),
+                    "name": row["agent_name"],
+                    "email": row["agent_email"]
+                }
+            
+            # Build viewer context if authenticated viewer
+            viewer_context = None
+            if viewer_id:
+                # Check for existing active visit
+                visit_id = await conn.fetchval("""
+                    SELECT id 
+                    FROM visit_requests 
+                    WHERE property_id = $1 
+                      AND buyer_id = $2
+                      AND status IN ('REQUESTED', 'APPROVED', 'COUNTERED', 'CHECKED_IN')
+                    LIMIT 1
+                """, property_id, viewer_id)
+
+                viewer_context = {
+                    "is_owner": row["seller_id"] == viewer_id,
+                    "is_agent": row["agent_id"] == viewer_id if row["agent_id"] else False,
+                    "visit_id": str(visit_id) if visit_id else None
+                }
+                print(f"[DEBUG] viewer_context for property {property_id}: {viewer_context}")
+                
+            # Get property highlights
+            highlights_row = await conn.fetchrow("""
+                SELECT facing, floor_number, total_floors, furnishing, 
+                       possession_date, property_age, parking_spaces, balconies
+                FROM property_highlights
+                WHERE property_id = $1
+            """, property_id)
+            
+            highlights = None
+            if highlights_row:
+                highlights = {
+                    "facing": highlights_row["facing"],
+                    "floor_number": highlights_row["floor_number"],
+                    "total_floors": highlights_row["total_floors"],
+                    "furnishing": highlights_row["furnishing"],
+                    "possession_date": highlights_row["possession_date"].isoformat() if highlights_row["possession_date"] else None,
+                    "property_age": highlights_row["property_age"],
+                    "parking_spaces": highlights_row["parking_spaces"],
+                    "balconies": highlights_row["balconies"]
+                }
+            
+            # Get price history
+            price_history_rows = await conn.fetch("""
+                SELECT new_price as price, changed_at as date
+                FROM property_price_history
+                WHERE property_id = $1
+                ORDER BY changed_at ASC
+            """, property_id)
+            
+            price_history = [
+                {"price": float(r["price"]), "date": r["date"].isoformat()}
+                for r in price_history_rows
+            ]
+            
+            result = {
+                "success": True,
+                "property": {
+                    "id": str(row["id"]),
+                    "title": row["title"],
+                    "description": row["description"],
+                    "type": row["type"],
+                    "price": float(row["price"]) if row["price"] else None,
+                    "city": row["city"],
+                    "state": row["state"],
+                    "pincode": row["pincode"],
+                    "address": row["address"],
+                    "latitude": row["latitude"],
+                    "longitude": row["longitude"],
+                    "bedrooms": row["bedrooms"],
+                    "bathrooms": row["bathrooms"],
+                    "area_sqft": float(row["area_sqft"]) if row["area_sqft"] else None,
+                    "agent": agent,
+                    "media": [
+                        {
+                            "id": str(m["id"]),
+                            "media_type": m["media_type"],
+                            "file_url": m["file_url"],
+                            "display_order": m["display_order"],
+                            "is_primary": m["is_primary"]
+                        }
+                        for m in media
+                    ],
+                    "highlights": highlights,
+                    "price_history": price_history,
+                    "created_at": row["created_at"].isoformat(),
+                    "updated_at": row["updated_at"].isoformat()
+                }
+            }
+            
+            # Add viewer context to property if authenticated
+            if viewer_context:
+                result["property"]["viewer"] = viewer_context
+            
+            return result
+    
+    # ========================================================================
+    # ADMIN OVERRIDE METHODS
+    # ========================================================================
+    
+    async def admin_override_status(
+        self,
+        property_id: UUID,
+        new_status: str,
+        admin_id: UUID,
+        reason: str,
+        ip_address: str
+    ) -> Dict[str, Any]:
+        """
+        Admin override for property status.
+        
+        Bypasses normal state machine validation.
+        CRITICAL: Requires mandatory audit logging with reason.
+        
+        Args:
+            property_id: Property to override
+            new_status: Target status
+            admin_id: Admin performing override
+            reason: Mandatory reason for audit
+            ip_address: Admin's IP
+            
+        Returns:
+            {"success": bool, "error": optional str}
+        """
+        async with self.db.acquire() as conn:
+            async with conn.transaction():
+                # Get current property
+                row = await conn.fetchrow("""
+                    SELECT id, status::text, seller_id
+                    FROM properties
+                    WHERE id = $1 AND deleted_at IS NULL
+                    FOR UPDATE
+                """, property_id)
+                
+                if not row:
+                    return {
+                        "success": False,
+                        "error": "Property not found",
+                        "code": 404
+                    }
+                
+                old_status = row["status"]
+                
+                if old_status == new_status:
+                    return {
+                        "success": False,
+                        "error": f"Property is already in {new_status} status",
+                        "code": 400
+                    }
+                
+                # Update property status
+                await conn.execute("""
+                    UPDATE properties
+                    SET status = $1::property_status, updated_at = NOW()
+                    WHERE id = $2
+                """, new_status, property_id)
+                
+                # CRITICAL: Audit log with reason
+                await conn.execute("""
+                    INSERT INTO audit_logs (
+                        user_id, action, entity_type, entity_id, 
+                        ip_address, details
+                    )
+                    VALUES ($1, 'ADMIN_PROPERTY_OVERRIDE', 'properties', $2, $3, $4)
+                """,
+                admin_id,
+                property_id,
+                ip_address,
+                json.dumps({
+                    "old_status": old_status,
+                    "new_status": new_status,
+                    "reason": reason,
+                    "seller_id": str(row["seller_id"])
+                }))
+                
+                return {
+                    "success": True,
+                    "old_status": old_status,
+                    "new_status": new_status
+                }
+
+

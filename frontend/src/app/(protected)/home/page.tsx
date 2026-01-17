@@ -83,7 +83,8 @@ export default async function UserHomePage() {
                             </p>
                         </a>
 
-                        {/* Find an Agent */}
+
+                        {/* Match with Agent */}
                         <a
                             href="/agents"
                             className="block p-6 bg-gray-900 rounded-xl text-white hover:shadow-lg transition-shadow"
@@ -91,6 +92,17 @@ export default async function UserHomePage() {
                             <h2 className="text-xl font-semibold mb-2">Find an Agent</h2>
                             <p className="text-white/90">
                                 Connect with trusted real estate professionals
+                            </p>
+                        </a>
+
+                        {/* Saved Properties (New) */}
+                        <a
+                            href="/saved-properties"
+                            className="block p-6 bg-white border border-gray-200 rounded-xl hover:shadow-lg transition-shadow group"
+                        >
+                            <h2 className="text-xl font-semibold mb-2 text-gray-900 group-hover:text-[#FF385C] transition-colors">Saved Homes</h2>
+                            <p className="text-gray-600">
+                                View your bookmarked properties and whitelists
                             </p>
                         </a>
                     </div>

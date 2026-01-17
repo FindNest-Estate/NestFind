@@ -56,6 +56,8 @@ class UpdatePropertyRequest(BaseModel):
     longitude: Optional[float] = Field(None, ge=-180, le=180)
     address: Optional[str] = Field(None, max_length=500)
     city: Optional[str] = Field(None, max_length=100)
+    state: Optional[str] = Field(None, max_length=100)
+    pincode: Optional[str] = Field(None, max_length=10)
     bedrooms: Optional[int] = Field(None, ge=0, le=50)
     bathrooms: Optional[int] = Field(None, ge=0, le=50)
     area_sqft: Optional[Decimal] = Field(None, gt=0)
@@ -111,6 +113,8 @@ class PropertyResponse(BaseModel):
     longitude: Optional[float]
     address: Optional[str]
     city: Optional[str]
+    state: Optional[str]
+    pincode: Optional[str]
     bedrooms: Optional[int]
     bathrooms: Optional[int]
     area_sqft: Optional[Decimal]

@@ -19,7 +19,7 @@ const PUBLIC_ROUTES = [
     '/properties',
     '/about',
     '/contact',
-    '/find-agent',
+    '/agents',
 ];
 
 const AUTH_ROUTES = [

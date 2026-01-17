@@ -201,7 +201,7 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                         onChange={(e) => handleFieldUpdate('title', e.target.value)}
                                         onBlur={(e) => handleFieldUpdate('title', e.target.value)}
                                         placeholder="e.g., Spacious 3BHK Apartment in Koramangala"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                                     />
                                 </div>
 
@@ -213,7 +213,7 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                     <select
                                         value={property.type || ''}
                                         onChange={(e) => handleFieldUpdate('type', e.target.value as PropertyType)}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                                     >
                                         <option value="">Select type</option>
                                         <option value={PropertyType.LAND}>Land</option>
@@ -226,7 +226,7 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                 {/* Description */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Description
+                                        Description *
                                     </label>
                                     <textarea
                                         value={property.description || ''}
@@ -234,7 +234,7 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                         onBlur={(e) => handleFieldUpdate('description', e.target.value)}
                                         placeholder="Describe your property, key features, amenities..."
                                         rows={5}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
                                     />
                                     <p className="text-xs text-gray-500 mt-1">
                                         Be detailed - buyers want to know what makes your property special.
@@ -255,11 +255,47 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                             <LocationPicker
                                 initialLat={property.latitude || undefined}
                                 initialLng={property.longitude || undefined}
-                                onLocationSelect={(lat, lng, address) => {
-                                    handleFieldUpdate('latitude', lat);
-                                    handleFieldUpdate('longitude', lng);
-                                    if (address) {
-                                        handleFieldUpdate('address', address);
+                                showCurrentLocationButton={true}
+                                onLocationSelect={async (lat, lng, locationData) => {
+                                    // Batch all location updates into a single API call
+                                    // to avoid race conditions from multiple simultaneous updates
+                                    try {
+                                        setSaving(true);
+                                        const updates: any = {
+                                            latitude: lat,
+                                            longitude: lng,
+                                        };
+
+                                        if (locationData?.address) {
+                                            updates.address = locationData.address;
+                                        }
+                                        if (locationData?.city) {
+                                            updates.city = locationData.city;
+                                        }
+                                        if (locationData?.state) {
+                                            updates.state = locationData.state;
+                                        }
+                                        if (locationData?.pincode) {
+                                            updates.pincode = locationData.pincode;
+                                        }
+
+                                        console.log('[PropertyEditor] Batched location updates:', updates);
+                                        await updateProperty(propertyId, updates);
+
+                                        // Refetch to get updated completeness
+                                        const updatedProperty = await getProperty(propertyId);
+                                        console.log('[PropertyEditor] Refetched property state/pincode:', {
+                                            state: updatedProperty.state,
+                                            pincode: updatedProperty.pincode,
+                                            city: updatedProperty.city
+                                        });
+                                        setProperty(updatedProperty);
+                                        setError(null);
+                                    } catch (err: any) {
+                                        setError(err.message || 'Failed to update location');
+                                        console.error('Location update error:', err);
+                                    } finally {
+                                        setSaving(false);
                                     }
                                 }}
                             />
@@ -275,7 +311,38 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                     onChange={(e) => handleFieldUpdate('city', e.target.value)}
                                     onBlur={(e) => handleFieldUpdate('city', e.target.value)}
                                     placeholder="e.g., Bangalore"
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                />
+                            </div>
+
+                            {/* State */}
+                            <div className="mt-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    State
+                                </label>
+                                <input
+                                    type="text"
+                                    value={property.state || ''}
+                                    onChange={(e) => handleFieldUpdate('state', e.target.value)}
+                                    onBlur={(e) => handleFieldUpdate('state', e.target.value)}
+                                    placeholder="e.g., Karnataka"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                />
+                            </div>
+
+                            {/* Pincode */}
+                            <div className="mt-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Pincode
+                                </label>
+                                <input
+                                    type="text"
+                                    value={property.pincode || ''}
+                                    onChange={(e) => handleFieldUpdate('pincode', e.target.value)}
+                                    onBlur={(e) => handleFieldUpdate('pincode', e.target.value)}
+                                    placeholder="e.g., 560001"
+                                    maxLength={10}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                                 />
                             </div>
                         </section>
@@ -303,7 +370,7 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                             onChange={(e) => handleFieldUpdate('bedrooms', parseInt(e.target.value) || null)}
                                             onBlur={(e) => handleFieldUpdate('bedrooms', parseInt(e.target.value) || null)}
                                             placeholder="0"
-                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                                         />
                                     </div>
                                 )}
@@ -321,7 +388,7 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                             onChange={(e) => handleFieldUpdate('bathrooms', parseInt(e.target.value) || null)}
                                             onBlur={(e) => handleFieldUpdate('bathrooms', parseInt(e.target.value) || null)}
                                             placeholder="0"
-                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                                         />
                                     </div>
                                 )}
@@ -338,7 +405,7 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                         onChange={(e) => handleFieldUpdate('area_sqft', parseFloat(e.target.value) || null)}
                                         onBlur={(e) => handleFieldUpdate('area_sqft', parseFloat(e.target.value) || null)}
                                         placeholder="1500"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                                     />
                                 </div>
 
@@ -354,7 +421,7 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                         onChange={(e) => handleFieldUpdate('price', parseFloat(e.target.value) || null)}
                                         onBlur={(e) => handleFieldUpdate('price', parseFloat(e.target.value) || null)}
                                         placeholder="5000000"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                                     />
                                 </div>
                             </div>

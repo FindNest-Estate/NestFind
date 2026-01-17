@@ -22,12 +22,20 @@ const MapWithNoSSR = dynamic(() => import('./LocationPickerMap'), {
     ),
 });
 
+// Location data returned from reverse geocoding
+export interface LocationData {
+    address?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+}
+
 interface LocationPickerProps {
-    onLocationSelect: (lat: number, lng: number, address?: string) => void;
+    onLocationSelect: (lat: number, lng: number, locationData?: LocationData) => void;
     initialLat?: number;
     initialLng?: number;
     disabled?: boolean;
-    showCurrentLocationButton?: boolean; // Only for agent registration
+    showCurrentLocationButton?: boolean;
 }
 
 export default function LocationPicker({
@@ -53,7 +61,41 @@ export default function LocationPicker({
         setLocationError('');
     };
 
-    const handleUseCurrentLocation = () => {
+    // Reverse geocoding using OpenStreetMap Nominatim
+    const reverseGeocode = async (lat: number, lng: number): Promise<LocationData> => {
+        try {
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+                { headers: { 'User-Agent': 'NestFind/1.0' } }
+            );
+            const data = await response.json();
+            const addr = data.address || {};
+
+            // Log full response for debugging
+            console.log('[LocationPicker] Full Nominatim address object:', JSON.stringify(addr, null, 2));
+
+            // Extract fields with comprehensive fallbacks for Indian addresses
+            // Nominatim uses different field names depending on location type
+            const extractedCity = addr.city || addr.town || addr.village || addr.suburb || addr.county || addr.state_district || addr.municipality;
+            const extractedState = addr.state || addr['ISO3166-2-lvl4']?.split('-')[1] || addr.region || addr.province;
+            const extractedPincode = addr.postcode || addr.postal_code || addr.pincode;
+
+            const locationData = {
+                address: data.display_name,
+                city: extractedCity,
+                state: extractedState,
+                pincode: extractedPincode
+            };
+
+            console.log('[LocationPicker] Extracted:', { city: extractedCity, state: extractedState, pincode: extractedPincode });
+            return locationData;
+        } catch (error) {
+            console.error('Reverse geocoding failed:', error);
+            return {};
+        }
+    };
+
+    const handleUseCurrentLocation = async () => {
         if (disabled || !navigator.geolocation) {
             setLocationError('Geolocation is not supported by your browser');
             return;
@@ -63,10 +105,13 @@ export default function LocationPicker({
         setLocationError('');
 
         navigator.geolocation.getCurrentPosition(
-            (position) => {
+            async (position) => {
                 const { latitude, longitude } = position.coords;
                 setSelectedLocation({ lat: latitude, lng: longitude });
-                onLocationSelect(latitude, longitude);
+
+                // Reverse geocode to get address details
+                const locationData = await reverseGeocode(latitude, longitude);
+                onLocationSelect(latitude, longitude, locationData);
                 setIsGettingLocation(false);
             },
             (error) => {

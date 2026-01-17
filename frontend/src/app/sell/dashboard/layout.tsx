@@ -67,7 +67,7 @@ export default function SellerDashboardLayout({
             <Navbar />
 
             {/* Dashboard Header & Tabs */}
-            <div className="bg-white border-b border-gray-200 pt-24 pb-0">
+            <div className="bg-white border-b border-gray-200 pt-4 pb-0">
                 <div className="max-w-7xl mx-auto px-6">
                     <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
                         <div>

@@ -98,6 +98,15 @@ async def create_property(
     )
     
     if not result["success"]:
+        # If draft already exists, return 409 Conflict with the existing draft ID
+        if "existing_draft_id" in result:
+            raise HTTPException(
+                status_code=409, 
+                detail={
+                    "message": result.get("error"),
+                    "existing_draft_id": result.get("existing_draft_id")
+                }
+            )
         raise HTTPException(status_code=500, detail=result.get("error", "Failed to create property"))
     
     return result["property"]

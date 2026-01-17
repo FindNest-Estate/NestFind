@@ -1,0 +1,26 @@
+DEBUG ERROR: column ap.is_active does not exist
+
+Traceback (most recent call last):
+  File "D:\NestFind\backend\app\routers\public_agents.py", line 117, in get_nearby_agents
+    result = await service.get_nearby_agents(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NestFind\backend\app\services\public_agents_service.py", line 251, in get_nearby_agents
+    total = await conn.fetchval(count_query, latitude, longitude, radius_km)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NestFind\backend\venv\Lib\site-packages\asyncpg\connection.py", line 718, in fetchval
+    data = await self._execute(query, args, 1, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NestFind\backend\venv\Lib\site-packages\asyncpg\connection.py", line 1873, in _execute
+    result, _ = await self.__execute(
+                ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NestFind\backend\venv\Lib\site-packages\asyncpg\connection.py", line 1970, in __execute
+    result, stmt = await self._do_execute(
+                   ^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NestFind\backend\venv\Lib\site-packages\asyncpg\connection.py", line 2013, in _do_execute
+    stmt = await self._get_statement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\NestFind\backend\venv\Lib\site-packages\asyncpg\connection.py", line 443, in _get_statement
+    statement = await self._protocol.prepare(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "asyncpg/protocol/protocol.pyx", line 165, in prepare
+asyncpg.exceptions.UndefinedColumnError: column ap.is_active does not exist

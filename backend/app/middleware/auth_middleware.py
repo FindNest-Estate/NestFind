@@ -34,6 +34,12 @@ async def _get_token_from_request(
         token = request.cookies.get("access_token")
         if token:
             return token
+
+    # Fall back to query params (for SSE)
+    if request:
+        token = request.query_params.get("token")
+        if token:
+            return token
     
     return None
 
@@ -56,7 +62,9 @@ async def get_current_user_any_status(
     elif request:
         token = request.cookies.get("access_token")
     
+    
     if not token:
+        print(f"DEBUG: No token found. Headers: {request.headers.get('Authorization')}, Cookies: {request.cookies.keys()}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated"
@@ -235,4 +243,92 @@ def require_role(required_role: str):
         return current_user
     
     return role_checker
+
+
+async def get_optional_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    request: Request = None,
+    db_pool = Depends(get_db_pool)
+) -> Optional[AuthenticatedUser]:
+    """
+    Optional authentication - returns user if authenticated, None otherwise.
+    
+    Use for endpoints that work for both authenticated and unauthenticated users,
+    but may return additional data when authenticated (e.g., viewer context).
+    
+    Does NOT raise exceptions for missing/invalid tokens.
+    """
+    # Get token from header or cookie
+    token = None
+    if credentials and credentials.credentials:
+        token = credentials.credentials
+    elif request:
+        token = request.cookies.get("access_token")
+    
+    if not token:
+        return None
+    
+    # Decode JWT
+    payload = decode_access_token(token)
+    if not payload:
+        return None
+    
+    # Validate required fields exist
+    sub = payload.get("sub")
+    session_id_str = payload.get("session_id")
+    
+    if not sub or not session_id_str:
+        return None
+    
+    try:
+        user_id = UUID(sub)
+        session_id = UUID(session_id_str)
+    except (ValueError, TypeError):
+        return None
+    
+    # Verify session is not revoked
+    session_service = SessionService(db_pool)
+    session = await session_service.verify_session(session_id)
+    
+    if not session:
+        return None
+    
+    # Re-verify user status and roles from database
+    async with db_pool.acquire() as conn:
+        user = await conn.fetchrow(
+            """
+            SELECT id, status
+            FROM users
+            WHERE id = $1
+            """,
+            user_id
+        )
+        
+        if not user:
+            return None
+        
+        # Only return user context if ACTIVE
+        if user['status'] != 'ACTIVE':
+            return None
+        
+        # Load user roles from database
+        roles = await conn.fetch(
+            """
+            SELECT r.name
+            FROM user_roles ur
+            JOIN roles r ON ur.role_id = r.id
+            WHERE ur.user_id = $1
+            """,
+            user_id
+        )
+        
+        role_names = [role['name'] for role in roles]
+    
+    return AuthenticatedUser(
+        user_id=user_id,
+        session_id=session_id,
+        status=user['status'],
+        roles=role_names
+    )
+
 

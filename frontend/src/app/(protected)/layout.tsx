@@ -1,23 +1,18 @@
 /**
- * Protected Routes Layout
+ * Protected Routes Layout - Client Component Version
  * 
- * Server Component that enforces authentication and status checks.
- * Based on: frontend/docs/auth_state_machine.md
- * 
- * RULES:
- * - Always fetch user status from backend
- * - Never trust cached role/status
- * - Redirect based on user status
+ * Due to cross-origin cookie issues between frontend (3000) and backend (8000),
+ * we use client-side auth checking with localStorage tokens.
  */
 
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { ReactNode } from 'react';
-import AuthLoadingSpinner from '@/components/auth/AuthLoadingSpinner';
+'use client';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { getCurrentUser } from '@/lib/authApi';
+import NotificationsProvider from '@/components/providers/NotificationsProvider';
 
-interface UserResponse {
+interface User {
     id: string;
     full_name: string;
     email: string;
@@ -25,80 +20,73 @@ interface UserResponse {
     status: 'PENDING_VERIFICATION' | 'ACTIVE' | 'IN_REVIEW' | 'DECLINED' | 'SUSPENDED';
 }
 
-/**
- * Server-side auth check
- */
-async function getAuthUser(): Promise<UserResponse | null> {
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get('access_token')?.value;
-
-    if (!accessToken) {
-        return null;
-    }
-
-    try {
-        const response = await fetch(`${API_BASE_URL}/user/me`, {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-            },
-            cache: 'no-store', // Always fetch fresh - CRITICAL
-        });
-
-        if (!response.ok) {
-            // Token invalid/expired
-            return null;
-        }
-
-        return await response.json();
-    } catch {
-        // Do not log error object to avoid leaking sensitive data
-        console.error('[ProtectedLayout] Auth check failed');
-        return null;
-    }
-}
-
-/**
- * Enforce user status redirects
- */
-function enforceStatusRedirect(user: UserResponse): void {
-    switch (user.status) {
-        case 'PENDING_VERIFICATION':
-            redirect('/verify-otp');
-        case 'IN_REVIEW':
-            redirect('/under-review');
-        case 'DECLINED':
-            redirect('/declined');
-        case 'SUSPENDED':
-            redirect('/suspended');
-        case 'ACTIVE':
-            // Continue to render children
-            break;
-        default:
-            redirect('/login');
-    }
-}
-
-export default async function ProtectedLayout({
+export default function ProtectedLayout({
     children,
 }: {
-    children: ReactNode;
+    children: React.ReactNode;
 }) {
-    const user = await getAuthUser();
+    const router = useRouter();
+    const pathname = usePathname();
+    const [user, setUser] = useState<User | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // No user - redirect to login
-    if (!user) {
-        redirect('/login');
+    useEffect(() => {
+        async function checkAuth() {
+            console.log('[ProtectedLayout] Starting auth check...');
+            console.log('[ProtectedLayout] Token:', localStorage.getItem('access_token') ? 'EXISTS' : 'MISSING');
+            try {
+                const userData = await getCurrentUser();
+
+                // Check status
+                switch (userData.status) {
+                    case 'PENDING_VERIFICATION':
+                        router.replace('/verify-otp');
+                        return;
+                    case 'IN_REVIEW':
+                        router.replace('/under-review');
+                        return;
+                    case 'DECLINED':
+                        router.replace('/declined');
+                        return;
+                    case 'SUSPENDED':
+                        router.replace('/suspended');
+                        return;
+                    case 'ACTIVE':
+                        // Good to go
+                        break;
+                    default:
+                        router.replace('/login');
+                        return;
+                }
+
+                setUser(userData);
+            } catch (error) {
+                console.error('[ProtectedLayout] Auth check failed:', error);
+                router.replace('/login?session_expired=true');
+            } finally {
+                setIsLoading(false);
+            }
+        }
+
+        checkAuth();
+    }, [router, pathname]);
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#FF385C]"></div>
+            </div>
+        );
     }
 
-    // Check status and redirect if not ACTIVE
-    enforceStatusRedirect(user);
+    if (!user) {
+        return null; // Will redirect
+    }
 
-    // User is ACTIVE - render children with user context
     return (
         <div data-user-id={user.id} data-user-role={user.role}>
+            <NotificationsProvider />
             {children}
         </div>
     );
 }
-

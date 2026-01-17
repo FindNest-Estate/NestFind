@@ -145,3 +145,134 @@ class RegisterAgentService:
                     "success": True,
                     "user_id": user_id
                 }
+
+    async def get_latest_rejection_reason(self, user_id: UUID) -> Optional[str]:
+        """Fetch the latest rejection reason from audit logs."""
+        async with self.db.acquire() as conn:
+            details = await conn.fetchval(
+                """
+                SELECT details
+                FROM audit_logs
+                WHERE entity_id = $1 AND action = 'AGENT_DECLINED'
+                ORDER BY timestamp DESC
+                LIMIT 1
+                """,
+                user_id
+            )
+            
+            if details:
+                # details is already a dict if JSONB is handled, or string if not.
+                # asyncpg returns JSONB as string usually if no codec?
+                # Actually earlier I used json.dumps to insert.
+                # Here we need to parse it if it's a string.
+                if isinstance(details, str):
+                    try:
+                        data = json.loads(details)
+                        return data.get('decision_reason')
+                    except:
+                        return None
+                elif isinstance(details, dict):
+                     return details.get('decision_reason')
+            
+            return None
+
+    async def resubmit_agent(self, user_id: UUID, ip_address: str) -> dict:
+        """
+        Transition DECLINED -> IN_REVIEW.
+        """
+        async with self.db.acquire() as conn:
+            async with conn.transaction():
+                # Check current status
+                status_val = await conn.fetchval(
+                    "SELECT status::text FROM users WHERE id = $1",
+                    user_id
+                )
+                
+                if status_val != 'DECLINED':
+                    return {
+                        "success": False,
+                        "error": f"Cannot resubmit from {status_val} state"
+                    }
+                
+                # Update status
+                await conn.execute(
+                    """
+                    UPDATE users
+                    SET status = 'IN_REVIEW', created_at = NOW()
+                    WHERE id = $1
+                    """,
+                    user_id
+                )
+                
+                # Audit
+                await conn.execute(
+                    """
+                    INSERT INTO audit_logs 
+                    (user_id, action, entity_type, entity_id, ip_address, details)
+                    VALUES ($1, 'AGENT_RESUBMITTED', 'users', $1, $2, '{}')
+                    """,
+                    user_id, ip_address
+                )
+                
+                return {"success": True}
+
+    async def get_application_details(self, user_id: UUID) -> dict:
+        """Fetch full application details."""
+        async with self.db.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT u.full_name, u.email, u.mobile_number, u.address, u.latitude, u.longitude,
+                       ap.pan_number, ap.aadhaar_number, ap.service_radius_km
+                FROM users u
+                LEFT JOIN agent_profiles ap ON u.id = ap.user_id
+                WHERE u.id = $1
+                """,
+                user_id
+            )
+            
+            if not row:
+                raise Exception("User not found")
+                
+            return dict(row)
+
+    async def update_application(self, user_id: UUID, data: dict, ip_address: str) -> dict:
+        """Update application details."""
+        async with self.db.acquire() as conn:
+            async with conn.transaction():
+                # Check status
+                status = await conn.fetchval("SELECT status FROM users WHERE id = $1", user_id)
+                if status not in ('DECLINED', 'IN_REVIEW'):
+                     return {"success": False, "error": "Cannot edit application in current state"}
+
+                # Update users table
+                await conn.execute(
+                    """
+                    UPDATE users
+                    SET full_name = $1, mobile_number = $2, address = $3, latitude = $4, longitude = $5
+                    WHERE id = $6
+                    """,
+                    data['full_name'], data['mobile_number'], data['address'], 
+                    data['latitude'], data['longitude'], user_id
+                )
+                
+                # Update agent_profiles table
+                await conn.execute(
+                    """
+                    UPDATE agent_profiles
+                    SET pan_number = $1, aadhaar_number = $2, service_radius_km = $3
+                    WHERE user_id = $4
+                    """,
+                    data['pan_number'], data['aadhaar_number'], data['service_radius_km'], user_id
+                )
+                
+                # Audit
+                await conn.execute(
+                    """
+                    INSERT INTO audit_logs 
+                    (user_id, action, entity_type, entity_id, ip_address, details)
+                    VALUES ($1, 'AGENT_APPLICATION_UPDATED', 'users', $1, $2, '{}')
+                    """,
+                    user_id, ip_address
+                )
+                
+                return {"success": True}

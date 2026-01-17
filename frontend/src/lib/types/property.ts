@@ -74,6 +74,8 @@ export interface PropertyDetail {
     longitude: number | null;
     address: string | null;
     city: string | null;
+    state: string | null;
+    pincode: string | null;
     bedrooms: number | null;
     bathrooms: number | null;
     area_sqft: number | null;
@@ -141,6 +143,8 @@ export interface UpdatePropertyRequest {
     longitude?: number;
     address?: string;
     city?: string;
+    state?: string;
+    pincode?: string;
     bedrooms?: number;
     bathrooms?: number;
     area_sqft?: number;

@@ -33,20 +33,28 @@ export default function CreatePropertyPage() {
 
                 if (existingDraft) {
                     console.log('[CreatePropertyPage] Found existing draft:', existingDraft.id);
-                    // Resume editing existing draft
-                    router.push(`/sell/create/${existingDraft.id}`);
+                    // Resume editing existing draft - use replace to avoid back button loop
+                    router.replace(`/sell/create/${existingDraft.id}`);
                 } else {
                     console.log('[CreatePropertyPage] No existing draft found. Creating new...');
                     // No existing draft - create new one
-                    const response = await createProperty({
-                        title: 'Untitled Property'
-                    });
+                    const response = await createProperty({});
 
                     console.log('[CreatePropertyPage] New draft created:', response.id);
-                    router.push(`/sell/create/${response.id}`);
+                    // Use replace to avoid back button loop
+                    router.replace(`/sell/create/${response.id}`);
                 }
             } catch (error: any) {
                 console.error('[CreatePropertyPage] Failed to create/resume property:', error);
+
+                if (error?.status === 409) {
+                    const existingDraftId = error?.data?.existing_draft_id || error?.data?.detail?.existing_draft_id;
+                    if (existingDraftId) {
+                        console.log('[CreatePropertyPage] Draft already exists, redirecting:', existingDraftId);
+                        router.replace(`/sell/create/${existingDraftId}`);
+                        return;
+                    }
+                }
 
                 // On error, redirect to dashboard with error message
                 if (error?.status === 401) {

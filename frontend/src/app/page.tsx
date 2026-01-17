@@ -1,7 +1,24 @@
+'use client';
+
 import './landing.css';
 import Navbar from '@/components/Navbar';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Search, MapPin } from 'lucide-react';
 
 export default function LandingPage() {
+    const [searchCity, setSearchCity] = useState('');
+    const router = useRouter();
+
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (searchCity.trim()) {
+            router.push(`/properties?city=${encodeURIComponent(searchCity.trim())}`);
+        } else {
+            router.push('/properties');
+        }
+    };
+
     return (
         <div className="landing-page">
             <Navbar />
@@ -14,8 +31,27 @@ export default function LandingPage() {
                         NestFind connects you with verified real estate agents who prioritize your trust.
                         Transparent transactions, secure processes, and expert guidance every step of the way.
                     </p>
-                    <a href="#featured-properties" className="hero-cta">
-                        Browse Properties
+
+                    {/* Search Bar */}
+                    <form onSubmit={handleSearch} className="hero-search-form">
+                        <div className="hero-search-bar">
+                            <MapPin className="search-icon" />
+                            <input
+                                type="text"
+                                placeholder="Find your dream property..."
+                                value={searchCity}
+                                onChange={(e) => setSearchCity(e.target.value)}
+                                className="search-input"
+                            />
+                            <button type="submit" className="search-button">
+                                <Search size={20} />
+                                Search
+                            </button>
+                        </div>
+                    </form>
+
+                    <a href="/properties" className="hero-cta">
+                        Browse All Properties
                     </a>
                 </div>
             </section>

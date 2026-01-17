@@ -77,16 +77,17 @@ class AdminAgentApprovalService:
                 )
                 
                 # Audit: AGENT_APPROVED
+                import json
                 await conn.execute(
                     """
                     INSERT INTO audit_logs 
                     (user_id, action, entity_type, entity_id, ip_address, details)
-                    VALUES ($1, 'AGENT_APPROVED', 'users', $1, $2, $3)
+                    VALUES ($1, 'AGENT_APPROVED', 'users', $2, $3, $4)
                     """,
-                    agent_id, ip_address, {
+                    admin_id, agent_id, ip_address, json.dumps({
                         'approved_by': str(admin_id),
                         'decision_reason': decision_reason
-                    }
+                    })
                 )
                 
                 return {
@@ -157,19 +158,94 @@ class AdminAgentApprovalService:
                 )
                 
                 # Audit: AGENT_DECLINED
+                import json
                 await conn.execute(
                     """
                     INSERT INTO audit_logs 
                     (user_id, action, entity_type, entity_id, ip_address, details)
-                    VALUES ($1, 'AGENT_DECLINED', 'users', $1, $2, $3)
+                    VALUES ($1, 'AGENT_DECLINED', 'users', $2, $3, $4)
                     """,
-                    agent_id, ip_address, {
+                    admin_id, agent_id, ip_address, json.dumps({
                         'declined_by': str(admin_id),
                         'decision_reason': decision_reason
-                    }
+                    })
                 )
                 
                 return {
                     "success": True,
                     "status": "DECLINED"
                 }
+    
+    async def get_pending_agents(
+        self,
+        page: int = 1,
+        per_page: int = 20
+    ) -> dict:
+        """
+        Get list of agents pending approval (status=IN_REVIEW).
+        
+        Returns:
+        {
+            "success": bool,
+            "agents": [...],
+            "pagination": {...}
+        }
+        """
+        offset = (page - 1) * per_page
+        
+        async with self.db.acquire() as conn:
+            # Get total count
+            total = await conn.fetchval(
+                """
+                SELECT COUNT(*)
+                FROM users u
+                JOIN user_roles ur ON u.id = ur.user_id
+                JOIN roles r ON ur.role_id = r.id
+                WHERE r.name = 'AGENT' AND u.status = 'IN_REVIEW'
+                """
+            )
+            
+            # Get pending agents
+            rows = await conn.fetch(
+                """
+                SELECT 
+                    u.id, u.full_name, u.email, u.mobile_number,
+                    u.created_at, u.status::text,
+                    ap.pan_number, ap.aadhaar_number, ap.service_radius_km
+                FROM users u
+                JOIN user_roles ur ON u.id = ur.user_id
+                JOIN roles r ON ur.role_id = r.id
+                LEFT JOIN agent_profiles ap ON u.id = ap.user_id
+                WHERE r.name = 'AGENT' AND u.status = 'IN_REVIEW'
+                ORDER BY u.created_at ASC
+                LIMIT $1 OFFSET $2
+                """,
+                per_page, offset
+            )
+            
+            agents = []
+            for row in rows:
+                agents.append({
+                    "id": str(row["id"]),
+                    "full_name": row["full_name"],
+                    "email": row["email"],
+                    "phone_number": row["mobile_number"],
+                    "status": row["status"],
+                    "pan_number": row["pan_number"],
+                    "aadhaar_number": row["aadhaar_number"],
+                    "service_radius": row["service_radius_km"],
+                    "submitted_at": row["created_at"].isoformat()
+                })
+            
+            return {
+                "success": True,
+                "agents": agents,
+                "pagination": {
+                    "page": page,
+                    "per_page": per_page,
+                    "total": total,
+                    "total_pages": (total + per_page - 1) // per_page if total > 0 else 0,
+                    "has_more": (page * per_page) < total
+                }
+            }
+

@@ -115,10 +115,17 @@ export async function deleteProperty(
  * Request agent assignment.
  * Transitions property from DRAFT to PENDING_ASSIGNMENT.
  */
+export interface HireAgentResponse {
+    success: boolean;
+    assignment_id: string;
+    agent_name: string;
+    new_status: string;
+}
+
 export async function hireAgent(
     propertyId: string
-): Promise<UpdatePropertyResponse> {
-    return post<UpdatePropertyResponse>(`/properties/${propertyId}/hire`, {});
+): Promise<HireAgentResponse> {
+    return post<HireAgentResponse>(`/properties/${propertyId}/hire-agent`, {});
 }
 
 // ============================================================================

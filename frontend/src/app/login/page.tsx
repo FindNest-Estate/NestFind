@@ -6,7 +6,7 @@
  * Premium two-column layout with trust signals
  */
 
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { login } from '@/lib/authApi';
@@ -19,10 +19,11 @@ interface LockoutState {
     remainingSeconds: number;
 }
 
-export default function LoginPage() {
+function LoginContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const returnUrl = searchParams.get('returnUrl') || '/dashboard';
+    const isAdminLogin = returnUrl.includes('admin') || returnUrl.includes('Admin');
     const sessionExpired = searchParams.get('session_expired') === 'true';
 
     const [email, setEmail] = useState('');
@@ -70,7 +71,7 @@ export default function LoginPage() {
         setIsSubmitting(true);
 
         try {
-            const response = await login({ email, password });
+            const response = await login({ email, password, portal: 'user' });
 
             // Check if response is error with lockout
             if ('locked_until' in response && response.locked_until) {
@@ -92,18 +93,27 @@ export default function LoginPage() {
 
             // Check for generic error
             if ('success' in response && !response.success) {
-                setError(response.error || 'Login failed');
+                setError(response.message || response.error || 'Login failed');
                 return;
             }
 
             // Success - has access_token
             if ('access_token' in response) {
                 // Tokens are set via HTTP-only cookies by backend
+                // AND we store them in localStorage for fallback (especially for cross-origin PUT/POST)
+                if (response.access_token) localStorage.setItem('access_token', response.access_token);
+                if (response.refresh_token) localStorage.setItem('refresh_token', response.refresh_token);
+
                 // Redirect based on user status ONLY
                 // Role-based routing is handled by Server Component in protected layout
                 if (response.user.status === 'ACTIVE') {
                     // Navigate to protected area - Server Component handles role routing
-                    router.push('/dashboard');
+                    // If returnUrl is present (e.g. /admin), use it, otherwise default to dashboard
+                    if (returnUrl && returnUrl !== '/dashboard' && !returnUrl.includes('/login')) {
+                        router.push(returnUrl);
+                    } else {
+                        router.push('/dashboard');
+                    }
                 } else if (response.user.status === 'PENDING_VERIFICATION') {
                     router.push('/verify-otp');
                 } else if (response.user.status === 'IN_REVIEW') {
@@ -115,8 +125,13 @@ export default function LoginPage() {
                 }
             }
         } catch (err: any) {
+            console.error('[LOGIN DEBUG] Caught error:', err);
             if (err instanceof RateLimitError) {
                 setError('Too many requests. Please wait and try again.');
+            } else if (err?.message) {
+                setError(err.message);
+            } else if (err?.data?.error) {
+                setError(err.data.error);
             } else {
                 setError('Login failed. Please check your credentials.');
             }
@@ -175,10 +190,10 @@ export default function LoginPage() {
                         </div>
 
                         <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 mb-2">
-                            Welcome back
+                            {isAdminLogin ? 'Admin Portal' : 'Welcome back'}
                         </h1>
                         <p className="text-base text-gray-600">
-                            Please enter your details to sign in.
+                            {isAdminLogin ? 'Secure access for administrators.' : 'Please enter your details to sign in.'}
                         </p>
 
                         {sessionExpired && (
@@ -279,12 +294,31 @@ export default function LoginPage() {
                         </div>
 
                         <div className="text-center">
-                            <Link
-                                href="/register"
-                                className="inline-block text-base font-semibold text-gray-900 hover:text-[#FF385C] transition duration-200 hover:underline underline-offset-4"
-                            >
-                                Create an account
-                            </Link>
+                            {isAdminLogin ? (
+                                <Link
+                                    href="/login"
+                                    className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                                >
+                                    ← Back to Employee/User Login
+                                </Link>
+                            ) : (
+                                <>
+                                    <Link
+                                        href="/register"
+                                        className="inline-block text-base font-semibold text-gray-900 hover:text-[#FF385C] transition duration-200 hover:underline underline-offset-4"
+                                    >
+                                        Create an account
+                                    </Link>
+                                    <div className="mt-6 pt-6 border-t border-gray-100">
+                                        <Link
+                                            href="/admin-login"
+                                            className="text-sm font-medium text-gray-500 hover:text-[#FF385C] transition-colors"
+                                        >
+                                            Login as Admin
+                                        </Link>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </form>
 
@@ -300,5 +334,20 @@ export default function LoginPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-white">
+                <svg className="animate-spin h-8 w-8 text-[#FF385C]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+        }>
+            <LoginContent />
+        </Suspense>
     );
 }

@@ -19,14 +19,14 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Request
 from fastapi.responses import JSONResponse
 import asyncpg
 
-from app.core.database import get_db
-from app.core.auth import get_current_user
+from app.core.database import get_db_pool
+from app.middleware.auth_middleware import get_current_user, AuthenticatedUser
 
 router = APIRouter(prefix="/properties", tags=["property-media"])
 
 # Configuration
 UPLOAD_DIR = Path("uploads/properties")
-MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
+MAX_IMAGE_SIZE = 15 * 1024 * 1024  # 15MB
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/jpg"}
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
@@ -43,8 +43,8 @@ async def upload_media(
     property_id: UUID,
     request: Request,
     file: UploadFile = File(...),
-    db: asyncpg.Pool = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    db: asyncpg.Pool = Depends(get_db_pool),
+    current_user: AuthenticatedUser = Depends(get_current_user)
 ):
     """
     Upload a media file for a property.
@@ -54,7 +54,7 @@ async def upload_media(
     - Max 5MB for images
     - Allowed types: jpg, jpeg, png, webp
     """
-    user_id = current_user["user_id"]
+    user_id = current_user.user_id
     
     async with db.acquire() as conn:
         # Verify property ownership and status
@@ -96,8 +96,10 @@ async def upload_media(
             )
         
         # Read file and check size
+        print(f"[PropertyMedia] Uploading file for property {property_id} by user {user_id}")
         content = await file.read()
         file_size = len(content)
+        print(f"[PropertyMedia] File size: {file_size} bytes, Type: {file.content_type}")
         
         if file_size > MAX_IMAGE_SIZE:
             raise HTTPException(
@@ -194,8 +196,8 @@ async def delete_media(
     property_id: UUID,
     media_id: UUID,
     request: Request,
-    db: asyncpg.Pool = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    db: asyncpg.Pool = Depends(get_db_pool),
+    current_user: AuthenticatedUser = Depends(get_current_user)
 ):
     """
     Delete a media file (soft delete).
@@ -203,7 +205,7 @@ async def delete_media(
     - Only property owner can delete
     - Only allowed in DRAFT status
     """
-    user_id = current_user["user_id"]
+    user_id = current_user.user_id
     
     async with db.acquire() as conn:
         async with conn.transaction():
@@ -287,8 +289,8 @@ async def set_media_primary(
     property_id: UUID,
     media_id: UUID,
     request: Request,
-    db: asyncpg.Pool = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    db: asyncpg.Pool = Depends(get_db_pool),
+    current_user: AuthenticatedUser = Depends(get_current_user)
 ):
     """
     Set a media item as the primary image.
@@ -296,7 +298,7 @@ async def set_media_primary(
     - Only property owner can set primary
     - Only allowed in DRAFT status
     """
-    user_id = current_user["user_id"]
+    user_id = current_user.user_id
     
     async with db.acquire() as conn:
         async with conn.transaction():
@@ -357,15 +359,15 @@ async def set_media_primary(
 @router.get("/{property_id}/media")
 async def list_media(
     property_id: UUID,
-    db: asyncpg.Pool = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    db: asyncpg.Pool = Depends(get_db_pool),
+    current_user: AuthenticatedUser = Depends(get_current_user)
 ):
     """
     List all media for a property.
     
     - Only property owner can list
     """
-    user_id = current_user["user_id"]
+    user_id = current_user.user_id
     
     async with db.acquire() as conn:
         # Verify property ownership

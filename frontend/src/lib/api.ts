@@ -83,6 +83,9 @@ export async function apiClient<T = any>(
         credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
+            ...(typeof window !== 'undefined' && localStorage.getItem('access_token')
+                ? { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+                : {}),
             ...fetchOptions.headers,
         },
     };

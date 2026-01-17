@@ -2,29 +2,82 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Search, Filter, MoreHorizontal, Eye, Edit2, AlertCircle, LayoutDashboard } from 'lucide-react';
-import { getSellerProperties, PropertySummary, PropertyStatus } from '@/lib/api/seller';
+import { Plus, Search, Filter, MoreHorizontal, Eye, Edit2, AlertCircle, LayoutDashboard, Trash2, CheckCircle, Send, Loader2 } from 'lucide-react';
+import { getSellerProperties, deleteProperty, hireAgent, PropertySummary, PropertyStatus } from '@/lib/api/seller';
 
 export default function SellerListingsPage() {
     const [properties, setProperties] = useState<PropertySummary[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [submittingId, setSubmittingId] = useState<string | null>(null);
+
+    const fetchProperties = async () => {
+        try {
+            setIsLoading(true);
+            const response = await getSellerProperties();
+            setProperties(response.properties);
+            setError(null);
+        } catch (err) {
+            setError('Failed to load properties. Please try again.');
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        async function fetchProperties() {
-            try {
-                const response = await getSellerProperties();
-                setProperties(response.properties);
-            } catch (err) {
-                setError('Failed to load properties. Please try again.');
-                console.error(err);
-            } finally {
-                setIsLoading(false);
-            }
-        }
-
         fetchProperties();
     }, []);
+
+    // Delete handler
+    const handleDelete = async (propertyId: string, title: string | null) => {
+        const displayTitle = title || 'Untitled Property';
+        if (!confirm(`Delete "${displayTitle}"? This action cannot be undone.`)) {
+            return;
+        }
+
+        setDeletingId(propertyId);
+        setError(null);
+        setSuccessMessage(null);
+
+        try {
+            await deleteProperty(propertyId);
+            setSuccessMessage(`"${displayTitle}" has been deleted.`);
+            // Refresh the list from database
+            await fetchProperties();
+            // Clear success message after 3 seconds
+            setTimeout(() => setSuccessMessage(null), 3000);
+        } catch (err: any) {
+            setError(err.message || 'Failed to delete property.');
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
+    // Submit for agent review handler
+    const handleSubmitForReview = async (propertyId: string, title: string | null) => {
+        const displayTitle = title || 'Untitled Property';
+        if (!confirm(`Submit "${displayTitle}" for agent review? An agent will be assigned to verify your property.`)) {
+            return;
+        }
+
+        setSubmittingId(propertyId);
+        setError(null);
+        setSuccessMessage(null);
+
+        try {
+            const result = await hireAgent(propertyId);
+            setSuccessMessage(`"${displayTitle}" submitted! Agent ${result.agent_name} will review your property.`);
+            await fetchProperties();
+            setTimeout(() => setSuccessMessage(null), 5000);
+        } catch (err: any) {
+            setError(err.message || 'Failed to submit for review. Make sure all required fields are filled.');
+        } finally {
+            setSubmittingId(null);
+        }
+    };
 
     // Status Badge Renderer (Strict Mapping)
     const renderStatusBadge = (status: PropertyStatus, label: string) => {
@@ -106,6 +159,14 @@ export default function SellerListingsPage() {
     // POPULATED STATE (Data Table)
     return (
         <div className="space-y-6">
+            {/* Success Message */}
+            {successMessage && (
+                <div className="flex items-center gap-2 p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700">
+                    <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                    <span>{successMessage}</span>
+                </div>
+            )}
+
             {/* Header Actions */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h2 className="text-lg font-semibold text-gray-900">
@@ -171,25 +232,55 @@ export default function SellerListingsPage() {
                                 </td>
                                 <td className="px-6 py-4 text-sm text-gray-600 font-medium">
                                     {property.price
-                                        ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: property.currency }).format(property.price)
+                                        ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(property.price)
                                         : <span className="text-gray-400 italic">Not set</span>
                                     }
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                     <div className="flex items-center justify-end gap-2">
                                         {property.allowed_actions.includes('edit') && (
-                                            <button className="p-1.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title="Edit">
+                                            <Link
+                                                href={`/sell/create/${property.id}`}
+                                                className="p-1.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                                                title="Edit"
+                                            >
                                                 <Edit2 className="w-4 h-4" />
-                                            </button>
+                                            </Link>
                                         )}
                                         {property.allowed_actions.includes('view') && (
-                                            <button className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="View details">
+                                            <Link
+                                                href={`/sell/create/${property.id}`}
+                                                className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                title="View details"
+                                            >
                                                 <Eye className="w-4 h-4" />
+                                            </Link>
+                                        )}
+                                        {property.allowed_actions.includes('delete') && (
+                                            <button
+                                                onClick={() => handleDelete(property.id, property.title)}
+                                                disabled={deletingId === property.id}
+                                                className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                                                title="Delete"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
                                             </button>
                                         )}
-                                        <button className="p-1.5 text-gray-400 hover:text-gray-600 rounded transition-colors">
-                                            <MoreHorizontal className="w-4 h-4" />
-                                        </button>
+                                        {/* Submit for Review - only for DRAFT properties */}
+                                        {property.status === PropertyStatus.DRAFT && property.allowed_actions.includes('edit') && (
+                                            <button
+                                                onClick={() => handleSubmitForReview(property.id, property.title)}
+                                                disabled={submittingId === property.id}
+                                                className="p-1.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors disabled:opacity-50"
+                                                title="Submit for Agent Review"
+                                            >
+                                                {submittingId === property.id ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <Send className="w-4 h-4" />
+                                                )}
+                                            </button>
+                                        )}
                                     </div>
                                 </td>
                             </tr>

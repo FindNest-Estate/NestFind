@@ -1,81 +1,64 @@
 /**
- * Dashboard Router Page
+ * Dashboard Router Page - Client Component
  * 
- * Server Component that redirects users to their role-specific landing page.
- * This maintains backend-authoritative architecture by:
- * - Fetching fresh user data from /user/me (cache: 'no-store')
- * - Redirecting based on role from backend response
- * - Never caching or storing role client-side
- * 
- * Redirects:
- * - USER → / (landing page for buyers/sellers)
- * - AGENT → /agent/dashboard
- * - ADMIN → /admin
+ * Redirects users to their role-specific landing page.
+ * Uses client-side auth to avoid cross-origin cookie issues.
  */
 
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+'use client';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { getCurrentUser } from '@/lib/authApi';
 
-interface UserResponse {
+interface User {
     id: string;
     full_name: string;
     email: string;
     role: 'USER' | 'AGENT' | 'ADMIN';
-    status: 'PENDING_VERIFICATION' | 'ACTIVE' | 'IN_REVIEW' | 'DECLINED' | 'SUSPENDED';
-}
-
-/**
- * Server-side auth check with fresh data
- */
-async function getAuthUser(): Promise<UserResponse | null> {
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get('access_token')?.value;
-
-    if (!accessToken) {
-        return null;
-    }
-
-    try {
-        const response = await fetch(`${API_BASE_URL}/user/me`, {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-            },
-            cache: 'no-store', // CRITICAL: Always fetch fresh
-        });
-
-        if (!response.ok) {
-            return null;
-        }
-
-        return await response.json();
-    } catch {
-        console.error('[DashboardRouter] Auth check failed');
-        return null;
-    }
+    status: string;
 }
 
 /**
  * Role-specific home pages
  */
-const ROLE_HOME_PAGES: Record<UserResponse['role'], string> = {
+const ROLE_HOME_PAGES: Record<User['role'], string> = {
     USER: '/',  // Users (buyers/sellers) go to landing page
     AGENT: '/agent/dashboard',
     ADMIN: '/admin',
 };
 
-export default async function DashboardRouterPage() {
-    const user = await getAuthUser();
+export default function DashboardRouterPage() {
+    const router = useRouter();
+    const [isLoading, setIsLoading] = useState(true);
 
-    // No user - redirect to login (shouldn't happen due to layout check, but safety first)
-    if (!user) {
-        redirect('/login');
+    useEffect(() => {
+        async function redirectToRoleHome() {
+            try {
+                const user = await getCurrentUser();
+                const targetPage = ROLE_HOME_PAGES[user.role] || '/';
+                router.replace(targetPage);
+            } catch (error) {
+                console.error('[DashboardRouter] Auth check failed:', error);
+                router.replace('/login');
+            } finally {
+                setIsLoading(false);
+            }
+        }
+
+        redirectToRoleHome();
+    }, [router]);
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#FF385C] mx-auto mb-4"></div>
+                    <p className="text-gray-500">Redirecting...</p>
+                </div>
+            </div>
+        );
     }
 
-    // User status is already verified by parent layout
-    // Redirect based on role from fresh backend response
-    const targetPage = ROLE_HOME_PAGES[user.role];
-    redirect(targetPage);
+    return null;
 }

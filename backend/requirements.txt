@@ -5,7 +5,8 @@ pydantic>=2.0.0
 python-multipart
 python-jose[cryptography]
 passlib[bcrypt]
+pydantic[email]
 python-dotenv
 requests
-apscheduler
+APScheduler>=3.10.0
 asyncpg

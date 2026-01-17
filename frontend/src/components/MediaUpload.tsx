@@ -69,9 +69,9 @@ export default function MediaUpload({ propertyId, media, onMediaChange, disabled
                     continue;
                 }
 
-                // Validate file size (5MB)
-                if (file.size > 5 * 1024 * 1024) {
-                    setError(`${file.name} is too large. Max size: 5MB`);
+                // Validate file size (15MB)
+                if (file.size > 15 * 1024 * 1024) {
+                    setError(`${file.name} is too large. Max size: 15MB`);
                     continue;
                 }
 
@@ -170,7 +170,7 @@ export default function MediaUpload({ propertyId, media, onMediaChange, disabled
                                 Drop images here or click to upload
                             </p>
                             <p className="text-sm text-gray-500 mt-1">
-                                JPG, PNG, WebP up to 5MB each
+                                JPG, PNG, WebP up to 15MB each
                             </p>
                         </div>
                     </div>
@@ -178,77 +178,81 @@ export default function MediaUpload({ propertyId, media, onMediaChange, disabled
             </div>
 
             {/* Media Grid */}
-            {media.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {media.map((item) => (
-                        <div
-                            key={item.id}
-                            className="relative group aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden border border-gray-200"
-                        >
-                            {/* Image */}
-                            <img
-                                src={getImageUrl(item.file_url)}
-                                alt={item.original_filename}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                    // Fallback for broken images
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                }}
-                            />
+            {
+                media.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        {media.map((item) => (
+                            <div
+                                key={item.id}
+                                className="relative group aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden border border-gray-200"
+                            >
+                                {/* Image */}
+                                <img
+                                    src={getImageUrl(item.file_url)}
+                                    alt={item.original_filename}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                        // Fallback for broken images
+                                        (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                />
 
-                            {/* Primary Badge */}
-                            {item.is_primary && (
-                                <div className="absolute top-2 left-2 px-2 py-1 bg-emerald-600 text-white text-xs font-medium rounded-full flex items-center gap-1">
-                                    <Star className="w-3 h-3" />
-                                    Primary
-                                </div>
-                            )}
+                                {/* Primary Badge */}
+                                {item.is_primary && (
+                                    <div className="absolute top-2 left-2 px-2 py-1 bg-emerald-600 text-white text-xs font-medium rounded-full flex items-center gap-1">
+                                        <Star className="w-3 h-3" />
+                                        Primary
+                                    </div>
+                                )}
 
-                            {/* Action Overlay */}
-                            {!disabled && (
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                    {/* Set Primary Button */}
-                                    {!item.is_primary && (
+                                {/* Action Overlay */}
+                                {!disabled && (
+                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                        {/* Set Primary Button */}
+                                        {!item.is_primary && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleSetPrimary(item.id);
+                                                }}
+                                                className="p-2 bg-white rounded-full hover:bg-emerald-100 transition-colors"
+                                                title="Set as primary"
+                                            >
+                                                <Star className="w-4 h-4 text-emerald-600" />
+                                            </button>
+                                        )}
+
+                                        {/* Delete Button */}
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                handleSetPrimary(item.id);
+                                                handleDelete(item.id);
                                             }}
-                                            className="p-2 bg-white rounded-full hover:bg-emerald-100 transition-colors"
-                                            title="Set as primary"
+                                            className="p-2 bg-white rounded-full hover:bg-red-100 transition-colors"
+                                            title="Delete"
                                         >
-                                            <Star className="w-4 h-4 text-emerald-600" />
+                                            <X className="w-4 h-4 text-red-600" />
                                         </button>
-                                    )}
-
-                                    {/* Delete Button */}
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDelete(item.id);
-                                        }}
-                                        className="p-2 bg-white rounded-full hover:bg-red-100 transition-colors"
-                                        title="Delete"
-                                    >
-                                        <X className="w-4 h-4 text-red-600" />
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            )}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )
+            }
 
             {/* Empty State */}
-            {media.length === 0 && !uploading && (
-                <div className="text-center py-6 text-gray-500">
-                    <ImageIcon className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-                    <p className="text-sm">No photos uploaded yet</p>
-                    <p className="text-xs text-gray-400 mt-1">
-                        Properties with photos get 10x more views
-                    </p>
-                </div>
-            )}
-        </div>
+            {
+                media.length === 0 && !uploading && (
+                    <div className="text-center py-6 text-gray-500">
+                        <ImageIcon className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                        <p className="text-sm">No photos uploaded yet</p>
+                        <p className="text-xs text-gray-400 mt-1">
+                            Properties with photos get 10x more views
+                        </p>
+                    </div>
+                )
+            }
+        </div >
     );
 }

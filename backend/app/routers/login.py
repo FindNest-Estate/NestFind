@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr
 from uuid import UUID
-from typing import Optional
+from typing import Optional, Literal
 from datetime import datetime
 
 from ..services.login_service import LoginService
 from ..services.session_service import SessionService
 from ..services.refresh_token_service import RefreshTokenService
-from ..core.jwt import create_access_token
+from ..core.jwt import create_access_token, get_refresh_token_duration
 from ..core.database import get_db_pool
 
 
@@ -17,6 +17,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication - Login"])
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    portal: Optional[Literal["user", "admin"]] = "user"  # Which portal is being used
 
 
 class UserInfo(BaseModel):
@@ -54,6 +55,7 @@ async def login(
     - JWT issuance with session binding
     - Refresh token issuance
     - Sets HTTP-only cookies for tokens
+    - Portal-based role restrictions (admin portal only for ADMIN)
     """
     ip_address = http_request.client.host
     user_agent = http_request.headers.get("user-agent", "unknown")
@@ -93,6 +95,24 @@ async def login(
         if not user_data:
             raise HTTPException(status_code=500, detail="User data not found after authentication")
         
+        user_role = user_data["role"]
+        
+        # Portal-based access restriction
+        if request.portal == "admin":
+            # Admin portal: Only ADMIN role allowed
+            if user_role != "ADMIN":
+                return LoginResponse(
+                    success=False,
+                    message="Access denied. Admin portal is for administrators only."
+                )
+        else:
+            # User portal: ADMIN should use admin portal
+            if user_role == "ADMIN":
+                return LoginResponse(
+                    success=False,
+                    message="Please use the admin portal to login."
+                )
+        
         # Create session
         session = await session_service.create_session(
             user_id=auth_result["user_id"],
@@ -100,17 +120,27 @@ async def login(
             user_agent=user_agent
         )
         
-        # Generate JWT
+        # Generate JWT with role-based expiration
         access_token = create_access_token(
             user_id=auth_result["user_id"],
-            session_id=session["session_id"]
+            session_id=session["session_id"],
+            role=user_role
         )
         
-        # Issue refresh token
+        # Issue refresh token with role-based duration
+        refresh_duration = get_refresh_token_duration(user_role)
         refresh_token = await refresh_service.issue_refresh_token(
             session_id=session["session_id"],
             ip_address=ip_address
         )
+        
+        # Cookie max_age based on role (in seconds)
+        if user_role == "ADMIN":
+            access_max_age = 15 * 60  # 15 minutes
+            refresh_max_age = 60 * 60  # 1 hour
+        else:
+            access_max_age = 30 * 24 * 60 * 60  # 30 days
+            refresh_max_age = 30 * 24 * 60 * 60  # 30 days
         
         # Set HTTP-only cookies for tokens
         response.set_cookie(
@@ -119,7 +149,7 @@ async def login(
             httponly=True,
             secure=False,  # Set to True in production with HTTPS
             samesite="lax",
-            max_age=15 * 60,  # 15 minutes
+            max_age=access_max_age,
             path="/"
         )
         response.set_cookie(
@@ -128,7 +158,7 @@ async def login(
             httponly=True,
             secure=False,  # Set to True in production with HTTPS
             samesite="lax",
-            max_age=7 * 24 * 60 * 60,  # 7 days
+            max_age=refresh_max_age,
             path="/"
         )
         

@@ -20,7 +20,7 @@ archive/
 brain/
 
 # Exclude documentation folders
-docs/
+# docs/
 backend/docs/
 frontend/docs/
 

@@ -82,6 +82,7 @@ export interface RegisterAgentRequest {
 export interface LoginRequest {
     email: string;
     password: string;
+    portal?: 'user' | 'admin';  // Which portal is being used
 }
 
 export interface LoginResponse {
@@ -93,7 +94,8 @@ export interface LoginResponse {
 
 export interface LoginErrorResponse {
     success: false;
-    error: string;
+    message?: string;
+    error?: string;
     locked_until?: string; // ISO DateTime
 }
 

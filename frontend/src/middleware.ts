@@ -22,13 +22,13 @@ const PUBLIC_ROUTES = [
     '/properties',
     '/about',
     '/contact',
-    '/find-agent',
     '/agents',
 ];
 
 // Auth routes - unauthenticated only
 const AUTH_ROUTES = [
     '/login',
+    '/admin-login',
     '/register',
 ];
 

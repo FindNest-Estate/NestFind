@@ -240,6 +240,70 @@
   background: var(--red-hover);
 }
 
+/* Hero Search Bar */
+.hero-search-form {
+  margin-bottom: var(--spacing-lg);
+}
+
+.hero-search-bar {
+  display: flex;
+  align-items: center;
+  max-width: 600px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 50px;
+  box-shadow: 0 4px 24px rgba(31, 41, 51, 0.12);
+  padding: 8px;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.hero-search-bar:focus-within {
+  border-color: var(--red);
+  box-shadow: 0 4px 24px rgba(255, 56, 92, 0.15);
+}
+
+.search-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--red);
+  margin-left: 16px;
+  flex-shrink: 0;
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  padding: 12px 16px;
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.search-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--red);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.search-button:hover {
+  background: var(--red-hover);
+}
+
 /* === TRUST STATISTICS BAR === */
 .trust-stats {
   background: var(--charcoal);
