@@ -1415,3 +1415,252 @@ class AgentAssignmentService:
                 "offer_id": offer_id,
                 "amount": amount
             }
+
+    # ========================================================================
+    # MESSAGES
+    # ========================================================================
+
+    async def get_agent_messages(self, agent_id: UUID) -> Dict[str, Any]:
+        """
+        Get all conversations for agent from database.
+        Conversations are with sellers from assigned properties.
+        """
+        async with self.db.acquire() as conn:
+            # Get sellers from agent's assignments
+            rows = await conn.fetch("""
+                SELECT DISTINCT 
+                    u.id as contact_id,
+                    u.full_name as contact_name,
+                    u.email as contact_email,
+                    'SELLER' as contact_type,
+                    p.title as property_title,
+                    p.id as property_id
+                FROM agent_assignments aa
+                JOIN properties p ON aa.property_id = p.id
+                JOIN users u ON p.seller_id = u.id
+                WHERE aa.agent_id = $1 AND aa.status IN ('ACCEPTED', 'COMPLETED')
+                ORDER BY p.title
+                LIMIT 50
+            """, agent_id)
+            
+            conversations = []
+            for r in rows:
+                conversations.append({
+                    "id": str(r['contact_id']),
+                    "contact_name": r['contact_name'],
+                    "contact_email": r['contact_email'],
+                    "contact_type": r['contact_type'],
+                    "property_title": r['property_title'] or "No Property",
+                    "property_id": str(r['property_id']) if r['property_id'] else None,
+                    "last_message": "Click to start conversation",
+                    "last_message_time": datetime.now(timezone.utc).isoformat(),
+                    "unread_count": 0,
+                    "messages": []
+                })
+            
+            return {
+                "success": True,
+                "conversations": conversations
+            }
+
+    async def send_agent_message(
+        self, 
+        agent_id: UUID, 
+        conversation_id: str, 
+        content: str, 
+        message_type: str = "text"
+    ) -> Dict[str, Any]:
+        """
+        Send a message (creates notification for recipient).
+        In a full implementation, this would use a messages table.
+        For now, we create an in-app notification.
+        """
+        async with self.db.acquire() as conn:
+            # Get agent name
+            agent = await conn.fetchrow(
+                "SELECT full_name FROM users WHERE id = $1",
+                agent_id
+            )
+            
+            if not agent:
+                return {"success": False, "error": "Agent not found"}
+            
+            # Create notification for recipient
+            notif_service = NotificationsService(self.db)
+            await notif_service.create_notification(
+                user_id=UUID(conversation_id),
+                notification_type="MESSAGE",
+                title=f"New message from {agent['full_name']}",
+                body=content[:100],
+                link="/messages"
+            )
+            
+            message = {
+                "id": str(UUID(int=0)),  # Mock ID
+                "sender_id": str(agent_id),
+                "content": content,
+                "message_type": message_type,
+                "sent_at": datetime.now(timezone.utc).isoformat(),
+                "read": False
+            }
+            
+            return {
+                "success": True,
+                "message": message
+            }
+
+    # ========================================================================
+    # DOCUMENTS
+    # ========================================================================
+
+    async def get_agent_documents(
+        self, 
+        agent_id: UUID, 
+        category: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get documents associated with agent's properties.
+        Documents are tied to properties via property_documents or similar table.
+        For now, we return property media and metadata as "documents".
+        """
+        async with self.db.acquire() as conn:
+            # Get property media as documents from assigned properties
+            query = """
+                SELECT 
+                    pm.id,
+                    pm.file_url,
+                    pm.is_primary,
+                    p.id as property_id,
+                    p.title as property_title,
+                    pm.created_at,
+                    'property_media' as category
+                FROM property_media pm
+                JOIN properties p ON pm.property_id = p.id
+                JOIN agent_assignments aa ON aa.property_id = p.id
+                WHERE aa.agent_id = $1 
+                  AND aa.status IN ('ACCEPTED', 'COMPLETED')
+                  AND pm.deleted_at IS NULL
+                ORDER BY pm.created_at DESC
+                LIMIT 100
+            """
+            
+            rows = await conn.fetch(query, agent_id)
+            
+            documents = []
+            for r in rows:
+                file_url = r['file_url'] or ""
+                extension = file_url.split('.')[-1].lower() if '.' in file_url else 'file'
+                doc_type = 'image' if extension in ['jpg', 'jpeg', 'png', 'gif', 'webp'] else 'document'
+                
+                documents.append({
+                    "id": str(r['id']),
+                    "name": f"{r['property_title'] or 'Property'} - Media",
+                    "file_url": file_url,
+                    "category": r['category'],
+                    "type": doc_type,
+                    "property_id": str(r['property_id']) if r['property_id'] else None,
+                    "property_title": r['property_title'],
+                    "created_at": r['created_at'].isoformat() if r['created_at'] else None,
+                    "status": "active"
+                })
+            
+            # Calculate stats
+            stats = {
+                "total": len(documents),
+                "by_category": {
+                    "property_media": len(documents),
+                    "contracts": 0,
+                    "legal": 0,
+                    "financial": 0
+                }
+            }
+            
+            return {
+                "success": True,
+                "documents": documents,
+                "stats": stats
+            }
+
+    async def upload_agent_document(
+        self,
+        agent_id: UUID,
+        name: str,
+        category: str,
+        property_id: Optional[UUID],
+        file_url: str
+    ) -> Dict[str, Any]:
+        """
+        Upload a document. For now, adds to property_media if property_id provided.
+        """
+        async with self.db.acquire() as conn:
+            if property_id:
+                # Verify agent has access to this property
+                assignment = await conn.fetchrow("""
+                    SELECT id FROM agent_assignments 
+                    WHERE property_id = $1 AND agent_id = $2 AND status IN ('ACCEPTED', 'COMPLETED')
+                """, property_id, agent_id)
+                
+                if not assignment:
+                    return {"success": False, "error": "Access denied to this property"}
+                
+                # Insert as property media
+                doc_id = await conn.fetchval("""
+                    INSERT INTO property_media (property_id, file_url, is_primary)
+                    VALUES ($1, $2, false)
+                    RETURNING id
+                """, property_id, file_url)
+                
+                document = {
+                    "id": str(doc_id),
+                    "name": name,
+                    "category": category,
+                    "file_url": file_url,
+                    "property_id": str(property_id),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "status": "active"
+                }
+            else:
+                # Store as a virtual document (not persisted to media table)
+                document = {
+                    "id": str(UUID(int=0)),
+                    "name": name,
+                    "category": category,
+                    "file_url": file_url,
+                    "property_id": None,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "status": "active"
+                }
+            
+            return {
+                "success": True,
+                "document": document
+            }
+
+    async def delete_agent_document(
+        self,
+        agent_id: UUID,
+        document_id: str
+    ) -> Dict[str, Any]:
+        """
+        Soft delete a document (property media).
+        """
+        async with self.db.acquire() as conn:
+            # Verify agent has access via property assignment
+            media = await conn.fetchrow("""
+                SELECT pm.id, p.id as property_id
+                FROM property_media pm
+                JOIN properties p ON pm.property_id = p.id
+                JOIN agent_assignments aa ON aa.property_id = p.id
+                WHERE pm.id = $1 AND aa.agent_id = $2 AND aa.status IN ('ACCEPTED', 'COMPLETED')
+            """, UUID(document_id), agent_id)
+            
+            if not media:
+                return {"success": False, "error": "Document not found or access denied"}
+            
+            # Soft delete
+            await conn.execute("""
+                UPDATE property_media SET deleted_at = NOW() WHERE id = $1
+            """, UUID(document_id))
+            
+            return {"success": True}
+

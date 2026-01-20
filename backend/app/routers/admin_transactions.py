@@ -39,7 +39,7 @@ def get_client_ip(request: Request) -> str:
 
 async def require_admin(current_user: AuthenticatedUser):
     """Verify user is admin."""
-    if current_user.role != "admin":
+    if "ADMIN" not in current_user.roles:
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
@@ -63,7 +63,7 @@ async def list_admin_transactions(
         params = []
         
         if status:
-            where_clause = "WHERE t.status = $1"
+            where_clause = "WHERE t.status::text = $1"
             params.append(status)
         
         offset = (page - 1) * per_page
@@ -85,7 +85,7 @@ async def list_admin_transactions(
             JOIN users agent ON agent.id = t.agent_id
             {where_clause}
             ORDER BY 
-                CASE WHEN t.status = 'ADMIN_REVIEW' THEN 0 ELSE 1 END,
+                CASE WHEN t.status::text = 'ADMIN_REVIEW' THEN 0 ELSE 1 END,
                 t.created_at DESC
             LIMIT {per_page} OFFSET {offset}
         """

@@ -13,7 +13,7 @@ interface PropertyProgressProps {
 
 export default function PropertyProgress({ percentage, canHireAgent, level = 'BASIC', missingFields = [] }: PropertyProgressProps) {
     const getProgressColor = () => {
-        if (canHireAgent) return 'bg-emerald-600';
+        if (canHireAgent) return 'bg-[#ff385c]';
         if (percentage >= 70) return 'bg-yellow-500';
         if (percentage >= 40) return 'bg-orange-500';
         return 'bg-gray-400';
@@ -31,7 +31,7 @@ export default function PropertyProgress({ percentage, canHireAgent, level = 'BA
         <div className="bg-white border border-gray-200 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Listing Completeness</h3>
-                <span className="text-2xl font-bold text-emerald-600">{percentage}%</span>
+                <span className="text-2xl font-bold text-[#ff385c]">{percentage}%</span>
             </div>
 
             {/* Progress Bar */}
@@ -47,13 +47,13 @@ export default function PropertyProgress({ percentage, canHireAgent, level = 'BA
 
             {/* Status Message */}
             {canHireAgent ? (
-                <div className="flex items-start gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                    <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2 p-3 bg-rose-50 border border-rose-200 rounded-lg">
+                    <CheckCircle className="w-5 h-5 text-[#ff385c] flex-shrink-0 mt-0.5" />
                     <div>
-                        <p className="text-sm font-medium text-emerald-900">
+                        <p className="text-sm font-medium text-[#ff385c]">
                             Your listing is ready for agent review!
                         </p>
-                        <p className="text-xs text-emerald-700 mt-1">
+                        <p className="text-xs text-rose-700 mt-1">
                             Click "Hire Agent" below to submit for verification.
                         </p>
                     </div>

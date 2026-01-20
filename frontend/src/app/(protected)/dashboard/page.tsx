@@ -23,7 +23,7 @@ interface User {
  * Role-specific home pages
  */
 const ROLE_HOME_PAGES: Record<User['role'], string> = {
-    USER: '/',  // Users (buyers/sellers) go to landing page
+    USER: '/buyer/dashboard',  // Users (buyers) go to dedicated dashboard
     AGENT: '/agent/dashboard',
     ADMIN: '/admin',
 };

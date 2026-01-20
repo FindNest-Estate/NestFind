@@ -8,12 +8,9 @@ import {
     Clock,
     MapPin,
     CheckCircle,
-    User,
-    Video,
     Plus,
     Trash2,
-    X,
-    Filter
+    X
 } from 'lucide-react';
 import {
     getAgentSchedule,
@@ -35,9 +32,13 @@ function getWeekDays(startDate: Date) {
 }
 
 // Modal Component
-function AddEventModal({ isOpen, onClose, onSave }: any) {
-    if (!isOpen) return null;
+interface AddEventModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (data: { title: string; start: string; type: string }) => void;
+}
 
+function AddEventModal({ isOpen, onClose, onSave }: AddEventModalProps) {
     const [title, setTitle] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [time, setTime] = useState('09:00');
@@ -49,6 +50,8 @@ function AddEventModal({ isOpen, onClose, onSave }: any) {
         onClose();
         setTitle('');
     };
+
+    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
@@ -113,12 +116,19 @@ function AddEventModal({ isOpen, onClose, onSave }: any) {
 }
 
 // Visit Action Modal Component
-function VisitActionModal({ isOpen, onClose, event, onAction }: any) {
-    if (!isOpen || !event) return null;
+interface VisitActionModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    event: ScheduleEvent | null;
+    onAction: (id: string, action: string) => Promise<void>;
+}
 
+function VisitActionModal({ isOpen, onClose, event, onAction }: VisitActionModalProps) {
     // Mocking status state locally for the modal flow
-    const [status, setStatus] = useState(event.status || 'SCHEDULED');
+    const [status, setStatus] = useState(event?.status || 'SCHEDULED');
     const [isProcessing, setIsProcessing] = useState(false);
+
+    if (!isOpen || !event) return null;
 
     const handleAction = async (action: string) => {
         setIsProcessing(true);
@@ -184,7 +194,7 @@ export default function CalendarPage() {
     const [view, setView] = useState<'month' | 'week'>('month');
     const [currentDate, setCurrentDate] = useState(new Date());
     const [events, setEvents] = useState<ScheduleEvent[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [, setIsLoading] = useState(true);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [visitModalEvent, setVisitModalEvent] = useState<ScheduleEvent | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());

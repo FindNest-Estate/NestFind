@@ -9,7 +9,7 @@ const fixLeafletIcons = () => {
     // Only run on client
     if (typeof window === 'undefined') return;
 
-    // @ts-ignore
+    // @ts-expect-error - Deleting internal Leaflet property for icon configuration
     delete L.Icon.Default.prototype._getIconUrl;
     L.Icon.Default.mergeOptions({
         iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -30,7 +30,9 @@ export default function AgentMap({ lat, lng, radiusKm, agentName }: AgentMapProp
 
     useEffect(() => {
         fixLeafletIcons();
-        setIsClient(true);
+        // Defer state update to avoid synchronous setState in effect
+        const timer = setTimeout(() => setIsClient(true), 0);
+        return () => clearTimeout(timer);
     }, []);
 
     if (!isClient) {

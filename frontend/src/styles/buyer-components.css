@@ -1,0 +1,273 @@
+/* Buyer Portal Premium Design System */
+
+/* Glassmorphism Effects */
+.glass-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+    border-radius: 1rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+    box-shadow: 0 12px 48px 0 rgba(31, 38, 135, 0.12);
+    transform: translateY(-2px);
+}
+
+.glass-card-dark {
+    background: rgba(17, 24, 39, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+}
+
+/* Premium Gradients */
+.gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.gradient-success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.gradient-danger {
+    background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+}
+
+.gradient-info {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.gradient-warm {
+    background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+}
+
+.gradient-cool {
+    background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+}
+
+/* Animated Gradients */
+@keyframes gradient-shift {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+.gradient-animated {
+    background: linear-gradient(-45deg, #667eea, #764ba2, #f59e0b, #f43f5e);
+    background-size: 400% 400%;
+    animation: gradient-shift 15s ease infinite;
+}
+
+/* Micro Interactions */
+.hover-lift {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s;
+}
+
+.hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.hover-scale {
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-scale:hover {
+    transform: scale(1.05);
+}
+
+.hover-glow {
+    transition: box-shadow 0.3s;
+}
+
+.hover-glow:hover {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+}
+
+/* Smooth Animations */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes pulse-gentle {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.8;
+    }
+}
+
+.animate-slide-in-up {
+    animation: slideInUp 0.5s ease-out;
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.animate-pulse-gentle {
+    animation: pulse-gentle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    transition: background 0.2s;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* Loading States */
+.skeleton {
+    background: linear-gradient(90deg,
+            rgba(229, 231, 235, 1) 0%,
+            rgba(243, 244, 246, 1) 50%,
+            rgba(229, 231, 235, 1) 100%);
+    background-size: 200% 100%;
+    animation: loading 1.5s ease-in-out infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Badge Variants */
+.badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge-success {
+    @apply bg-emerald-100 text-emerald-800;
+}
+
+.badge-warning {
+    @apply bg-amber-100 text-amber-800;
+}
+
+.badge-danger {
+    @apply bg-red-100 text-red-800;
+}
+
+.badge-info {
+    @apply bg-blue-100 text-blue-800;
+}
+
+.badge-neutral {
+    @apply bg-gray-100 text-gray-800;
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .dark-mode-enabled .glass-card {
+        background: rgba(17, 24, 39, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .dark-mode-enabled .custom-scrollbar::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .dark-mode-enabled .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+    }
+}
+
+/* Responsive Design Utilities */
+@media (max-width: 640px) {
+    .glass-card {
+        border-radius: 0.75rem;
+        padding: 1rem;
+    }
+}
+
+/* Button Variants with Micro-interactions */
+.btn-primary {
+    @apply px-6 py-3 bg-gradient-to-r from-rose-500 to-pink-600 text-white font-semibold rounded-xl;
+    @apply hover:from-rose-600 hover:to-pink-700 hover:shadow-lg hover:-translate-y-0.5;
+    @apply transition-all duration-200 ease-out;
+    @apply active:scale-95;
+}
+
+.btn-secondary {
+    @apply px-6 py-3 bg-white text-gray-700 font-semibold rounded-xl border-2 border-gray-200;
+    @apply hover:border-gray-300 hover:shadow-md hover:-translate-y-0.5;
+    @apply transition-all duration-200 ease-out;
+}
+
+.btn-ghost {
+    @apply px-4 py-2 text-gray-600 font-medium rounded-lg;
+    @apply hover:bg-gray-100 hover:text-gray-900;
+    @apply transition-all duration-200;
+}
+
+/* Input Focus States */
+.input-focus {
+    @apply focus:ring-2 focus:ring-rose-500 focus:border-transparent;
+    @apply transition-all duration-200;
+}
+
+/* Card Grid Layouts */
+.grid-auto-fill {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.grid-auto-fit {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+}

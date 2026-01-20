@@ -15,6 +15,8 @@ router = APIRouter(prefix="/user", tags=["User"])
 # SCHEMAS
 # ============================================================================
 
+from datetime import datetime
+
 class UserResponse(BaseModel):
     id: UUID
     email: str
@@ -22,6 +24,8 @@ class UserResponse(BaseModel):
     mobile_number: Optional[str]
     status: str
     role: str
+    created_at: Optional[datetime] = None
+    avatar_url: Optional[str] = None
 
 
 class UpdateProfileRequest(BaseModel):
@@ -68,7 +72,8 @@ async def get_me(
         async with db_pool.acquire() as conn:
             user_data = await conn.fetchrow(
                 """
-                SELECT u.id, u.email, u.full_name, u.mobile_number, u.status::text, r.name::text as role
+                SELECT u.id, u.email, u.full_name, u.mobile_number, u.status::text, 
+                       u.created_at, r.name::text as role
                 FROM users u
                 JOIN user_roles ur ON u.id = ur.user_id
                 JOIN roles r ON ur.role_id = r.id
@@ -86,7 +91,9 @@ async def get_me(
                 full_name=user_data["full_name"],
                 mobile_number=user_data["mobile_number"],
                 status=user_data["status"],
-                role=user_data["role"]
+                role=user_data["role"],
+                created_at=user_data["created_at"],
+                avatar_url=None
             )
     
     except Exception as e:

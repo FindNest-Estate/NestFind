@@ -21,8 +21,9 @@ export default function TransactionsPage() {
 
     useEffect(() => {
         // Mock loading or fetching if ID exists
-        // In real app we might verify if transaction exists for this reservation
-        setIsLoading(false);
+        // Defer state update to avoid synchronous setState in effect
+        const timer = setTimeout(() => setIsLoading(false), 0);
+        return () => clearTimeout(timer);
     }, []);
 
     const handleSchedule = async () => {

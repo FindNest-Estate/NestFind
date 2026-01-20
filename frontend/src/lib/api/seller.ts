@@ -122,10 +122,46 @@ export interface HireAgentResponse {
     new_status: string;
 }
 
+export interface BuyerActivity {
+    type: 'view' | 'save' | 'inquiry' | 'visit' | 'offer';
+    title: string;
+    property_title?: string;
+    property_id?: string;
+    timestamp: string;
+    icon: string;
+    relative_time: string;
+}
+
+export interface SellerPortfolioStats {
+    success: boolean;
+    active_listings: number;
+    total_properties: number;
+    total_views: number;
+    total_visits: number;
+    total_offers: number;
+    deals_closed: number;
+    conversion_rate: number;
+    pending_actions: number;
+    activities?: BuyerActivity[];
+}
+
 export async function hireAgent(
     propertyId: string
 ): Promise<HireAgentResponse> {
     return post<HireAgentResponse>(`/properties/${propertyId}/hire-agent`, {});
+}
+
+export interface GlobalActivityResponse {
+    success: boolean;
+    activities: BuyerActivity[];
+}
+
+export async function getSellerDashboardStats(): Promise<SellerPortfolioStats> {
+    return get<SellerPortfolioStats>('/seller/dashboard/stats');
+}
+
+export async function getSellerGlobalActivity(limit: number = 10): Promise<GlobalActivityResponse> {
+    return get<GlobalActivityResponse>(`/seller/dashboard/activity?limit=${limit}`);
 }
 
 // ============================================================================

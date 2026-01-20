@@ -6,16 +6,13 @@ import {
     XCircle,
     Loader2,
     AlertCircle,
-    User,
-    Mail,
-    Phone,
-    Calendar,
-    Building2,
-    BadgeCheck,
     Clock,
     ChevronLeft,
     ChevronRight,
-    RefreshCw
+    RefreshCw,
+    BadgeCheck,
+    MapPin,
+    Hash
 } from 'lucide-react';
 import Link from 'next/link';
 import { getPendingAgents, approveAgent, declineAgent, PendingAgent, Pagination } from '@/lib/api/admin';
@@ -59,25 +56,25 @@ function ConfirmModal({ isOpen, action, agent, isLoading, onConfirm, onCancel }:
     const IconComponent = isApprove ? CheckCircle : XCircle;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
-            <div className="relative bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={onCancel} />
+            <div className="relative bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl scale-100 transition-transform">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${isApprove ? 'bg-emerald-100' : 'bg-red-100'}`}>
                     <IconComponent className={`w-6 h-6 ${isApprove ? 'text-emerald-600' : 'text-red-600'}`} />
                 </div>
 
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{title}</h3>
-                <p className="text-gray-600 mb-4">{description}</p>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">{title}</h3>
+                <p className="text-slate-600 mb-6">{description}</p>
 
-                <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Reason (optional)
+                <div className="mb-6">
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                        Reason (Optional)
                     </label>
                     <textarea
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
                         placeholder={isApprove ? 'Add approval notes...' : 'Add decline reason...'}
-                        className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+                        className="w-full p-3 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none transition-all"
                         rows={3}
                     />
                 </div>
@@ -86,14 +83,14 @@ function ConfirmModal({ isOpen, action, agent, isLoading, onConfirm, onCancel }:
                     <button
                         onClick={onCancel}
                         disabled={isLoading}
-                        className="flex-1 py-2.5 px-4 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                        className="flex-1 py-2.5 px-4 border border-slate-200 rounded-lg font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
                     >
                         Cancel
                     </button>
                     <button
                         onClick={() => onConfirm(reason || undefined)}
                         disabled={isLoading}
-                        className={`flex-1 py-2.5 px-4 ${buttonColor} text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2`}
+                        className={`flex-1 py-2.5 px-4 ${buttonColor} text-white rounded-lg font-medium transition-all shadow-sm flex items-center justify-center gap-2`}
                     >
                         {isLoading ? (
                             <Loader2 className="w-5 h-5 animate-spin" />
@@ -120,67 +117,67 @@ function AgentRow({
     onDecline: () => void;
 }) {
     return (
-        <tr className="hover:bg-gray-50 transition-colors">
+        <tr className="group hover:bg-slate-50 transition-colors">
             <td className="px-6 py-4">
                 <Link href={`/admin/agents/${agent.id}`} className="flex items-center gap-4 group cursor-pointer">
-                    <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-200 transition-colors">
-                        <span className="text-emerald-600 font-bold">
+                    <div className="w-10 h-10 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-full flex items-center justify-center flex-shrink-0 border border-emerald-100/50">
+                        <span className="text-emerald-700 font-bold">
                             {agent.full_name.charAt(0).toUpperCase()}
                         </span>
                     </div>
                     <div>
-                        <div className="font-medium text-gray-900 group-hover:text-emerald-600 transition-colors">{agent.full_name}</div>
-                        <div className="text-sm text-gray-500">{agent.email}</div>
+                        <div className="font-medium text-slate-900 group-hover:text-emerald-600 transition-colors">{agent.full_name}</div>
+                        <div className="text-sm text-slate-500">{agent.email}</div>
                     </div>
                 </Link>
             </td>
             <td className="px-6 py-4">
                 <div className="space-y-1">
                     {agent.service_radius && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <span className="text-gray-400 text-xs uppercase tracking-wider font-semibold">Radius:</span>
-                            {agent.service_radius} km
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{agent.service_radius} km radius</span>
                         </div>
                     )}
                     {agent.pan_number && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <BadgeCheck className="w-4 h-4 text-emerald-500" />
-                            <span className="font-mono text-xs text-gray-500">PAN:</span> {agent.pan_number}
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <BadgeCheck className="w-3.5 h-3.5 text-emerald-500" />
+                            <span className="font-mono text-xs">PAN: {agent.pan_number}</span>
                         </div>
                     )}
                 </div>
             </td>
             <td className="px-6 py-4">
-                {/* Reusing this column for Aadhaar since Experience is gone */}
                 {agent.aadhaar_number ? (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <span className="font-mono text-xs text-gray-500">UID:</span> {agent.aadhaar_number}
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <Hash className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="font-mono text-xs">UID: {agent.aadhaar_number}</span>
                     </div>
                 ) : (
-                    <span className="text-gray-400 italic">Not specified</span>
+                    <span className="text-slate-400 text-sm italic">Not specified</span>
                 )}
             </td>
             <td className="px-6 py-4">
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <Clock className="w-4 h-4" />
+                <div className="flex items-center gap-2 text-sm text-slate-500">
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
                     {formatDate(agent.submitted_at)}
                 </div>
             </td>
-            <td className="px-6 py-4">
-                <div className="flex items-center gap-2">
+            <td className="px-6 py-4 text-right">
+                <div className="flex items-center justify-end gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                         onClick={onApprove}
-                        className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                        title="Approve"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg text-sm font-medium transition-colors border border-transparent hover:border-emerald-200"
                     >
-                        <CheckCircle className="w-5 h-5" />
+                        <CheckCircle className="w-4 h-4" />
+                        Approve
                     </button>
                     <button
                         onClick={onDecline}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Decline"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors border border-transparent hover:border-red-200"
                     >
-                        <XCircle className="w-5 h-5" />
+                        <XCircle className="w-4 h-4" />
+                        Decline
                     </button>
                 </div>
             </td>
@@ -190,12 +187,12 @@ function AgentRow({
 
 function EmptyState() {
     return (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-200">
-            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-8 h-8 text-emerald-600" />
+        <div className="text-center py-20 bg-white">
+            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-8 h-8 text-slate-300" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">No pending approvals</h3>
-            <p className="text-gray-500 max-w-sm mx-auto">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">No pending approvals</h3>
+            <p className="text-slate-500 max-w-sm mx-auto">
                 All agent applications have been reviewed. Check back later for new submissions.
             </p>
         </div>
@@ -283,18 +280,18 @@ export default function AdminAgentsPage() {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Agent Approvals</h1>
-                    <p className="text-gray-500">Review and approve agent applications</p>
+                    <h1 className="text-2xl font-bold text-slate-900">Agent Approvals</h1>
+                    <p className="text-slate-500">Review and verify pending agent applications</p>
                 </div>
                 <button
                     onClick={() => fetchAgents(pagination.page)}
                     disabled={isLoading}
-                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-                    title="Refresh"
+                    className="p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors border border-slate-200"
+                    title="Refresh Data"
                 >
                     <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
                 </button>
@@ -316,77 +313,72 @@ export default function AdminAgentsPage() {
                 </div>
             )}
 
-            {/* Content */}
-            {isLoading ? (
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                    <div className="animate-pulse">
-                        <div className="h-12 bg-gray-100 border-b border-gray-200" />
-                        {[1, 2, 3].map((i) => (
-                            <div key={i} className="flex items-center gap-4 p-4 border-b border-gray-100">
-                                <div className="w-10 h-10 bg-gray-200 rounded-full" />
-                                <div className="flex-1 space-y-2">
-                                    <div className="h-4 bg-gray-200 rounded w-1/4" />
-                                    <div className="h-3 bg-gray-200 rounded w-1/3" />
-                                </div>
-                            </div>
-                        ))}
+            {/* Content Table */}
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                {isLoading ? (
+                    <div className="flex items-center justify-center py-20">
+                        <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mx-auto" />
+                        <p className="text-slate-400 mt-2 text-sm">Loading applications...</p>
                     </div>
-                </div>
-            ) : agents.length === 0 ? (
-                <EmptyState />
-            ) : (
-                <>
-                    {/* Table */}
-                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                        <table className="w-full text-left">
-                            <thead className="bg-gray-50 border-b border-gray-200">
-                                <tr>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Agent</th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Details</th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Identity</th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Submitted</th>
-                                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200">
-                                {agents.map((agent) => (
-                                    <AgentRow
-                                        key={agent.id}
-                                        agent={agent}
-                                        onApprove={() => handleOpenModal(agent, 'approve')}
-                                        onDecline={() => handleOpenModal(agent, 'decline')}
-                                    />
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Pagination */}
-                    {pagination.total_pages > 1 && (
-                        <div className="flex items-center justify-center gap-2">
-                            <button
-                                onClick={() => handlePageChange(pagination.page - 1)}
-                                disabled={pagination.page === 1}
-                                className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <ChevronLeft className="w-5 h-5" />
-                            </button>
-
-                            <span className="px-4 py-2 text-gray-700">
-                                Page {pagination.page} of {pagination.total_pages}
-                            </span>
-
-                            <button
-                                onClick={() => handlePageChange(pagination.page + 1)}
-                                disabled={!pagination.has_more}
-                                className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <ChevronRight className="w-5 h-5" />
-                            </button>
+                ) : agents.length === 0 ? (
+                    <EmptyState />
+                ) : (
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50 border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Agent</th>
+                                        <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Details</th>
+                                        <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Identity</th>
+                                        <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Submitted</th>
+                                        <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {agents.map((agent) => (
+                                        <AgentRow
+                                            key={agent.id}
+                                            agent={agent}
+                                            onApprove={() => handleOpenModal(agent, 'approve')}
+                                            onDecline={() => handleOpenModal(agent, 'decline')}
+                                        />
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
-                    )}
-                </>
-            )}
+
+                        {/* Pagination */}
+                        <div className="p-4 border-t border-slate-200 bg-slate-50/50 flex items-center justify-between">
+                            <p className="text-sm text-slate-500">
+                                Showing <span className="font-medium">{agents.length}</span> applications
+                            </p>
+
+                            {pagination.total_pages > 1 && (
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => handlePageChange(pagination.page - 1)}
+                                        disabled={pagination.page === 1}
+                                        className="p-2 border border-slate-200 bg-white rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        <ChevronLeft className="w-4 h-4 text-slate-600" />
+                                    </button>
+                                    <span className="flex items-center px-4 text-sm text-slate-600 font-medium bg-white border border-slate-200 rounded-lg">
+                                        Page {pagination.page} of {pagination.total_pages}
+                                    </span>
+                                    <button
+                                        onClick={() => handlePageChange(pagination.page + 1)}
+                                        disabled={!pagination.has_more}
+                                        className="p-2 border border-slate-200 bg-white rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        <ChevronRight className="w-4 h-4 text-slate-600" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
 
             {/* Confirmation Modal */}
             <ConfirmModal

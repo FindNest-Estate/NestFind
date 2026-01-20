@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { browseProperties, PropertyCard as IPropertyCard, BrowseFilters } from '@/lib/api/public';
 import PropertyCard from '@/components/PropertyCard';
+import PropertyCategories from '@/components/buyer/PropertyCategories';
 
 /**
  * Property Browse Page - /properties
@@ -122,6 +123,7 @@ export default function PropertiesBrowsePage() {
     const [keyword, setKeyword] = useState('');
     const [sortBy, setSortBy] = useState<'newest' | 'price_asc' | 'price_desc' | 'area_desc' | 'area_asc'>('newest');
     const [showFilters, setShowFilters] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState('all');
 
     const fetchProperties = useCallback(async (page = 1, resetFilters = false) => {
         setIsLoading(true);
@@ -153,6 +155,9 @@ export default function PropertiesBrowsePage() {
                     if (minA > 0) filters.min_area = minA;
                     if (maxA > 0) filters.max_area = maxA;
                 }
+
+                // TODO: Apply category filter to backend when mapping is available
+                // For now, categories are visual only
             }
 
             const response = await browseProperties(filters);
@@ -180,12 +185,18 @@ export default function PropertiesBrowsePage() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    const handleCategoryChange = (categoryId: string) => {
+        setSelectedCategory(categoryId);
+        // TODO: Connect to backend filtering when category mapping is available
+        fetchProperties(1);
+    };
+
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/20">
             <Navbar />
 
             {/* Hero Section */}
-            <section className="bg-gradient-to-b from-rose-50 to-gray-50 pt-24 pb-8 px-6">
+            <section className="bg-gradient-to-b from-rose-50 to-transparent pt-24 pb-8 px-6">
                 <div className="max-w-7xl mx-auto">
                     <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 text-center">
                         Find Your Perfect Home
@@ -196,7 +207,7 @@ export default function PropertiesBrowsePage() {
 
                     {/* Search Bar */}
                     <form onSubmit={handleSearch} className="max-w-3xl mx-auto">
-                        <div className="flex gap-2 bg-white p-2 rounded-full shadow-lg border border-gray-200">
+                        <div className="flex gap-2 glass-card p-2 rounded-full shadow-lg">
                             <div className="flex-1 flex items-center gap-2 px-4">
                                 <Search className="w-5 h-5 text-gray-400" />
                                 <input
@@ -204,7 +215,7 @@ export default function PropertiesBrowsePage() {
                                     placeholder="Find your dream property..."
                                     value={searchCity}
                                     onChange={(e) => setSearchCity(e.target.value)}
-                                    className="w-full py-2 outline-none text-gray-800 placeholder-gray-400"
+                                    className="w-full py-2 outline-none text-gray-800 placeholder-gray-400 bg-transparent"
                                 />
                             </div>
                             <button
@@ -216,12 +227,22 @@ export default function PropertiesBrowsePage() {
                             </button>
                             <button
                                 type="submit"
-                                className="px-6 py-3 bg-[#FF385C] text-white rounded-full font-medium hover:bg-[#E31C5F] transition-colors"
+                                className="px-6 py-3 bg-gradient-to-r from-rose-500 to-pink-600 text-white rounded-full font-medium hover:shadow-lg hover:-translate-y-0.5 transition-all"
                             >
                                 Search
                             </button>
                         </div>
                     </form>
+                </div>
+            </section>
+
+            {/* Property Categories */}
+            <section className="px-6 py-4">
+                <div className="max-w-7xl mx-auto">
+                    <PropertyCategories
+                        onCategoryChange={handleCategoryChange}
+                        selectedCategory={selectedCategory}
+                    />
                 </div>
             </section>
 

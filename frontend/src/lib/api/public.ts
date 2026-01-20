@@ -24,6 +24,7 @@ export interface PropertyCard {
     longitude: number | null;
     thumbnail_url: string | null;
     agent_name: string | null;
+    status?: string;
     created_at: string;
 }
 

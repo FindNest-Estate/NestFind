@@ -24,7 +24,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Initialize from cookies/localStorage on mount
         const storedToken = Cookies.get('access_token');
         if (storedToken) {
-            setToken(storedToken);
+            // Defer state update to avoid synchronous setState in effect
+            const timer = setTimeout(() => setToken(storedToken), 0);
             // Verify/Fetch user details
             getCurrentUser()
                 .then(userData => setUser(userData))
@@ -39,8 +40,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     }
                 })
                 .finally(() => setIsLoading(false));
+            return () => clearTimeout(timer);
         } else {
-            setIsLoading(false);
+            const timer = setTimeout(() => setIsLoading(false), 0);
+            return () => clearTimeout(timer);
         }
     }, []);
 

@@ -154,7 +154,7 @@ export default function RegistrationDetailPage({ params }: { params: Promise<Pag
         setActionMessage(null);
         try {
             // Get GPS if available
-            let gps = { lat: null as number | null, lng: null as number | null };
+            const gps = { lat: null as number | null, lng: null as number | null };
             if (navigator.geolocation) {
                 try {
                     const position = await new Promise<GeolocationPosition>((resolve, reject) => {

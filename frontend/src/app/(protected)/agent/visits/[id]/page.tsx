@@ -3,9 +3,10 @@
 import { useState, useEffect, use } from "react";
 import { getVisitById, approveVisit, rejectVisit, startVisitSession, completeVisit, markNoShow, respondToCounter, submitAgentFeedback } from "@/lib/api/visits";
 import { Visit, VisitStatus, AgentFeedbackData } from "@/lib/types/visit";
-import { Loader2, MapPin, Calendar, Clock, Navigation, CheckCircle, XCircle, Key, MessageSquare, Star } from "lucide-react";
+import { Loader2, MapPin, Calendar, Clock, Navigation, CheckCircle, XCircle, Key, MessageSquare, Star, ArrowLeft, User, Mail, Phone, CalendarDays, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
+import Link from 'next/link';
 import CounterVisitModal from "@/components/property/CounterVisitModal";
 
 interface PageParams {
@@ -47,7 +48,6 @@ export default function AgentVisitDetailPage({ params }: { params: Promise<PageP
         try {
             const data = await getVisitById(resolvedParams.id);
             setVisit(data.visit ?? null);
-            // If already checked in, mark session as started
             if (data.visit?.status === 'CHECKED_IN') {
                 setSessionStarted(true);
             }
@@ -197,292 +197,276 @@ export default function AgentVisitDetailPage({ params }: { params: Promise<PageP
     const isCompleted = visit.status === VisitStatus.COMPLETED;
 
     return (
-        <div className="space-y-6">
-            <div className="max-w-3xl mx-auto">
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                    <div className="flex justify-between mb-6">
-                        <h1 className="text-xl font-bold">Visit #{visit.id.slice(0, 8)}</h1>
-                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${visit.status === VisitStatus.APPROVED ? 'bg-green-100 text-green-800' :
-                            isCheckedIn ? 'bg-blue-100 text-blue-800' :
-                                isCompleted ? 'bg-emerald-100 text-emerald-800' :
-                                    'bg-gray-100 text-gray-800'
-                            }`}>
-                            {isCheckedIn ? 'In Progress' : visit.status.replace('_', ' ')}
-                        </span>
-                    </div>
+        <div className="space-y-6 animate-fade-in">
+            {/* Back Nav Link */}
+            {/* <Link href="/agent/visits" className="inline-flex items-center gap-2 text-slate-500 hover:text-emerald-600 transition-colors">
+                <ArrowLeft className="w-4 h-4" />
+                Back to Visits
+            </Link> */}
 
-                    <div className="space-y-4 mb-8">
-                        {/* Property Info */}
-                        <div className="flex gap-4 p-4 bg-gray-50 rounded-xl">
-                            {visit.property?.thumbnail_url && (
-                                <img src={visit.property.thumbnail_url} className="w-16 h-16 rounded-lg object-cover" />
-                            )}
-                            <div>
-                                <h3 className="font-semibold">{visit.property?.title}</h3>
-                                <p className="text-sm text-gray-500">{visit.property?.address}</p>
-                            </div>
-                        </div>
-
-                        {/* Buyer Info */}
-                        <div className="p-4 bg-blue-50 rounded-xl">
-                            <h3 className="font-semibold text-blue-900 mb-2">Buyer Details</h3>
-                            <p className="text-blue-800">{visit.buyer?.full_name}</p>
-                            <p className="text-blue-700 text-sm mt-1">{visit.buyer_message ? `"${visit.buyer_message}"` : 'No message'}</p>
-                        </div>
-
-                        {/* Session Active Indicator */}
-                        {isCheckedIn && (
-                            <div className="p-4 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl text-white">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                                        <Key className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold">Session Active</h3>
-                                        <p className="text-emerald-100 text-sm">OTP has been sent to buyer</p>
-                                    </div>
-                                </div>
-                                <div className="bg-white/10 rounded-lg p-3 text-sm">
-                                    Ask the buyer to show you their verification code from their app or email to confirm their identity.
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {locationError && (
-                        <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
-                            {locationError}
-                        </div>
-                    )}
-
-                    {/* Controls */}
-                    <div className="grid gap-3">
-                        {visit.status === VisitStatus.REQUESTED && (
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={handleReject}
-                                    disabled={isActionLoading}
-                                    className="flex-1 py-3 border border-red-200 text-red-700 rounded-xl font-medium hover:bg-red-50"
-                                >
-                                    Reject
-                                </button>
-                                <button
-                                    onClick={handleApprove}
-                                    disabled={isActionLoading}
-                                    className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700"
-                                >
-                                    Approve Request
-                                </button>
-                            </div>
-                        )}
-
-                        {visit.status === VisitStatus.APPROVED && (
-                            <button
-                                onClick={handleStartSession}
-                                disabled={isActionLoading}
-                                className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 flex items-center justify-center gap-2"
-                            >
-                                {isActionLoading ? (
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                ) : (
-                                    <MapPin className="w-5 h-5" />
-                                )}
-                                Start Visit Session
-                            </button>
-                        )}
-
-                        {isCheckedIn && (
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={handleNoShow}
-                                    disabled={isActionLoading}
-                                    className="flex-1 py-3 border border-red-200 text-red-700 rounded-xl font-medium hover:bg-red-50"
-                                >
-                                    Buyer No-Show
-                                </button>
-                                <button
-                                    onClick={handleComplete}
-                                    disabled={isActionLoading}
-                                    className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700"
-                                >
-                                    Complete Visit
-                                </button>
-                            </div>
-                        )}
-
-                        {/* Negotiation Controls */}
-                        {(visit.allowed_actions?.includes('approve') || visit.allowed_actions?.includes('accept_counter') || visit.allowed_actions?.includes('counter')) && (
-                            <div className="flex flex-col gap-3">
-                                {visit.status === VisitStatus.COUNTERED && (
-                                    <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 mb-2">
-                                        <p className="text-amber-900 font-medium">Counter Offer Received</p>
-                                        <p className="text-amber-800 text-sm">Proposed: {visit.counter_date && format(new Date(visit.counter_date), "PPp")}</p>
-                                        {visit.counter_message && <p className="text-amber-700 text-sm mt-1">"{visit.counter_message}"</p>}
-                                    </div>
-                                )}
-
-                                <div className="flex gap-3">
-                                    {(visit.allowed_actions?.includes('reject')) && (
-                                        <button
-                                            onClick={handleReject}
-                                            disabled={isActionLoading}
-                                            className="px-4 py-3 border border-red-200 text-red-700 rounded-xl font-medium hover:bg-red-50"
-                                        >
-                                            Reject
-                                        </button>
-                                    )}
-
-                                    {visit.allowed_actions?.includes('counter') && (
-                                        <button
-                                            onClick={() => setShowCounterModal(true)}
-                                            disabled={isActionLoading}
-                                            className="flex-1 py-3 border border-blue-200 text-blue-700 rounded-xl font-medium hover:bg-blue-50"
-                                        >
-                                            {visit.status === VisitStatus.COUNTERED ? "Counter Back" : "Counter/Propose New Time"}
-                                        </button>
-                                    )}
-
-                                    {visit.allowed_actions?.includes('approve') && (
-                                        <button
-                                            onClick={handleApprove}
-                                            disabled={isActionLoading}
-                                            className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700"
-                                        >
-                                            Approve
-                                        </button>
-                                    )}
-
-                                    {visit.allowed_actions?.includes('accept_counter') && (
-                                        <button
-                                            onClick={handleAcceptCounter}
-                                            disabled={isActionLoading}
-                                            className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700"
-                                        >
-                                            Accept Counter
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        )}
+            {/* Title Section */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                        Visit Details
+                        <span className="text-slate-400 font-normal text-lg">#{visit.id.slice(0, 8)}</span>
+                    </h1>
+                    <div className="flex items-center gap-2 text-slate-500 mt-1">
+                        <MapPin className="w-4 h-4" />
+                        {visit.property?.address}
                     </div>
                 </div>
 
-                {/* Feedback Section - Show for completed visits */}
-                {(isCompleted || showFeedbackForm) && !feedbackSubmitted && (
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mt-6">
+                {/* Status Badge */}
+                <div className={`px-4 py-1.5 rounded-full text-sm font-semibold flex items-center gap-2 border ${isCheckedIn ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                    isCompleted ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                        visit.status === VisitStatus.APPROVED ? 'bg-green-50 border-green-200 text-green-700' :
+                            'bg-gray-50 border-gray-200 text-gray-700'
+                    }`}>
+                    {isCheckedIn ? <Key className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                    {isCheckedIn ? 'Session Active' : visit.status.replace('_', ' ')}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                {/* Left Column: Property & Session Info */}
+                <div className="lg:col-span-2 space-y-6">
+
+                    {/* Property Card */}
+                    <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-xl overflow-hidden shadow-sm">
+                        <div className="aspect-video w-full bg-slate-100 relative">
+                            {visit.property?.thumbnail_url ? (
+                                <img src={visit.property.thumbnail_url} className="w-full h-full object-cover" alt="Property" />
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-slate-400">
+                                    <MapPin className="w-12 h-12" />
+                                </div>
+                            )}
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
+                                <h2 className="text-white text-xl font-bold">{visit.property?.title}</h2>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Session Active Panel */}
+                    {isCheckedIn && (
+                        <div className="p-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl text-white shadow-md">
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                                    <Key className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-lg">Visit Session is Active</h3>
+                                    <p className="text-emerald-100">Started on {format(new Date(), 'p')}</p>
+                                </div>
+                            </div>
+                            <div className="bg-white/10 rounded-lg p-4 text-sm leading-relaxed border border-white/10">
+                                <p className="font-semibold mb-1">Verify Buyer Identity</p>
+                                Ask the buyer to show you their verification code (OTP) from their app or email.
+                                Currently, the system has sent an OTP to the buyer.
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Feedback Form */}
+                    {(isCompleted || showFeedbackForm) && !feedbackSubmitted && (
+                        <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-xl p-6 shadow-sm">
+                            <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
+                                <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                                    <MessageSquare className="w-5 h-5 text-emerald-600" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-gray-900">Agent Feedback</h3>
+                                    <p className="text-gray-500 text-sm">Record your observations</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-6">
+                                <StarRating
+                                    label="Buyer Interest Level"
+                                    value={feedback.buyer_interest_level || 0}
+                                    onChange={(v) => setFeedback({ ...feedback, buyer_interest_level: v })}
+                                />
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Perceived Budget</label>
+                                        <select
+                                            className="w-full p-2.5 border border-gray-200 rounded-lg text-sm bg-white"
+                                            value={feedback.buyer_perceived_budget || ''}
+                                            onChange={(e) => setFeedback({ ...feedback, buyer_perceived_budget: e.target.value as any })}
+                                        >
+                                            <option value="">Select Level</option>
+                                            <option value="LOW">Low</option>
+                                            <option value="MEDIUM">Medium</option>
+                                            <option value="HIGH">High</option>
+                                            <option value="PREMIUM">Premium</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Recommended Action</label>
+                                        <select
+                                            className="w-full p-2.5 border border-gray-200 rounded-lg text-sm bg-white"
+                                            value={feedback.recommended_action || ''}
+                                            onChange={(e) => setFeedback({ ...feedback, recommended_action: e.target.value as any })}
+                                        >
+                                            <option value="">Select Action</option>
+                                            <option value="PROCEED">Proceed</option>
+                                            <option value="NEGOTIATE">Negotiate</option>
+                                            <option value="PASS">Pass</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Property Notes</label>
+                                    <textarea
+                                        value={feedback.property_condition_notes}
+                                        onChange={(e) => setFeedback({ ...feedback, property_condition_notes: e.target.value })}
+                                        className="w-full p-3 border border-gray-200 rounded-lg text-sm"
+                                        rows={3}
+                                        placeholder="Any observations about property condition..."
+                                    />
+                                </div>
+
+                                <button
+                                    onClick={handleSubmitFeedback}
+                                    disabled={isSubmittingFeedback}
+                                    className="w-full py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                    {isSubmittingFeedback ? 'Submitting...' : 'Submit Feedback'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Feedback Confirmation */}
+                    {feedbackSubmitted && (
+                        <div className="bg-emerald-50 rounded-xl p-6 border border-emerald-200 flex items-center gap-4">
+                            <CheckCircle className="w-8 h-8 text-emerald-600" />
+                            <div>
+                                <h3 className="font-bold text-emerald-900">Feedback Submitted</h3>
+                                <p className="text-emerald-700 text-sm">Thank you for helping improve our matching.</p>
+                            </div>
+                        </div>
+                    )}
+
+                </div>
+
+                {/* Right Column: Actions & Buyer Info */}
+                <div className="space-y-6">
+
+                    {/* Logic for Actions Card */}
+                    <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-xl p-6 shadow-sm">
+                        <h3 className="font-bold text-gray-900 mb-4">Actions</h3>
+
+                        <div className="space-y-3">
+                            {/* REQUESTED */}
+                            {visit.status === VisitStatus.REQUESTED && (
+                                <>
+                                    <button onClick={handleApprove} disabled={isActionLoading} className="w-full py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 flex items-center justify-center gap-2">
+                                        <CheckCircle className="w-4 h-4" /> Approve Visit
+                                    </button>
+                                    <button onClick={handleReject} disabled={isActionLoading} className="w-full py-2.5 border border-gray-300 text-red-600 rounded-lg font-medium hover:bg-red-50 flex items-center justify-center gap-2">
+                                        <XCircle className="w-4 h-4" /> Reject
+                                    </button>
+                                </>
+                            )}
+
+                            {/* APPROVED */}
+                            {visit.status === VisitStatus.APPROVED && (
+                                <button onClick={handleStartSession} disabled={isActionLoading} className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95">
+                                    {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+                                    Start Visit Session
+                                </button>
+                            )}
+
+                            {/* IN PROGRESS */}
+                            {isCheckedIn && (
+                                <>
+                                    <button onClick={handleComplete} disabled={isActionLoading} className="w-full py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 flex items-center justify-center gap-2">
+                                        <CheckCircle className="w-4 h-4" /> Complete Visit
+                                    </button>
+                                    <button onClick={handleNoShow} disabled={isActionLoading} className="w-full py-2.5 border border-gray-300 text-orange-600 rounded-lg font-medium hover:bg-orange-50 flex items-center justify-center gap-2">
+                                        <AlertCircle className="w-4 h-4" /> Mark No-Show
+                                    </button>
+                                </>
+                            )}
+
+                            {/* Negotiation Actions */}
+                            {(visit.allowed_actions?.includes('counter') || visit.status === VisitStatus.COUNTERED) && (
+                                <button onClick={() => setShowCounterModal(true)} disabled={isActionLoading} className="w-full py-2.5 border border-blue-200 text-blue-600 rounded-lg font-medium hover:bg-blue-50 flex items-center justify-center gap-2">
+                                    <Clock className="w-4 h-4" />
+                                    {visit.status === VisitStatus.COUNTERED ? "Counter Back" : "Reschedule / Counter"}
+                                </button>
+                            )}
+
+                            {isCompleted && (
+                                <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-100 text-gray-500 font-medium text-sm">
+                                    No further actions available
+                                </div>
+                            )}
+
+                            {locationError && (
+                                <div className="text-xs text-red-600 bg-red-50 p-2 rounded mt-2">
+                                    {locationError}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Buyer Info Card */}
+                    <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-xl p-6 shadow-sm">
+                        <h3 className="font-bold text-gray-900 mb-4">Buyer</h3>
                         <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-                                <MessageSquare className="w-5 h-5 text-emerald-600" />
+                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                                <User className="w-6 h-6 text-blue-600" />
                             </div>
                             <div>
-                                <h3 className="font-bold text-gray-900">Visit Feedback</h3>
-                                <p className="text-gray-500 text-sm">Share your observations about this visit</p>
+                                <div className="font-medium text-gray-900">{visit.buyer?.full_name || 'Guest User'}</div>
+                                <div className="text-xs text-gray-500">Prospective Buyer</div>
                             </div>
                         </div>
-
-                        <div className="space-y-4">
-                            <StarRating
-                                label="Buyer Interest Level"
-                                value={feedback.buyer_interest_level || 0}
-                                onChange={(v) => setFeedback({ ...feedback, buyer_interest_level: v })}
-                            />
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Perceived Budget
-                                </label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {['LOW', 'MEDIUM', 'HIGH', 'PREMIUM'].map(level => (
-                                        <button
-                                            key={level}
-                                            type="button"
-                                            onClick={() => setFeedback({ ...feedback, buyer_perceived_budget: level as any })}
-                                            className={`py-2 rounded-lg border text-sm ${feedback.buyer_perceived_budget === level ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'border-gray-200 text-gray-600'}`}
-                                        >
-                                            {level}
-                                        </button>
-                                    ))}
+                        {visit.buyer_message && (
+                            <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-600 italic">
+                                "{visit.buyer_message}"
+                            </div>
+                        )}
+                        <div className="mt-4 pt-4 border-t border-gray-100 space-y-2 text-sm">
+                            {visit.buyer?.email && (
+                                <div className="flex items-center gap-2 text-gray-600">
+                                    <Mail className="w-4 h-4" /> {visit.buyer.email}
                                 </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Recommended Action
-                                </label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {['PROCEED', 'NEGOTIATE', 'PASS', 'UNDECIDED'].map(action => (
-                                        <button
-                                            key={action}
-                                            type="button"
-                                            onClick={() => setFeedback({ ...feedback, recommended_action: action as any })}
-                                            className={`py-2 rounded-lg border text-sm ${feedback.recommended_action === action ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-600'}`}
-                                        >
-                                            {action}
-                                        </button>
-                                    ))}
+                            )}
+                            {visit.buyer?.phone_number && (
+                                <div className="flex items-center gap-2 text-gray-600">
+                                    <Phone className="w-4 h-4" /> {visit.buyer.phone_number}
                                 </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Property Condition Notes
-                                </label>
-                                <textarea
-                                    value={feedback.property_condition_notes}
-                                    onChange={(e) => setFeedback({ ...feedback, property_condition_notes: e.target.value })}
-                                    className="w-full p-3 border border-gray-200 rounded-lg text-sm"
-                                    rows={2}
-                                    placeholder="Any observations about property condition..."
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Buyer Questions
-                                </label>
-                                <textarea
-                                    value={feedback.buyer_questions}
-                                    onChange={(e) => setFeedback({ ...feedback, buyer_questions: e.target.value })}
-                                    className="w-full p-3 border border-gray-200 rounded-lg text-sm"
-                                    rows={2}
-                                    placeholder="Key questions asked by the buyer..."
-                                />
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                                <input
-                                    type="checkbox"
-                                    id="follow-up"
-                                    checked={feedback.follow_up_required}
-                                    onChange={(e) => setFeedback({ ...feedback, follow_up_required: e.target.checked })}
-                                    className="w-4 h-4 text-emerald-600 rounded"
-                                />
-                                <label htmlFor="follow-up" className="text-sm text-gray-700">
-                                    Follow-up required
-                                </label>
-                            </div>
-
-                            <button
-                                onClick={handleSubmitFeedback}
-                                disabled={isSubmittingFeedback}
-                                className="w-full py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 disabled:opacity-50"
-                            >
-                                {isSubmittingFeedback ? 'Submitting...' : 'Submit Feedback'}
-                            </button>
+                            )}
                         </div>
                     </div>
-                )}
 
-                {/* Feedback Submitted */}
-                {feedbackSubmitted && (
-                    <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-200 flex items-center gap-4 mt-6">
-                        <CheckCircle className="w-8 h-8 text-emerald-600" />
-                        <div>
-                            <h3 className="font-bold text-emerald-900">Feedback Submitted!</h3>
-                            <p className="text-emerald-700 text-sm">Thank you for your observations.</p>
+                    {/* Timings Card */}
+                    <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-xl p-6 shadow-sm">
+                        <h3 className="font-bold text-gray-900 mb-4">Schedule</h3>
+                        <div className="flex items-start gap-3">
+                            <CalendarDays className="w-5 h-5 text-gray-400 mt-0.5" />
+                            <div>
+                                <div className="text-sm font-medium text-gray-900">
+                                    {visit.confirmed_date ? format(new Date(visit.confirmed_date), 'PPPP') : format(new Date(visit.preferred_date), 'PPPP')}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                    {visit.confirmed_date ? format(new Date(visit.confirmed_date), 'p') : format(new Date(visit.preferred_date), 'p')}
+                                </div>
+                                {visit.confirmed_date && (
+                                    <div className="uppercase text-[10px] font-bold tracking-wide text-emerald-600 bg-emerald-50 inline-block px-1.5 py-0.5 rounded mt-1">Confirmed</div>
+                                )}
+                            </div>
                         </div>
                     </div>
-                )}
+
+                </div>
             </div>
 
             <CounterVisitModal

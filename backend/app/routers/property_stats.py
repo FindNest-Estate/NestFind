@@ -210,7 +210,7 @@ class RecentActivityResponse(BaseModel):
     activities: List[ActivityItem]
 
 
-class AgentPortfolioStats(BaseModel):
+class SellerPortfolioStats(BaseModel):
     success: bool
     active_listings: int
     total_properties: int
@@ -259,7 +259,7 @@ async def get_recent_activity(
     return RecentActivityResponse(**result)
 
 
-@router.get("/agent/portfolio-stats", response_model=AgentPortfolioStats)
+@router.get("/agent/portfolio-stats", response_model=SellerPortfolioStats)
 async def get_agent_portfolio_stats(
     db_pool = Depends(get_db_pool),
     current_user: AuthenticatedUser = Depends(require_role("AGENT"))
@@ -270,9 +270,49 @@ async def get_agent_portfolio_stats(
     from ..middleware.auth_middleware import require_role  # runtime import to avoid circular
     
     service = PropertyStatsService(db_pool)
-    result = await service.get_agent_portfolio_performance(current_user.user_id)
+    result = await service.get_seller_portfolio_performance(current_user.user_id)
     
     if not result["success"]:
         raise HTTPException(status_code=500, detail="Failed to calculate portfolio stats")
         
-    return AgentPortfolioStats(**result)
+    return SellerPortfolioStats(**result)
+
+
+@router.get("/seller/dashboard/stats", response_model=SellerPortfolioStats)
+async def get_seller_dashboard_stats(
+    db_pool = Depends(get_db_pool),
+    current_user: AuthenticatedUser = Depends(get_current_user)
+):
+    """
+    Get aggregated statistics for the logged-in seller.
+    """
+    service = PropertyStatsService(db_pool)
+    result = await service.get_seller_portfolio_performance(current_user.user_id)
+    
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail="Failed to calculate dashboard stats")
+        
+    return SellerPortfolioStats(**result)
+
+
+class GlobalActivityResponse(BaseModel):
+    success: bool
+    activities: List[ActivityItem]
+
+
+@router.get("/seller/dashboard/activity", response_model=GlobalActivityResponse)
+async def get_seller_dashboard_activity(
+    limit: int = 10,
+    db_pool = Depends(get_db_pool),
+    current_user: AuthenticatedUser = Depends(get_current_user)
+):
+    """
+    Get recent activity across ALL seller's properties.
+    """
+    service = PropertyStatsService(db_pool)
+    result = await service.get_seller_global_activity(current_user.user_id, limit)
+    
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail="Failed to fetch activity")
+        
+    return GlobalActivityResponse(**result)

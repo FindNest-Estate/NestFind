@@ -35,6 +35,7 @@ export interface SavedProperty {
     status: string;
     thumbnail_url: string;
     notes?: string;
+    saved_price?: number;
     saved_at: string;
 }
 
@@ -113,4 +114,82 @@ export async function checkIfSaved(propertyId: string): Promise<boolean> {
     } catch {
         return false;
     }
+}
+
+// Collections API
+
+export interface Collection {
+    id: string;
+    name: string;
+    color: string;
+    property_count: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface CollectionCreate {
+    name: string;
+    color: string;
+}
+
+export interface CollectionUpdate {
+    name?: string;
+    color?: string;
+}
+
+async function fetchWithAuth(url: string, options: RequestInit = {}) {
+    const token = getAuthToken();
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        ...options.headers,
+    };
+
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+        ...options,
+        headers,
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Something went wrong' }));
+        throw new Error(error.detail || 'API Request Failed');
+    }
+
+    return response.json();
+}
+
+export async function getCollections(): Promise<Collection[]> {
+    return fetchWithAuth('/collections/');
+}
+
+export async function createCollection(data: CollectionCreate): Promise<Collection> {
+    return fetchWithAuth('/collections/', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function updateCollection(id: string, data: CollectionUpdate): Promise<Collection> {
+    return fetchWithAuth(`/collections/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function deleteCollection(id: string): Promise<{ success: boolean }> {
+    return fetchWithAuth(`/collections/${id}`, {
+        method: 'DELETE',
+    });
+}
+
+export async function addPropertyToCollection(collectionId: string, propertyId: string): Promise<{ success: boolean }> {
+    return fetchWithAuth(`/collections/${collectionId}/items/${propertyId}`, {
+        method: 'POST',
+    });
+}
+
+export async function removePropertyFromCollection(collectionId: string, propertyId: string): Promise<{ success: boolean }> {
+    return fetchWithAuth(`/collections/${collectionId}/items/${propertyId}`, {
+        method: 'DELETE',
+    });
 }

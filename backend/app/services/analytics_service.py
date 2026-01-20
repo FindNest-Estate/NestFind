@@ -33,14 +33,14 @@ class AnalyticsService:
                 JOIN roles r ON ur.role_id = r.id
             """)
 
-            # 3. Active Listings
+            # 3. Active Listings (properties that are ACTIVE or have accepted assignment)
             active_properties = await conn.fetchval("""
-                SELECT COUNT(*) FROM properties WHERE status = 'ACTIVE'
+                SELECT COUNT(*) FROM properties WHERE status::text = 'ACTIVE'
             """)
 
-            # 4. Pending Verifications
+            # 4. Pending Verifications (properties waiting for agent verification)
             pending_verifications = await conn.fetchval("""
-                SELECT COUNT(*) FROM properties WHERE status = 'PENDING_VERIFY'
+                SELECT COUNT(*) FROM properties WHERE status::text IN ('PENDING_ASSIGNMENT', 'ASSIGNED', 'VERIFICATION_IN_PROGRESS')
             """)
 
             return {

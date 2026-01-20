@@ -39,9 +39,23 @@ function AdminLoginContent() {
         try {
             const response = await login({ email, password, portal: 'admin' });
 
-            // Check for login error
+            // Check for login error - backend returns success: false with message
             if ('success' in response && !response.success) {
-                setError(response.error || 'Login failed');
+                // Use message field (backend returns 'message' not 'error')
+                const errorMessage = (response as any).message || response.error || 'Login failed';
+
+                // Provide user-friendly error messages
+                if (errorMessage.toLowerCase().includes('invalid credentials')) {
+                    setError('Incorrect email or password. Please try again.');
+                } else if (errorMessage.toLowerCase().includes('admin portal')) {
+                    setError('Access denied. This account does not have admin privileges.');
+                } else if (errorMessage.toLowerCase().includes('locked')) {
+                    setError('Account temporarily locked due to too many failed attempts. Please try again later.');
+                } else if (errorMessage.toLowerCase().includes('suspended')) {
+                    setError('Your account has been suspended. Contact support for assistance.');
+                } else {
+                    setError(errorMessage);
+                }
                 return;
             }
 
@@ -53,18 +67,28 @@ function AdminLoginContent() {
                 if (response.user.status === 'ACTIVE') {
                     router.push(returnUrl);
                 } else {
-                    setError('Account not active');
+                    setError('Account not active. Please contact support.');
                 }
+            } else {
+                // Unexpected response format
+                setError('Unexpected response. Please try again.');
             }
         } catch (err: any) {
+            console.error('[Admin Login Error]', err);
+
             if (err instanceof RateLimitError) {
-                setError('Too many requests. Please wait and try again.');
-            } else if (err?.message) {
+                setError('Too many login attempts. Please wait a few minutes and try again.');
+            } else if (err?.message && err.message !== 'Login failed') {
+                // Use message from error if available
                 setError(err.message);
+            } else if (err?.data?.message) {
+                setError(err.data.message);
             } else if (err?.data?.error) {
                 setError(err.data.error);
+            } else if (err?.data?.detail) {
+                setError(err.data.detail);
             } else {
-                setError('Login failed. Please check your credentials.');
+                setError('Login failed. Please check your credentials and try again.');
             }
         } finally {
             setIsSubmitting(false);

@@ -670,3 +670,131 @@ async def hire_agent(
         agent_name=result["agent_name"],
         new_status=result["new_status"]
     )
+
+
+# ============================================================================
+# MESSAGES ENDPOINTS
+# ============================================================================
+
+class MessagesResponse(BaseModel):
+    success: bool
+    conversations: List[dict]
+
+
+class MessageSendRequest(BaseModel):
+    conversation_id: str
+    content: str
+    message_type: str = "text"
+
+
+class MessageSendResponse(BaseModel):
+    success: bool
+    message: dict
+
+
+@router.get("/agent/messages", response_model=MessagesResponse)
+async def get_agent_messages(
+    current_user: AuthenticatedUser = Depends(require_role("AGENT")),
+    db_pool = Depends(get_db_pool)
+):
+    """
+    Get all conversations for agent.
+    """
+    service = AgentAssignmentService(db_pool)
+    result = await service.get_agent_messages(agent_id=current_user.user_id)
+    return MessagesResponse(**result)
+
+
+@router.post("/agent/messages/send", response_model=MessageSendResponse)
+async def send_agent_message(
+    body: MessageSendRequest,
+    current_user: AuthenticatedUser = Depends(require_role("AGENT")),
+    db_pool = Depends(get_db_pool)
+):
+    """
+    Send a message in a conversation.
+    """
+    service = AgentAssignmentService(db_pool)
+    result = await service.send_agent_message(
+        agent_id=current_user.user_id,
+        conversation_id=body.conversation_id,
+        content=body.content,
+        message_type=body.message_type
+    )
+    return MessageSendResponse(**result)
+
+
+# ============================================================================
+# DOCUMENTS ENDPOINTS
+# ============================================================================
+
+class DocumentsResponse(BaseModel):
+    success: bool
+    documents: List[dict]
+    stats: dict
+
+
+class DocumentUploadRequest(BaseModel):
+    name: str
+    category: str
+    property_id: Optional[UUID] = None
+    file_url: str
+
+
+class DocumentUploadResponse(BaseModel):
+    success: bool
+    document: dict
+
+
+@router.get("/agent/documents", response_model=DocumentsResponse)
+async def get_agent_documents(
+    category: Optional[str] = Query(None, description="Filter by category"),
+    current_user: AuthenticatedUser = Depends(require_role("AGENT")),
+    db_pool = Depends(get_db_pool)
+):
+    """
+    Get all documents for agent.
+    """
+    service = AgentAssignmentService(db_pool)
+    result = await service.get_agent_documents(
+        agent_id=current_user.user_id,
+        category=category
+    )
+    return DocumentsResponse(**result)
+
+
+@router.post("/agent/documents", response_model=DocumentUploadResponse)
+async def upload_agent_document(
+    body: DocumentUploadRequest,
+    current_user: AuthenticatedUser = Depends(require_role("AGENT")),
+    db_pool = Depends(get_db_pool)
+):
+    """
+    Upload a new document.
+    """
+    service = AgentAssignmentService(db_pool)
+    result = await service.upload_agent_document(
+        agent_id=current_user.user_id,
+        name=body.name,
+        category=body.category,
+        property_id=body.property_id,
+        file_url=body.file_url
+    )
+    return DocumentUploadResponse(**result)
+
+
+@router.delete("/agent/documents/{document_id}", response_model=ActionResponse)
+async def delete_agent_document(
+    document_id: str,
+    current_user: AuthenticatedUser = Depends(require_role("AGENT")),
+    db_pool = Depends(get_db_pool)
+):
+    """
+    Delete a document.
+    """
+    service = AgentAssignmentService(db_pool)
+    result = await service.delete_agent_document(
+        agent_id=current_user.user_id,
+        document_id=document_id
+    )
+    return ActionResponse(success=True)

@@ -50,6 +50,7 @@ export interface AuthUser {
     email: string;
     role: UserRole;
     status: UserStatus;
+    mobile_number?: string | null;
 }
 
 // ============================================================================

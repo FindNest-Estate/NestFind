@@ -14,7 +14,8 @@ import {
     Building2,
     DollarSign,
     Download,
-    Eye
+    Eye,
+    Printer
 } from 'lucide-react';
 import { get, post } from '@/lib/api';
 import { format } from 'date-fns';
@@ -54,6 +55,7 @@ interface Transaction {
     };
     status: string;
     display_status: string;
+    created_at?: string;
 }
 
 export default function AdminTransactionDetailPage({ params }: { params: Promise<PageParams> }) {
@@ -135,6 +137,115 @@ export default function AdminTransactionDetailPage({ params }: { params: Promise
         }).format(value);
     };
 
+    const handleDownloadInvoice = () => {
+        if (!transaction) return;
+
+        const invoiceWindow = window.open('', '_blank');
+        if (!invoiceWindow) return;
+
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Invoice #${transaction.id.slice(0, 8)}</title>
+                <style>
+                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; max-width: 800px; mx-auto; color: #333; }
+                    .header { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #eee; }
+                    .logo { font-size: 24px; font-weight: bold; color: #10B981; }
+                    .invoice-details { text-align: right; }
+                    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px; }
+                    .section-title { font-size: 14px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+                    .value { font-size: 16px; font-weight: 500; }
+                    .table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+                    .table th { text-align: left; padding: 12px; background: #f9fafb; font-size: 12px; text-transform: uppercase; color: #666; }
+                    .table td { padding: 12px; border-bottom: 1px solid #eee; }
+                    .total-section { display: flex; justify-content: flex-end; }
+                    .total-row { display: flex; justify-content: space-between; width: 300px; padding: 10px 0; }
+                    .total-row.final { font-size: 20px; font-weight: bold; border-top: 2px solid #eee; margin-top: 10px; padding-top: 20px; }
+                    .footer { margin-top: 80px; text-align: center; color: #999; font-size: 12px; }
+                    .status-stamp { display: inline-block; padding: 5px 10px; border: 2px solid #10B981; color: #10B981; font-weight: bold; text-transform: uppercase; border-radius: 4px; transform: rotate(-10deg); position: absolute; top: 150px; right: 40px; opacity: 0.5; font-size: 24px; }
+                </style>
+            </head>
+            <body>
+                ${transaction.status === 'COMPLETED' ? '<div class="status-stamp">PAID / COMPLETED</div>' : ''}
+                
+                <div class="header">
+                    <div class="logo">NestFind.</div>
+                    <div class="invoice-details">
+                        <h1>INVOICE</h1>
+                        <p>#INV-${transaction.id.slice(0, 8).toUpperCase()}</p>
+                        <p>Date: ${new Date().toLocaleDateString()}</p>
+                    </div>
+                </div>
+
+                <div class="grid">
+                    <div>
+                        <div class="section-title">Bill To</div>
+                        <div class="value">${transaction.buyer.name}</div>
+                        <div style="margin-top: 5px; color: #666;">Buyer ID: ${transaction.buyer.id.slice(0, 8)}</div>
+                    </div>
+                    <div>
+                        <div class="section-title">Property Details</div>
+                        <div class="value">${transaction.property.title}</div>
+                        <div style="margin-top: 5px; color: #666;">${transaction.property.address}<br>${transaction.property.city}</div>
+                    </div>
+                </div>
+
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Description</th>
+                            <th>Reference</th>
+                            <th style="text-align: right;">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Property Sale Value</td>
+                            <td>${transaction.property.id.slice(0, 8)}</td>
+                            <td style="text-align: right;">${formatCurrency(transaction.total_price)}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding-left: 20px; font-size: 12px; color: #666;">Handling Fees (included)</td>
+                            <td>-</td>
+                            <td style="text-align: right;">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="total-section">
+                    <div>
+                        <div class="total-row">
+                            <span>Subtotal</span>
+                            <span>${formatCurrency(transaction.total_price)}</span>
+                        </div>
+                        <div class="total-row">
+                            <span>Tax (0%)</span>
+                            <span>₹0.00</span>
+                        </div>
+                        <div class="total-row final">
+                            <span>Total</span>
+                            <span>${formatCurrency(transaction.total_price)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="footer">
+                    <p>Thank you for choosing NestFind.</p>
+                    <p>This is a computer generated invoice and does not require physical signature.</p>
+                </div>
+
+                <script>
+                    window.onload = function() { window.print(); }
+                </script>
+            </body>
+            </html>
+        `;
+
+        invoiceWindow.document.write(html);
+        invoiceWindow.document.close();
+    };
+
     const getDocTypeLabel = (type: string) => {
         const labels: Record<string, string> = {
             'NESTFIND_AGREEMENT': 'NestFind Agreement',
@@ -170,21 +281,31 @@ export default function AdminTransactionDetailPage({ params }: { params: Promise
     return (
         <div className="space-y-6">
             {/* Back Button */}
-            <button
-                onClick={() => router.back()}
-                className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
-            >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Transactions
-            </button>
+            <div className="flex items-center justify-between">
+                <button
+                    onClick={() => router.back()}
+                    className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to Transactions
+                </button>
+                <button
+                    onClick={handleDownloadInvoice}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
+                >
+                    <Printer className="w-4 h-4" />
+                    Print Invoice
+                </button>
+            </div>
 
             {/* Header */}
             <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-6 border border-amber-200">
+
                 <div className="flex items-center justify-between">
                     <div>
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${transaction.status === 'ADMIN_REVIEW'
-                                ? 'bg-amber-100 text-amber-700'
-                                : 'bg-emerald-100 text-emerald-700'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-emerald-100 text-emerald-700'
                             }`}>
                             <Clock className="w-3.5 h-3.5" />
                             {transaction.display_status}

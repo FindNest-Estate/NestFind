@@ -30,7 +30,7 @@ class SavedPropertiesService:
         async with self.db_pool.acquire() as conn:
             # Check if property exists and is ACTIVE
             property_exists = await conn.fetchrow("""
-                SELECT id, status 
+                SELECT id, status, price 
                 FROM properties 
                 WHERE id = $1
             """, property_id)
@@ -52,12 +52,12 @@ class SavedPropertiesService:
             
             # Insert or update (upsert)
             saved_id = await conn.fetchval("""
-                INSERT INTO saved_properties (user_id, property_id, notes)
-                VALUES ($1, $2, $3)
+                INSERT INTO saved_properties (user_id, property_id, notes, saved_price)
+                VALUES ($1, $2, $3, $4)
                 ON CONFLICT (user_id, property_id) 
                 DO UPDATE SET notes = EXCLUDED.notes, created_at = NOW()
                 RETURNING id
-            """, user_id, property_id, notes)
+            """, user_id, property_id, notes, property_exists['price'])
             
             return {
                 "success": True,
@@ -126,6 +126,7 @@ class SavedPropertiesService:
                 p.latitude,
                 p.longitude,
                 sp.notes,
+                sp.saved_price,
                 sp.created_at as saved_at,
                 (SELECT file_url FROM property_media 
                  WHERE property_id = p.id AND is_primary = true 
@@ -153,6 +154,7 @@ class SavedPropertiesService:
                 "latitude": row["latitude"],
                 "longitude": row["longitude"],
                 "notes": row["notes"],
+                "saved_price": float(row["saved_price"]) if row["saved_price"] else None,
                 "saved_at": row["saved_at"].isoformat(),
                 "thumbnail_url": row["thumbnail_url"]
             })

@@ -281,6 +281,7 @@ export interface ScheduleEvent {
     allDay: boolean;
     type: 'verification' | 'visit' | 'task';
     color: string;
+    status?: string;
 }
 
 export interface ScheduleResponse {
@@ -424,3 +425,132 @@ export async function getAgentOffers(): Promise<AgentOffersResponse> {
 export async function manageOfferAction(offerId: string, action: string, amount?: number): Promise<VisitActionResponse> { // Using same response shape
     return post<VisitActionResponse>(`/agent/offers/${offerId}/action`, { action, amount });
 }
+
+// ============================================================================
+// MESSAGES API
+// ============================================================================
+
+export interface ConversationMessage {
+    id: string;
+    sender_id: string;
+    content: string;
+    message_type: string;
+    sent_at: string;
+    read: boolean;
+}
+
+export interface Conversation {
+    id: string;
+    contact_name: string;
+    contact_email: string;
+    contact_type: 'SELLER' | 'BUYER';
+    property_title: string;
+    property_id: string | null;
+    last_message: string;
+    last_message_time: string;
+    unread_count: number;
+    messages: ConversationMessage[];
+}
+
+export interface MessagesResponse {
+    success: boolean;
+    conversations: Conversation[];
+}
+
+export interface MessageSendResponse {
+    success: boolean;
+    message: ConversationMessage;
+}
+
+/**
+ * Get agent messages/conversations from database
+ */
+export async function getAgentMessages(): Promise<MessagesResponse> {
+    return get<MessagesResponse>('/agent/messages');
+}
+
+/**
+ * Send a message
+ */
+export async function sendAgentMessage(
+    conversationId: string,
+    content: string,
+    messageType: string = 'text'
+): Promise<MessageSendResponse> {
+    return post<MessageSendResponse>('/agent/messages/send', {
+        conversation_id: conversationId,
+        content,
+        message_type: messageType
+    });
+}
+
+// ============================================================================
+// DOCUMENTS API
+// ============================================================================
+
+export interface AgentDocument {
+    id: string;
+    name: string;
+    file_url: string;
+    category: string;
+    type: string;
+    property_id: string | null;
+    property_title: string | null;
+    created_at: string | null;
+    status: string;
+}
+
+export interface DocumentsResponse {
+    success: boolean;
+    documents: AgentDocument[];
+    stats: {
+        total: number;
+        by_category: Record<string, number>;
+    };
+}
+
+export interface DocumentUploadResponse {
+    success: boolean;
+    document: AgentDocument;
+}
+
+/**
+ * Get agent documents from database
+ */
+export async function getAgentDocuments(category?: string): Promise<DocumentsResponse> {
+    const url = category ? `/agent/documents?category=${category}` : '/agent/documents';
+    return get<DocumentsResponse>(url);
+}
+
+/**
+ * Upload a document
+ */
+export async function uploadAgentDocument(
+    name: string,
+    category: string,
+    fileUrl: string,
+    propertyId?: string
+): Promise<DocumentUploadResponse> {
+    return post<DocumentUploadResponse>('/agent/documents', {
+        name,
+        category,
+        file_url: fileUrl,
+        property_id: propertyId
+    });
+}
+
+/**
+ * Delete a document
+ */
+export async function deleteAgentDocument(documentId: string): Promise<ActionResponse> {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/agent/documents/${documentId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            'Content-Type': 'application/json'
+        }
+    });
+    return response.json();
+}
+

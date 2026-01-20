@@ -5,6 +5,7 @@
  */
 
 import { get, post } from '@/lib/api';
+import queryString from 'query-string';
 
 // ============================================================================
 // TYPES
@@ -156,3 +157,112 @@ export async function getRevenueTrends(days = 30): Promise<{ success: boolean; d
     return get<{ success: boolean; data: RevenueTrend[] }>(`/admin/analytics/revenue-trends?days=${days}`);
 }
 
+
+// ============================================================================
+// AUDIT LOGS
+// ============================================================================
+
+export interface AuditLogItem {
+    id: string;
+    user_id: string | null;
+    user_name: string;
+    user_email: string | null;
+    action: string;
+    entity_type: string | null;
+    entity_id: string | null;
+    details: string | null;
+    ip_address: string | null;
+    timestamp: string;
+}
+
+export interface AuditLogResponse {
+    items: AuditLogItem[];
+    total: number;
+    page: number;
+    per_page: number;
+    pages: number;
+}
+
+export interface AuditLogFilters {
+    page?: number;
+    per_page?: number;
+    action?: string;
+    user_id?: string;
+    entity_type?: string;
+}
+
+export async function getAuditLogs(params: AuditLogFilters): Promise<AuditLogResponse> {
+    const qs = queryString.stringify(params, { skipNull: true, skipEmptyString: true });
+    return get<AuditLogResponse>(`/admin/audit-logs?${qs}`);
+}
+
+// ============================================================================
+// GLOBAL SEARCH HELPERS
+// ============================================================================
+
+export interface SearchResult {
+    id: string;
+    title: string;
+    subtitle: string;
+    type: 'user' | 'property' | 'agent' | 'transaction';
+    url: string;
+}
+
+export async function globalSearch(query: string): Promise<SearchResult[]> {
+    if (!query || query.length < 2) return [];
+
+    const results: SearchResult[] = [];
+
+    try {
+        const [usersOut, propsOut, txnsOut] = await Promise.allSettled([
+            get<{ users: any[] }>(`/admin/users?search=${query}&per_page=3`),
+            get<{ properties: any[] }>(`/admin/properties?search=${query}&per_page=3`),
+            get<{ transactions: any[] }>(`/admin/transactions?search=${query}&per_page=3`)
+        ]);
+
+        // Process Users
+        if (usersOut.status === 'fulfilled' && usersOut.value.users) {
+            usersOut.value.users.forEach((u: any) => {
+                results.push({
+                    id: u.id,
+                    title: u.full_name,
+                    subtitle: `${u.role.toUpperCase()} • ${u.email}`,
+                    type: u.role === 'agent' ? 'agent' : 'user',
+                    url: u.role === 'agent' ? `/admin/agents/${u.id}` : `/admin/users/${u.id}`
+                });
+            });
+        }
+
+        // Process Properties
+        if (propsOut.status === 'fulfilled' && propsOut.value.properties) {
+            propsOut.value.properties.forEach((p: any) => {
+                results.push({
+                    id: p.id,
+                    title: p.title,
+                    subtitle: `${p.city} • ₹${(p.price / 100000).toFixed(1)}L`,
+                    type: 'property',
+                    url: `/admin/properties/${p.id}`
+                });
+            });
+        }
+
+        // Process Transactions
+        if (txnsOut.status === 'fulfilled' && txnsOut.value.transactions) {
+            txnsOut.value.transactions.forEach((t: any) => {
+                results.push({
+                    id: t.id,
+                    title: `Transaction #${t.id.slice(0, 8)}`,
+                    subtitle: `${t.property.title} • ${t.status}`,
+                    type: 'transaction',
+                    url: `/admin/transactions/${t.id}`
+                });
+            });
+        }
+
+        return results;
+
+    } catch (error) {
+        console.error("Search failed:", error);
+        return results; // Return whatever partial results we have
+    }
+}

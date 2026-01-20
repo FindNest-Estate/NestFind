@@ -17,6 +17,9 @@ async def get_platform_overview(
         data = await service.get_platform_overview()
         return {"success": True, "data": data}
     except Exception as e:
+        import traceback
+        print(f"[ANALYTICS ERROR] {type(e).__name__}: {str(e)}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/revenue-trends")

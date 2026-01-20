@@ -93,7 +93,16 @@ function LoginContent() {
 
             // Check for generic error
             if ('success' in response && !response.success) {
-                setError(response.message || response.error || 'Login failed');
+                const errorMessage = (response as any).message || response.error || 'Login failed';
+
+                // Provide user-friendly error messages
+                if (errorMessage.toLowerCase().includes('invalid credentials')) {
+                    setError('Incorrect email or password. Please try again.');
+                } else if (errorMessage.toLowerCase().includes('admin portal')) {
+                    setError('Admins should use the Admin Portal to login.');
+                } else {
+                    setError(errorMessage);
+                }
                 return;
             }
 

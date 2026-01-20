@@ -5,7 +5,7 @@
  * Based on frontend/docs/auth_contract.md
  */
 
-import { post, get } from './api';
+import { post, get, put } from './api';
 import type {
     RegisterUserRequest,
     RegisterAgentRequest,
@@ -150,6 +150,28 @@ export async function verifyOTP(
  */
 export async function getCurrentUser(): Promise<AuthUser> {
     return get<AuthUser>('/user/me');
+}
+
+/**
+ * Update user profile
+ * 
+ * Endpoint: PUT /user/profile
+ */
+export async function updateProfile(
+    data: { full_name?: string; mobile_number?: string }
+): Promise<{ success: boolean; full_name: string; mobile_number?: string }> {
+    return put('/user/profile', data);
+}
+
+/**
+ * Change password
+ * 
+ * Endpoint: PUT /user/password
+ */
+export async function changePassword(
+    data: { current_password: string; new_password: string }
+): Promise<{ success: boolean; message: string }> {
+    return put('/user/password', data);
 }
 
 // ============================================================================

@@ -489,46 +489,46 @@ class PropertyStatsService:
                 "activities": activities[:limit]
             }
 
-    async def get_agent_portfolio_performance(
+    async def get_seller_portfolio_performance(
         self,
-        agent_id: UUID
+        seller_id: UUID
     ) -> Dict[str, Any]:
         """
-        Get aggregated performance stats for an agent's entire portfolio.
+        Get aggregated performance stats for a seller's (or agent's) entire portfolio.
         """
         async with self.db.acquire() as conn:
             # 1. Active Listings
             active_listings = await conn.fetchval("""
                 SELECT COUNT(*) FROM properties 
                 WHERE seller_id = $1 AND status = 'ACTIVE'
-            """, agent_id)
+            """, seller_id)
 
             # 2. Total Properties (active, sold, etc)
             total_properties = await conn.fetchval("""
                 SELECT COUNT(*) FROM properties 
                 WHERE seller_id = $1 AND deleted_at IS NULL
-            """, agent_id)
+            """, seller_id)
 
             # 3. Total Views (across all properties)
             total_views = await conn.fetchval("""
                 SELECT COUNT(*) FROM property_views pv
                 JOIN properties p ON pv.property_id = p.id
                 WHERE p.seller_id = $1
-            """, agent_id)
+            """, seller_id)
 
             # 4. Total Visits (Requested/Approved)
             total_visits = await conn.fetchval("""
                 SELECT COUNT(*) FROM visit_requests vr
                 JOIN properties p ON vr.property_id = p.id
                 WHERE p.seller_id = $1
-            """, agent_id)
+            """, seller_id)
 
             # 5. Deals Closed (Transactions Completed)
             deals_closed = await conn.fetchval("""
                 SELECT COUNT(*) FROM transactions t
                 JOIN properties p ON t.property_id = p.id
                 WHERE p.seller_id = $1 AND t.status = 'COMPLETED'
-            """, agent_id)
+            """, seller_id)
 
             return {
                 "success": True,
@@ -538,5 +538,140 @@ class PropertyStatsService:
                 "total_visits": total_visits or 0,
                 "deals_closed": deals_closed or 0,
                 "conversion_rate": round((deals_closed / total_visits * 100), 1) if total_visits and total_visits > 0 else 0
+            }
+
+    async def get_seller_global_activity(
+        self,
+        seller_id: UUID,
+        limit: int = 10
+    ) -> Dict[str, Any]:
+        """
+        Get recent activity across ALL properties owned by the seller.
+        """
+        async with self.db.acquire() as conn:
+            activities = []
+            
+            # Get recent views
+            views = await conn.fetch("""
+                SELECT 
+                    pv.viewed_at as timestamp,
+                    'view' as type,
+                    p.title as property_title,
+                    COALESCE(u.email, 'Anonymous') as actor
+                FROM property_views pv
+                JOIN properties p ON pv.property_id = p.id
+                LEFT JOIN users u ON pv.viewer_id = u.id
+                WHERE p.seller_id = $1
+                ORDER BY pv.viewed_at DESC
+                LIMIT $2
+            """, seller_id, limit)
+            
+            for v in views:
+                activities.append({
+                    "type": "view",
+                    "title": f"View on {v['property_title']}", 
+                    "timestamp": v['timestamp'].isoformat(),
+                    "icon": "eye"
+                })
+            
+            # Get recent saves
+            saves = await conn.fetch("""
+                SELECT 
+                    sp.created_at as timestamp,
+                    p.title as property_title,
+                    u.email as actor
+                FROM saved_properties sp
+                JOIN properties p ON sp.property_id = p.id
+                JOIN users u ON sp.user_id = u.id
+                WHERE p.seller_id = $1
+                ORDER BY sp.created_at DESC
+                LIMIT $2
+            """, seller_id, limit)
+            
+            for s in saves:
+                activities.append({
+                    "type": "save",
+                    "title": f"Saved {s['property_title']}",
+                    "timestamp": s['timestamp'].isoformat(),
+                    "icon": "bookmark"
+                })
+
+            # Get recent inquiries
+            inquiries = await conn.fetch("""
+                SELECT 
+                    c.created_at as timestamp,
+                    p.title as property_title,
+                    u.email as actor
+                FROM conversations c
+                JOIN properties p ON c.property_id = p.id
+                JOIN users u ON c.buyer_id = u.id
+                WHERE p.seller_id = $1
+                ORDER BY c.created_at DESC
+                LIMIT $2
+            """, seller_id, limit)
+            
+            for i in inquiries:
+                activities.append({
+                    "type": "inquiry",
+                    "title": f"Inquiry on {i['property_title']}",
+                    "timestamp": i['timestamp'].isoformat(),
+                    "icon": "message"
+                })
+                
+            # Get recent visits
+            visits = await conn.fetch("""
+                SELECT 
+                    vr.created_at as timestamp,
+                    vr.status,
+                    p.title as property_title,
+                    u.email as actor
+                FROM visit_requests vr
+                JOIN properties p ON vr.property_id = p.id
+                JOIN users u ON vr.buyer_id = u.id
+                WHERE p.seller_id = $1
+                ORDER BY vr.created_at DESC
+                LIMIT $2
+            """, seller_id, limit)
+            
+            for v in visits:
+                status_text = {
+                    'REQUESTED': 'Visit requested',
+                    'APPROVED': 'Visit approved',
+                    'COMPLETED': 'Visit completed',
+                    'CANCELLED': 'Visit cancelled'
+                }.get(v['status'], 'Visit update')
+                
+                activities.append({
+                    "type": "visit",
+                    "title": f"{status_text}: {v['property_title']}",
+                    "timestamp": v['timestamp'].isoformat(),
+                    "icon": "calendar"
+                })
+
+            # Sort and Limit
+            activities.sort(key=lambda x: x['timestamp'], reverse=True)
+            activities = activities[:limit]
+            
+            # Format Relative Time
+            now = datetime.now(timezone.utc)
+            for a in activities:
+                ts = datetime.fromisoformat(a['timestamp'].replace('Z', '+00:00'))
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                diff = now - ts
+                if diff.days > 0:
+                    a['relative_time'] = f"{diff.days}d ago"
+                elif diff.seconds > 3600:
+                    hours = diff.seconds // 3600
+                    a['relative_time'] = f"{hours}h ago"
+                elif diff.seconds > 60:
+                    mins = diff.seconds // 60
+                    a['relative_time'] = f"{mins}m ago"
+                else:
+                    a['relative_time'] = "Just now"
+
+            return {
+                "success": True,
+                "activities": activities
             }
 

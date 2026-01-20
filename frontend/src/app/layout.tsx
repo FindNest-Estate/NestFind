@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { ToastProvider } from "@/components/ui/Toast";
 
 export const metadata: Metadata = {
     title: "NestFind - Trusted Real Estate Platform",
@@ -16,7 +18,11 @@ export default function RootLayout({
         <html lang="en" suppressHydrationWarning>
             <body suppressHydrationWarning>
                 <AuthProvider>
-                    {children}
+                    <ThemeProvider defaultTheme="light" storageKey="nestfind-theme">
+                        <ToastProvider>
+                            {children}
+                        </ToastProvider>
+                    </ThemeProvider>
                 </AuthProvider>
             </body>
         </html>
