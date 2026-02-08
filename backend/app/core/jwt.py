@@ -1,11 +1,14 @@
+import os
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from uuid import UUID, uuid4
 from jose import JWTError, jwt
+from dotenv import load_dotenv
 
+load_dotenv()
 
-SECRET_KEY = "your-secret-key-change-in-production"
-ALGORITHM = "HS256"
+SECRET_KEY = os.getenv("API_SECRET_KEY", "your-secret-key-change-in-production")
+ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 # Session durations by role
 TOKEN_DURATION = {
