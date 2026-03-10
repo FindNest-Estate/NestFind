@@ -102,10 +102,25 @@ class ReservationService:
                     "error": f"Cannot create reservation. Offer status is {offer['status']}, must be ACCEPTED"
                 }
             
-            if offer['property_status'] != 'ACTIVE':
+            # Property must be ACTIVE or UNDER_DEAL (deal orchestrates status)
+            if offer['property_status'] not in ('ACTIVE', 'UNDER_DEAL'):
                 return {
                     "success": False,
                     "error": f"Property is not available (status: {offer['property_status']})"
+                }
+            
+            # Rule 2: Cannot reserve without visit completion
+            visit_completed = await conn.fetchval("""
+                SELECT EXISTS(
+                    SELECT 1 FROM visit_requests
+                    WHERE property_id = $1 AND buyer_id = $2 AND status = 'COMPLETED'
+                )
+            """, offer['property_id'], buyer_id)
+            
+            if not visit_completed:
+                return {
+                    "success": False,
+                    "error": "Cannot reserve property: Buyer must complete at least one property visit first."
                 }
             
             # Check for existing active reservation on property
@@ -164,6 +179,49 @@ class ReservationService:
                 )
             except Exception:
                 pass
+            
+            # ===================================================================
+            # DEAL INTEGRATION (Phase 1.5) - Silent orchestration
+            # ===================================================================
+            try:
+                from .deal_service import DealService
+                deal_service = DealService(self.db)
+                
+                # Get active deal
+                deal = await deal_service.get_active_deal_by_property(
+                    property_id=offer['property_id'],
+                    conn=conn
+                )
+                
+                if deal:
+                    # Simplified: accept_offer now auto-advances to TOKEN_PENDING
+                    # So we only need to transition TOKEN_PENDING → TOKEN_PAID
+                    if deal['status'] == 'TOKEN_PENDING':
+                        await deal_service.transition_deal(
+                            deal_id=deal['id'],
+                            new_status='TOKEN_PAID',
+                            actor_id=buyer_id,
+                            actor_role='BUYER',
+                            notes=f'Token payment completed for {offer["property_title"]}',
+                            metadata={
+                                'reservation_id': str(reservation['id']),
+                                'token_amount': str(deposit_amount)
+                            },
+                            ip_address=ip_address
+                        )
+                    
+                    # Link reservation
+                    await deal_service.link_reservation(
+                        deal_id=deal['id'],
+                        reservation_id=reservation['id'],
+                        token_amount=deposit_amount,
+                        actor_id=buyer_id,
+                        actor_role='BUYER',
+                        conn=conn
+                    )
+            except Exception as e:
+                # Silent failure - don't block legacy flow
+                print(f"[WARN] DEAL integration failed in create_reservation: {str(e)}")
             
             return {
                 "success": True,
@@ -430,6 +488,62 @@ class ReservationService:
                     "display_status": "Cancelled",
                     "deposit_refunded": False
                 }
+            }
+    
+    async def submit_payment_proof(
+        self,
+        reservation_id: UUID,
+        proof_url: str,
+        user_id: UUID,
+        ip_address: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Buyer uploads proof of token payment.
+        
+        Updates reservation and notifies seller/agent.
+        """
+        async with self.db.acquire() as conn:
+            reservation = await conn.fetchrow("""
+                SELECT r.*, p.seller_id, p.title as property_title
+                FROM reservations r
+                JOIN properties p ON p.id = r.property_id
+                WHERE r.id = $1
+            """, reservation_id)
+            
+            if not reservation:
+                return {"success": False, "error": "Reservation not found"}
+            
+            if reservation['buyer_id'] != user_id:
+                return {"success": False, "error": "Only the buyer can upload payment proof"}
+            
+            # Update reservation
+            async with conn.transaction():
+                await conn.execute("""
+                    UPDATE reservations 
+                    SET proof_url = $2,
+                        proof_uploaded_at = NOW(),
+                        proof_uploaded_by = $3
+                    WHERE id = $1
+                """, reservation_id, proof_url, user_id)
+                
+                # Notify seller
+                try:
+                    notifications_service = NotificationsService(self.db)
+                    await notifications_service.create_notification(
+                        user_id=reservation['seller_id'],
+                        notification_type='PAYMENT_PROOF_UPLOADED',
+                        title='Payment Proof Uploaded',
+                        message=f'Buyer has uploaded payment proof for {reservation["property_title"]}. Please verify.',
+                        related_entity_type='reservation',
+                        related_entity_id=reservation_id
+                    )
+                except Exception:
+                    pass
+            
+            return {
+                "success": True,
+                "message": "Payment proof uploaded successfully",
+                "proof_url": proof_url
             }
     
     async def expire_reservations(self) -> Dict[str, Any]:

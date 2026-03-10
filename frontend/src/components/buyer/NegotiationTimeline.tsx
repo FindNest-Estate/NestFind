@@ -2,10 +2,11 @@
 
 import { motion } from 'framer-motion';
 import { Clock, MessageSquare, DollarSign, CheckCircle2, XCircle, AlertCircle, ArrowRight } from 'lucide-react';
+import { OfferStatus } from '@/lib/types/offer';
 
-interface NegotiationEvent {
+export interface NegotiationEvent {
     id: string;
-    type: 'offer' | 'counter' | '  accepted' | 'rejected' | 'message' | 'status_change';
+    type: 'offer' | 'counter' | 'accepted' | 'rejected' | 'message' | 'status_change';
     title: string;
     description: string;
     amount?: number;
@@ -15,7 +16,7 @@ interface NegotiationEvent {
 
 interface NegotiationTimelineProps {
     events: NegotiationEvent[];
-    currentStatus: 'PENDING' | 'COUNTERED' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN';
+    currentStatus: OfferStatus;
 }
 
 export default function NegotiationTimeline({ events, currentStatus }: NegotiationTimelineProps) {
@@ -107,7 +108,7 @@ export default function NegotiationTimeline({ events, currentStatus }: Negotiati
                             </div>
 
                             {/* Content */}
-                            <div className={`${colors.light} rounded-xl p-4 border-2 border-${colors.bg.replace('bg-', '') - 100}`}>
+                            <div className={`${colors.light} rounded-xl p-4 border-2 border-opacity-50`}>
                                 <div className="flex items-start justify-between mb-2">
                                     <div>
                                         <h4 className={`font-bold ${colors.text} text-lg`}>{event.title}</h4>
@@ -126,8 +127,8 @@ export default function NegotiationTimeline({ events, currentStatus }: Negotiati
                                 {/* Author badge */}
                                 <div className="mt-3 flex items-center gap-2">
                                     <span className={`px-2 py-1 rounded-md text-xs font-semibold ${event.author === 'buyer' ? 'bg-blue-100 text-blue-700' :
-                                            event.author === 'seller' ? 'bg-purple-100 text-purple-700' :
-                                                'bg-gray-100 text-gray-700'
+                                        event.author === 'seller' ? 'bg-purple-100 text-purple-700' :
+                                            'bg-gray-100 text-gray-700'
                                         }`}>
                                         {event.author === 'buyer' ? '👤 You' :
                                             event.author === 'seller' ? '🏠 Seller' :

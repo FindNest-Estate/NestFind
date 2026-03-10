@@ -44,7 +44,7 @@ class PropertyStatsService:
             # Check if property exists and is active
             prop = await conn.fetchrow("""
                 SELECT id, seller_id FROM properties 
-                WHERE id = $1 AND status = 'ACTIVE' AND deleted_at IS NULL
+                WHERE id = $1 AND status IN ('ACTIVE', 'UNDER_DEAL', 'SOLD') AND deleted_at IS NULL
             """, property_id)
             
             if not prop:
@@ -205,7 +205,7 @@ class PropertyStatsService:
             # Get reference property
             prop = await conn.fetchrow("""
                 SELECT city, price, type FROM properties 
-                WHERE id = $1 AND status = 'ACTIVE' AND deleted_at IS NULL
+                WHERE id = $1 AND status IN ('ACTIVE', 'UNDER_DEAL', 'SOLD') AND deleted_at IS NULL
             """, property_id)
             
             if not prop:
@@ -230,7 +230,7 @@ class PropertyStatsService:
                      LIMIT 1) as thumbnail_url
                 FROM properties p
                 WHERE p.id != $1
-                  AND p.status = 'ACTIVE'
+                  AND p.status IN ('ACTIVE', 'UNDER_DEAL', 'SOLD')
                   AND p.deleted_at IS NULL
                   AND (p.city = $2 OR $2 IS NULL)
                   AND (p.price BETWEEN $3 AND $4 OR p.price IS NULL)

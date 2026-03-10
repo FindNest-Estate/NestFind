@@ -85,7 +85,7 @@ export default function AdminSearch() {
 
     // Group results by type
     const groupedResults = results.reduce((acc, result) => {
-        const type = result.type === 'agent' ? 'user' : result.type;
+        const type = (result.type as string) === 'agent' ? 'user' : result.type;
         const key = type === 'user' || type === 'agent' ? 'Users & Agents' :
             type === 'property' ? 'Properties' :
                 type === 'transaction' ? 'Transactions' : 'Other';

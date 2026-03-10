@@ -16,6 +16,7 @@ export interface VisitVerification {
     gps_lat: number;
     gps_lng: number;
     verified_at: string;
+    otp_verified_at?: string;
 }
 
 export interface Visit {
@@ -41,6 +42,8 @@ export interface Visit {
         title: string;
         address: string;
         thumbnail_url?: string;
+        latitude?: number;
+        longitude?: number;
     };
     agent?: {
         full_name: string;
@@ -132,5 +135,111 @@ export interface VisitFeedbackResponse {
     success: boolean;
     agent_feedback?: AgentFeedback;
     buyer_feedback?: BuyerFeedback;
+    error?: string;
+}
+
+// ============================================================================
+// FOLLOW-UP TYPES
+// ============================================================================
+
+export interface FollowupContext {
+    visit: {
+        id: string;
+        status: VisitStatus;
+        visit_date?: string;
+        property: {
+            id: string;
+            title: string;
+            price?: number;
+            city: string;
+        };
+        buyer: {
+            id: string;
+            name: string;
+            email?: string;
+            phone?: string;
+        };
+        agent: {
+            id: string;
+            name: string;
+            phone?: string;
+        };
+    };
+    verification?: {
+        gps_verified: boolean;
+        otp_verified: boolean;
+        duration_minutes?: number;
+    };
+    agent_feedback?: {
+        interest_level?: number;
+        budget?: string;
+        recommended_action?: string;
+        follow_up_required?: boolean;
+        notes?: string;
+    };
+    buyer_feedback?: {
+        overall_rating?: number;
+        interest_level?: string;
+        concerns?: string;
+        liked_aspects?: string;
+        would_recommend?: boolean;
+    };
+    offer?: {
+        id: string;
+        amount: number;
+        status: string;
+        created_at: string;
+    };
+    suggested_actions: string[];
+}
+
+export interface FollowupContextResponse {
+    success: boolean;
+    context?: FollowupContext;
+    error?: string;
+}
+
+export interface FlaggedVisit {
+    visit_id: string;
+    property_title: string;
+    property_city: string;
+    buyer_name: string;
+    interest_level?: number;
+    budget?: string;
+    recommended_action?: string;
+    feedback_at?: string;
+    visit_date?: string;
+}
+
+export interface PendingFeedbackVisit {
+    visit_id: string;
+    property_title: string;
+    buyer_name: string;
+    completed_at?: string;
+    visit_date?: string;
+}
+
+export interface HotLeadVisit {
+    visit_id: string;
+    property_id: string;
+    property_title: string;
+    property_price?: number;
+    buyer_name: string;
+    agent_interest_score?: number;
+    agent_action?: string;
+    buyer_interest?: string;
+    visit_date?: string;
+}
+
+export interface FollowupDashboardResponse {
+    success: boolean;
+    follow_up_required?: FlaggedVisit[];
+    pending_feedback?: PendingFeedbackVisit[];
+    hot_leads?: HotLeadVisit[];
+    summary?: {
+        follow_up_count: number;
+        pending_feedback_count: number;
+        hot_leads_count: number;
+    };
     error?: string;
 }

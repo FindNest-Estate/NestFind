@@ -19,8 +19,11 @@ from datetime import datetime
 from uuid import UUID
 
 from ..core.database import get_db_pool
-from ..middleware.auth_middleware import get_current_user, AuthenticatedUser
+from ..middleware.auth_middleware import get_current_user, AuthenticatedUser, require_role
 from ..services.visit_service import VisitService
+from ..services.visit_feedback_service import VisitFeedbackService
+from ..services.visit_media_service import VisitMediaService
+from ..services.visit_followup_service import VisitFollowUpService
 
 
 router = APIRouter(prefix="/visits", tags=["Visits"])
@@ -148,6 +151,27 @@ async def list_visits(
     return result
 
 
+# ============================================================================
+# FOLLOW-UP ENDPOINTS
+# ============================================================================
+
+@router.get("/followup-dashboard")
+async def get_followup_dashboard(
+    current_user: AuthenticatedUser = Depends(require_role("AGENT"))
+):
+    """
+    Agent dashboard: visits requiring follow-up, pending feedback, hot leads.
+    """
+    pool = get_db_pool()
+    service = VisitFollowUpService(pool)
+    
+    result = await service.get_followup_dashboard(
+        agent_id=current_user.user_id
+    )
+    
+    return result
+
+
 @router.get("/{visit_id}")
 async def get_visit(
     visit_id: UUID,
@@ -178,11 +202,9 @@ async def approve_visit(
     visit_id: UUID,
     data: VisitApprove,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("AGENT"))
 ):
     """Agent approves a visit request."""
-    if "AGENT" not in (current_user.roles or []):
-        raise HTTPException(status_code=403, detail="Only agents can approve visits")
     
     pool = get_db_pool()
     service = VisitService(pool)
@@ -209,11 +231,9 @@ async def reject_visit(
     visit_id: UUID,
     data: VisitReject,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("AGENT"))
 ):
     """Agent rejects a visit request."""
-    if "AGENT" not in (current_user.roles or []):
-        raise HTTPException(status_code=403, detail="Only agents can reject visits")
     
     pool = get_db_pool()
     service = VisitService(pool)
@@ -240,11 +260,9 @@ async def check_in_visit(
     visit_id: UUID,
     data: VisitCheckIn,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("AGENT"))
 ):
     """Agent checks in at property location with GPS verification."""
-    if "AGENT" not in (current_user.roles or []):
-        raise HTTPException(status_code=403, detail="Only agents can check in")
     
     pool = get_db_pool()
     service = VisitService(pool)
@@ -272,11 +290,9 @@ async def complete_visit(
     visit_id: UUID,
     data: VisitComplete,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("AGENT"))
 ):
     """Agent marks visit as completed."""
-    if "AGENT" not in (current_user.roles or []):
-        raise HTTPException(status_code=403, detail="Only agents can complete visits")
     
     pool = get_db_pool()
     service = VisitService(pool)
@@ -330,11 +346,9 @@ async def cancel_visit(
 async def mark_no_show(
     visit_id: UUID,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("AGENT"))
 ):
     """Agent marks buyer as no-show."""
-    if "AGENT" not in (current_user.roles or []):
-        raise HTTPException(status_code=403, detail="Only agents can mark no-show")
     
     pool = get_db_pool()
     service = VisitService(pool)
@@ -447,12 +461,17 @@ class BuyerFeedback(BaseModel):
     would_recommend: Optional[bool] = None
 
 
+class VisitVerifyOTP(BaseModel):
+    """OTP code for verification."""
+    otp_code: str = Field(..., min_length=6, max_length=6)
+
+
 @router.post("/{visit_id}/start-session")
 async def start_visit_session(
     visit_id: UUID,
     data: VisitStartSession,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("AGENT"))
 ):
     """
     Agent starts visit session with GPS verification.
@@ -462,8 +481,6 @@ async def start_visit_session(
     - Emails OTP to buyer
     - Stores OTP for buyer page display
     """
-    if "AGENT" not in (current_user.roles or []):
-        raise HTTPException(status_code=403, detail="Only agents can start visit sessions")
     
     pool = get_db_pool()
     service = VisitService(pool)
@@ -474,6 +491,38 @@ async def start_visit_session(
         gps_lat=data.gps_lat,
         gps_lng=data.gps_lng,
         ip_address=get_client_ip(request)
+    )
+    
+    if not result["success"]:
+        if "not found" in result["error"].lower():
+            raise HTTPException(status_code=404, detail=result["error"])
+        elif "denied" in result["error"].lower():
+            raise HTTPException(status_code=403, detail=result["error"])
+        raise HTTPException(status_code=400, detail=result["error"])
+    
+    return result
+
+
+    return result
+
+
+@router.post("/{visit_id}/verify-otp")
+async def verify_visit_otp(
+    visit_id: UUID,
+    data: VisitVerifyOTP,
+    request: Request,
+    current_user: AuthenticatedUser = Depends(require_role("AGENT"))
+):
+    """
+    Agent verifies the OTP provided by the buyer.
+    """
+    pool = get_db_pool()
+    service = VisitService(pool)
+    
+    result = await service.verify_visit_otp(
+        visit_id=visit_id,
+        agent_id=current_user.user_id,
+        otp_code=data.otp_code
     )
     
     if not result["success"]:
@@ -520,11 +569,9 @@ async def get_buyer_otp(
 async def submit_agent_feedback(
     visit_id: UUID,
     data: AgentFeedback,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("AGENT"))
 ):
     """Agent submits feedback after visit."""
-    if "AGENT" not in (current_user.roles or []):
-        raise HTTPException(status_code=403, detail="Only agents can submit agent feedback")
     
     pool = get_db_pool()
     from ..services.visit_feedback_service import VisitFeedbackService
@@ -697,6 +744,35 @@ async def delete_visit_image(
     
     result = await service.delete_image(
         image_id=image_id,
+        user_id=current_user.user_id
+    )
+    
+    if not result["success"]:
+        if "not found" in result["error"].lower():
+            raise HTTPException(status_code=404, detail=result["error"])
+        elif "denied" in result["error"].lower():
+            raise HTTPException(status_code=403, detail=result["error"])
+        raise HTTPException(status_code=400, detail=result["error"])
+    
+    return result
+
+
+@router.get("/{visit_id}/followup-context")
+async def get_followup_context(
+    visit_id: UUID,
+    current_user: AuthenticatedUser = Depends(get_current_user)
+):
+    """
+    Get complete follow-up context for a completed visit.
+    
+    Returns visit summary, feedback, verification data,
+    existing offers, and suggested next actions.
+    """
+    pool = get_db_pool()
+    service = VisitFollowUpService(pool)
+    
+    result = await service.get_followup_context(
+        visit_id=visit_id,
         user_id=current_user.user_id
     )
     

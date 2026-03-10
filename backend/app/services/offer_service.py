@@ -105,11 +105,34 @@ class OfferService:
             if not property_row:
                 return {"success": False, "error": "Property not found"}
             
-            if property_row['status'] != 'ACTIVE':
+            # Property must be ACTIVE or UNDER_DEAL (deal may be in progress)
+            if property_row['status'] not in ('ACTIVE', 'UNDER_DEAL'):
                 return {
                     "success": False, 
                     "error": f"Cannot make offer on property with status: {property_row['status']}"
                 }
+            
+            # PRE-CONDITION FIX #2: Check if deal is past price agreement
+            # Reject offers after PRICE_AGREED (immutability enforcement)
+            try:
+                from .deal_service import DealService
+                deal_service = DealService(self.db)
+                existing_deal = await deal_service.get_active_deal_by_property(
+                    property_id=property_id,
+                    conn=conn
+                )
+                if existing_deal:
+                    # Terminal and post-agreement states where offers are forbidden
+                    forbidden_states = ['PRICE_AGREED', 'TOKEN_PENDING', 'TOKEN_PAID', 
+                                       'AGREEMENT_SIGNED', 'REGISTRATION', 'COMPLETED', 
+                                       'COMMISSION_RELEASED', 'CANCELLED', 'EXPIRED']
+                    if existing_deal['status'] in forbidden_states:
+                        return {
+                            "success": False,
+                            "error": f"Cannot create offer: deal is already in {existing_deal['status']} state"
+                        }
+            except Exception:
+                pass  # If deal check fails, allow offer creation (backward compat)
             
             # Buyer cannot offer on their own property
             if property_row['seller_id'] == buyer_id:
@@ -156,6 +179,52 @@ class OfferService:
                     )
                 except Exception:
                     pass
+                
+                # ===================================================================
+                # DEAL INTEGRATION (Phase 1.5) - Silent orchestration
+                # ===================================================================
+                try:
+                    from .deal_service import DealService
+                    deal_service = DealService(self.db)
+                    
+                    # Get or create deal
+                    deal = await deal_service.get_or_create_deal(
+                        property_id=property_id,
+                        buyer_id=buyer_id,
+                        conn=conn
+                    )
+                    
+                    if deal:
+                        # PRE-CONDITION FIX #1: Handle NEGOTIATION for subsequent offers
+                        if deal['status'] in ('INITIATED', 'VISIT_SCHEDULED'):
+                            # First offer → OFFER_MADE
+                            await deal_service.transition_deal(
+                                deal_id=deal['id'],
+                                new_status='OFFER_MADE',
+                                actor_id=buyer_id,
+                                actor_role='BUYER',
+                                notes=f'Initial offer created for {property_row["title"]}',
+                                metadata={'offer_id': str(offer_row['id']), 'offered_price': str(offered_price)},
+                                ip_address=ip_address
+                            )
+                        elif deal['status'] == 'OFFER_MADE':
+                            # Second offer → transition to NEGOTIATION
+                            await deal_service.transition_deal(
+                                deal_id=deal['id'],
+                                new_status='NEGOTIATION',
+                                actor_id=buyer_id,
+                                actor_role='BUYER',
+                                notes=f'Counter-offer created for {property_row["title"]}',
+                                metadata={'offer_id': str(offer_row['id']), 'offered_price': str(offered_price)},
+                                ip_address=ip_address
+                            )
+                        elif deal['status'] == 'NEGOTIATION':
+                            # Subsequent offers in NEGOTIATION → stay in NEGOTIATION (no transition)
+                            # Just log the new offer in deal_events via link or metadata
+                            pass  # No state change needed, already in negotiation
+                except Exception as e:
+                    # Silent failure - don't block legacy flow
+                    print(f"[WARN] DEAL integration failed in create_offer: {str(e)}")
                 
                 return {
                     "success": True,
@@ -212,10 +281,15 @@ class OfferService:
                 base_query += f" AND o.property_id = ${len(params) + 1}"
                 params.append(property_id)
             
-            # Add status filter
+            # Add status filter (supports comma-separated values like "PENDING,COUNTERED")
             if status_filter:
-                base_query += f" AND o.status = ${len(params) + 1}"
-                params.append(status_filter)
+                statuses = [s.strip() for s in status_filter.split(',') if s.strip()]
+                if len(statuses) == 1:
+                    base_query += f" AND o.status = ${len(params) + 1}"
+                    params.append(statuses[0])
+                else:
+                    base_query += f" AND o.status = ANY(${len(params) + 1})"
+                    params.append(statuses)
             
             # Get total count
             count_row = await conn.fetchrow(f"""
@@ -390,6 +464,20 @@ class OfferService:
                     "error": f"Cannot accept offer in {offer['status']} status"
                 }
             
+            # Rule 1: Cannot finalize a deal without at least one completed visit
+            visit_completed = await conn.fetchval("""
+                SELECT EXISTS(
+                    SELECT 1 FROM visit_requests
+                    WHERE property_id = $1 AND buyer_id = $2 AND status = 'COMPLETED'
+                )
+            """, offer['property_id'], offer['buyer_id'])
+            
+            if not visit_completed:
+                return {
+                    "success": False,
+                    "error": "Cannot accept offer: Buyer must complete at least one property visit first."
+                }
+            
             # Check if offer expired
             now = datetime.now(timezone.utc)
             if offer['expires_at'] and offer['expires_at'].replace(tzinfo=timezone.utc) < now:
@@ -431,6 +519,28 @@ class OfferService:
             
             agreed_price = float(offer['counter_price'] or offer['offered_price'])
             
+            # ===================================================================
+            # DEAL INTEGRATION (Phase 3) - Formal Deal Creation
+            # ===================================================================
+            deal_id = None
+            try:
+                from .deal_service import DealService
+                deal_service = DealService(self.db)
+                
+                result = await deal_service.finalize_deal_from_offer(
+                    offer_id=offer_id,
+                    ip_address=ip_address
+                )
+                
+                if result.get('success'):
+                    deal_id = result.get('deal_id')
+                else:
+                    print(f"[WARN] Failed to finalize deal: {result.get('error')}")
+                    
+            except Exception as e:
+                # Silent failure - don't block legacy flow but log it
+                print(f"[WARN] DEAL integration failed in accept_offer: {str(e)}")
+            
             return {
                 "success": True,
                 "message": "Offer accepted successfully",
@@ -438,9 +548,10 @@ class OfferService:
                     "id": str(offer_id),
                     "status": "ACCEPTED",
                     "display_status": "Accepted",
-                    "agreed_price": agreed_price
+                    "agreed_price": agreed_price,
+                    "deal_id": str(deal_id) if deal_id else None
                 },
-                "next_step": "Create reservation to secure this property"
+                "next_step": "Proceed to Deal Workspace to complete execution steps"
             }
     
     async def reject_offer(

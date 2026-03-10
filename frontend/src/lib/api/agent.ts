@@ -4,7 +4,7 @@
  * Functions for agent operations (requires AGENT role)
  */
 
-import { get, post } from '@/lib/api';
+import { get, post, del } from '@/lib/api';
 
 // ============================================================================
 // TYPES
@@ -125,13 +125,23 @@ export interface CRMLead {
     phone: string | null;
     type: 'SELLER' | 'BUYER';
     stage: string;
+    temperature?: string;
+    notes?: string;
+    expected_value?: number;
     interest: string;
     last_contact: string;
+    is_explicit?: boolean;
 }
 
 export interface CRMLeadsResponse {
     success: boolean;
     leads: CRMLead[];
+}
+
+export interface CRMLeadActionResponse {
+    success: boolean;
+    lead_id?: string;
+    error?: string;
 }
 
 export interface AgentInsight {
@@ -268,6 +278,27 @@ export async function getAgentCRMLeads(): Promise<CRMLeadsResponse> {
 }
 
 /**
+ * Create a new manual CRM lead.
+ */
+export async function createAgentCRMLead(leadData: Partial<CRMLead>): Promise<CRMLeadActionResponse> {
+    return post<CRMLeadActionResponse>('/agent/crm/leads', leadData);
+}
+
+/**
+ * Update CRM lead (e.g. stage, temperature).
+ */
+export async function updateAgentCRMLead(leadId: string, updateData: Partial<CRMLead>): Promise<CRMLeadActionResponse> {
+    return post<CRMLeadActionResponse>(`/agent/crm/leads/${leadId}`, updateData, { method: 'PUT' });
+}
+
+/**
+ * Delete manual CRM lead.
+ */
+export async function deleteAgentCRMLead(leadId: string): Promise<CRMLeadActionResponse> {
+    return del<CRMLeadActionResponse>(`/agent/crm/leads/${leadId}`);
+}
+
+/**
  * Get agent insights.
  */
 export async function getAgentInsights(): Promise<InsightsResponse> {
@@ -320,6 +351,21 @@ export interface MarketingHistoryResponse {
     history: MarketingHistoryItem[];
 }
 
+export interface MarketingProfile {
+    name: string;
+    email: string;
+    phone?: string;
+    bio: string;
+    social_links: Record<string, string>;
+    service_areas: string[];
+    photo_url: string;
+}
+
+export interface MarketingProfileResponse {
+    success: boolean;
+    profile: MarketingProfile;
+}
+
 export interface ManageEventResponse {
     success: boolean;
     event?: ScheduleEvent;
@@ -343,14 +389,7 @@ export async function createScheduleEvent(title: string, start: string, type: st
  * Delete schedule event.
  */
 export async function deleteScheduleEvent(eventId: string): Promise<ActionResponse> {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/agent/schedule/events/${eventId}`, {
-        method: 'DELETE', // DELETE is not in the wrapper yet, defaulting to manual fetch or would need to add to api wrapper
-        headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-        }
-    });
-    return response.json();
+    return del<ActionResponse>(`/agent/schedule/events/${eventId}`);
 }
 
 /**
@@ -380,6 +419,20 @@ export async function generateMarketingAsset(
         template_id: templateId,
         custom_options: customOptions
     });
+}
+
+/**
+ * Get the agent's marketing profile.
+ */
+export async function getAgentMarketingProfile(): Promise<MarketingProfileResponse> {
+    return get<MarketingProfileResponse>('/agent/marketing/profile');
+}
+
+/**
+ * Update the agent's marketing profile.
+ */
+export async function updateAgentMarketingProfile(profileData: Partial<MarketingProfile>): Promise<ActionResponse> {
+    return post<ActionResponse>('/agent/marketing/profile', profileData, { method: 'PUT' });
 }
 
 export interface VisitActionResponse {
@@ -543,14 +596,6 @@ export async function uploadAgentDocument(
  * Delete a document
  */
 export async function deleteAgentDocument(documentId: string): Promise<ActionResponse> {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/agent/documents/${documentId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-        headers: {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-            'Content-Type': 'application/json'
-        }
-    });
-    return response.json();
+    return del<ActionResponse>(`/agent/documents/${documentId}`);
 }
 

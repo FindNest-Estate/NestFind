@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, MapPin } from 'lucide-react';
 
+import { VisitStatus } from '@/lib/types/visit';
+
 interface Visit {
     id: string;
     propertyTitle: string;
     propertyAddress: string;
     scheduledDate: string;
-    status: 'REQUESTED' | 'APPROVED' | 'COMPLETED' | 'CANCELLED';
+    status: VisitStatus;
 }
 
 interface VisitsCalendarProps {
@@ -131,12 +133,12 @@ export default function VisitsCalendar({ visits, onDateSelect }: VisitsCalendarP
                             onClick={() => future && onDateSelect(new Date(year, month, day))}
                             disabled={!future}
                             className={`aspect-square p-2 rounded-xl transition-all relative ${today
-                                    ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white ring-2 ring-rose-200'
-                                    : hasVisits
-                                        ? 'bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-300'
-                                        : future
-                                            ? 'hover:bg-gray-100 border border-gray-200'
-                                            : 'text-gray-300 cursor-not-allowed'
+                                ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white ring-2 ring-rose-200'
+                                : hasVisits
+                                    ? 'bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-300'
+                                    : future
+                                        ? 'hover:bg-gray-100 border border-gray-200'
+                                        : 'text-gray-300 cursor-not-allowed'
                                 }`}
                         >
                             <div className="flex flex-col items-center justify-center h-full">
@@ -149,9 +151,9 @@ export default function VisitsCalendar({ visits, onDateSelect }: VisitsCalendarP
                                             <div
                                                 key={i}
                                                 className={`w-1.5 h-1.5 rounded-full ${visit.status === 'APPROVED' ? 'bg-emerald-500' :
-                                                        visit.status === 'COMPLETED' ? 'bg-blue-500' :
-                                                            visit.status === 'CANCELLED' ? 'bg-red-500' :
-                                                                'bg-amber-500'
+                                                    visit.status === 'COMPLETED' ? 'bg-blue-500' :
+                                                        visit.status === 'CANCELLED' ? 'bg-red-500' :
+                                                            'bg-amber-500'
                                                     }`}
                                             />
                                         ))}

@@ -215,10 +215,41 @@ export async function respondToCounter(id: string, accept: boolean): Promise<Vis
 }
 
 // ============================================================================
-// ENHANCED VISIT VERIFICATION APIs
+// FOLLOW-UP APIs
 // ============================================================================
 
-import { VisitOTPResponse, AgentFeedbackData, BuyerFeedbackData, VisitFeedbackResponse, VisitImage } from '@/lib/types/visit';
+import {
+    VisitOTPResponse, AgentFeedbackData, BuyerFeedbackData, VisitFeedbackResponse, VisitImage,
+    FollowupContextResponse, FollowupDashboardResponse
+} from '@/lib/types/visit';
+
+export async function getFollowupContext(id: string): Promise<FollowupContextResponse> {
+    try {
+        return await get<FollowupContextResponse>(`/visits/${id}/followup-context`);
+    } catch (error: any) {
+        console.error('Get followup context error:', error);
+        return {
+            success: false,
+            error: error.data?.detail || error.message || 'Failed to get followup context'
+        };
+    }
+}
+
+export async function getFollowupDashboard(): Promise<FollowupDashboardResponse> {
+    try {
+        return await get<FollowupDashboardResponse>(`/visits/followup-dashboard`);
+    } catch (error: any) {
+        console.error('Get followup dashboard error:', error);
+        return {
+            success: false,
+            error: error.data?.detail || error.message || 'Failed to get followup dashboard'
+        };
+    }
+}
+
+// ============================================================================
+// ENHANCED VISIT VERIFICATION APIs
+// ============================================================================
 
 export async function startVisitSession(id: string, gpsLat: number, gpsLng: number): Promise<VisitResponse> {
     try {
@@ -231,6 +262,20 @@ export async function startVisitSession(id: string, gpsLat: number, gpsLng: numb
         return {
             success: false,
             error: error.data?.detail || error.message || 'Failed to start visit session'
+        };
+    }
+}
+
+export async function verifyVisitOTP(id: string, otpCode: string): Promise<VisitResponse> {
+    try {
+        return await post<VisitResponse>(`/visits/${id}/verify-otp`, {
+            otp_code: otpCode
+        });
+    } catch (error: any) {
+        console.error('Verify visit OTP error:', error);
+        return {
+            success: false,
+            error: error.data?.detail || error.message || 'Failed to verify OTP'
         };
     }
 }

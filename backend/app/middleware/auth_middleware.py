@@ -1,7 +1,7 @@
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from uuid import UUID
-from typing import Optional
+from typing import Optional, List
 
 from ..core.jwt import decode_access_token
 from ..core.database import get_db_pool
@@ -13,6 +13,7 @@ security = HTTPBearer(auto_error=False)
 
 class AuthenticatedUser:
     """Authenticated user context."""
+
     def __init__(self, user_id: UUID, session_id: UUID, status: str, roles: list):
         self.user_id = user_id
         self.session_id = session_id
@@ -20,108 +21,133 @@ class AuthenticatedUser:
         self.roles = roles
 
 
-async def _get_token_from_request(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    request: Request = None
-) -> Optional[str]:
-    """Extract token from Authorization header or cookies."""
-    # Try Authorization header first
-    if credentials and credentials.credentials:
-        return credentials.credentials
-    
-    # Fall back to cookies
-    if request:
-        token = request.cookies.get("access_token")
-        if token:
-            return token
+def _extract_tokens(
+    credentials: Optional[HTTPAuthorizationCredentials],
+    request: Optional[Request],
+) -> List[str]:
+    """Extract candidate tokens from header, cookie, and query string."""
+    candidates: List[str] = []
 
-    # Fall back to query params (for SSE)
+    if credentials and credentials.credentials:
+        candidates.append(credentials.credentials)
+
     if request:
-        token = request.query_params.get("token")
-        if token:
-            return token
-    
-    return None
+        cookie_token = request.cookies.get("access_token")
+        if cookie_token:
+            candidates.append(cookie_token)
+
+        # SSE fallback
+        query_token = request.query_params.get("token")
+        if query_token:
+            candidates.append(query_token)
+
+    # Preserve order while removing duplicates
+    seen = set()
+    tokens: List[str] = []
+    for token in candidates:
+        if token and token not in seen:
+            seen.add(token)
+            tokens.append(token)
+
+    return tokens
+
+
+async def _build_user_context(
+    token: str,
+    db_pool,
+) -> Optional[AuthenticatedUser]:
+    """Decode token and load canonical status/roles from DB. Returns None if invalid."""
+    payload = decode_access_token(token)
+    if not payload:
+        return None
+
+    sub = payload.get("sub")
+    session_id_str = payload.get("session_id")
+    if not sub or not session_id_str:
+        return None
+
+    try:
+        user_id = UUID(sub)
+        session_id = UUID(session_id_str)
+    except (ValueError, TypeError):
+        return None
+
+    session_service = SessionService(db_pool)
+    session = await session_service.verify_session(session_id)
+    if not session:
+        return None
+
+    async with db_pool.acquire() as conn:
+        user = await conn.fetchrow(
+            """
+            SELECT id, status
+            FROM users
+            WHERE id = $1
+            """,
+            user_id,
+        )
+        if not user:
+            return None
+
+        roles = await conn.fetch(
+            """
+            SELECT r.name
+            FROM user_roles ur
+            JOIN roles r ON ur.role_id = r.id
+            WHERE ur.user_id = $1
+            """,
+            user_id,
+        )
+        role_names = [role["name"] for role in roles]
+
+    return AuthenticatedUser(
+        user_id=user_id,
+        session_id=session_id,
+        status=user["status"],
+        roles=role_names,
+    )
 
 
 async def get_current_user_any_status(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     request: Request = None,
-    db_pool = Depends(get_db_pool)
+    db_pool=Depends(get_db_pool),
 ) -> dict:
     """
     JWT verification for any authenticated user (any status).
-    
+
     Use this for endpoints where users need to check their own status,
     like /user/me. Does NOT enforce ACTIVE status.
     """
-    # Get token from header or cookie
-    token = None
-    if credentials and credentials.credentials:
-        token = credentials.credentials
-    elif request:
-        token = request.cookies.get("access_token")
-    
-    
-    if not token:
-        print(f"DEBUG: No token found. Headers: {request.headers.get('Authorization')}, Cookies: {request.cookies.keys()}")
+    tokens = _extract_tokens(credentials, request)
+    if not tokens:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated"
+            detail="Not authenticated",
         )
-    
-    # Decode JWT
-    payload = decode_access_token(token)
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
-        )
-    
-    # Validate required fields exist
-    sub = payload.get("sub")
-    session_id_str = payload.get("session_id")
-    
-    if not sub or not session_id_str:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload"
-        )
-    
-    try:
-        user_id = UUID(sub)
-        session_id = UUID(session_id_str)
-    except (ValueError, TypeError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token format"
-        )
-    
-    # Verify session is not revoked
-    session_service = SessionService(db_pool)
-    session = await session_service.verify_session(session_id)
-    
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session revoked or expired"
-        )
-    
-    # Return minimal user context (status NOT checked)
-    return {
-        "user_id": user_id,
-        "session_id": session_id
-    }
+
+    for token in tokens:
+        context = await _build_user_context(token, db_pool)
+        if context:
+            return {
+                "user_id": context.user_id,
+                "session_id": context.session_id,
+            }
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or expired token",
+    )
 
 
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     request: Request = None,
-    db_pool = Depends(get_db_pool)
+    db_pool=Depends(get_db_pool),
 ) -> AuthenticatedUser:
     """
     JWT verification middleware for ACTIVE users only.
-    
+
     Enforces AUTH_SECURITY_RULES.md Rule 3 and Rule 4:
     - Verifies JWT signature
     - Checks session revocation
@@ -130,205 +156,96 @@ async def get_current_user(
     - NEVER trusts role/status from JWT
     - Requires ACTIVE status
     """
-    # Get token from header or cookie
-    token = None
-    if credentials and credentials.credentials:
-        token = credentials.credentials
-    elif request:
-        token = request.cookies.get("access_token")
-    
-    if not token:
+    tokens = _extract_tokens(credentials, request)
+    if not tokens:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated"
+            detail="Not authenticated",
         )
-    
-    # Decode JWT
-    payload = decode_access_token(token)
-    if not payload:
+
+    inactive_context: Optional[AuthenticatedUser] = None
+    for token in tokens:
+        context = await _build_user_context(token, db_pool)
+        if not context:
+            continue
+
+        if context.status != "ACTIVE":
+            inactive_context = context
+            continue
+
+        return context
+
+    if inactive_context:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account not active",
         )
-    
-    # Validate required fields exist
-    sub = payload.get("sub")
-    session_id_str = payload.get("session_id")
-    
-    if not sub or not session_id_str:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload"
-        )
-    
-    try:
-        user_id = UUID(sub)
-        session_id = UUID(session_id_str)
-    except (ValueError, TypeError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token format"
-        )
-    
-    # Verify session is not revoked
-    session_service = SessionService(db_pool)
-    session = await session_service.verify_session(session_id)
-    
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session revoked or expired"
-        )
-    
-    # Re-verify user status and roles from database (NEVER trust JWT)
-    async with db_pool.acquire() as conn:
-        user = await conn.fetchrow(
-            """
-            SELECT id, status
-            FROM users
-            WHERE id = $1
-            """,
-            user_id
-        )
-        
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found"
-            )
-        
-        # Check user status (ACTIVE required for protected resources)
-        if user['status'] != 'ACTIVE':
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Account not active"
-            )
-        
-        # Load user roles from database
-        roles = await conn.fetch(
-            """
-            SELECT r.name
-            FROM user_roles ur
-            JOIN roles r ON ur.role_id = r.id
-            WHERE ur.user_id = $1
-            """,
-            user_id
-        )
-        
-        role_names = [role['name'] for role in roles]
-    
-    return AuthenticatedUser(
-        user_id=user_id,
-        session_id=session_id,
-        status=user['status'],
-        roles=role_names
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or expired token",
     )
 
 
 def require_role(required_role: str):
     """
     Dependency factory to require specific role.
-    
+
     Usage: current_user: AuthenticatedUser = Depends(require_role("ADMIN"))
-    
+
     Note: This is a sync factory that returns an async dependency.
     The outer function MUST be sync so FastAPI receives a callable, not a coroutine.
     """
+
     async def role_checker(current_user: AuthenticatedUser = Depends(get_current_user)):
         if required_role not in current_user.roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Role {required_role} required"
+                detail=f"Role {required_role} required",
             )
         return current_user
-    
+
+    return role_checker
+
+
+def require_any_role(*allowed_roles: str):
+    """
+    Dependency factory: requires user to have at least ONE of the listed roles.
+
+    Usage: current_user: AuthenticatedUser = Depends(require_any_role("BUYER", "SELLER"))
+    """
+
+    async def role_checker(current_user: AuthenticatedUser = Depends(get_current_user)):
+        if not any(role in current_user.roles for role in allowed_roles):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"One of roles {list(allowed_roles)} required",
+            )
+        return current_user
+
     return role_checker
 
 
 async def get_optional_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     request: Request = None,
-    db_pool = Depends(get_db_pool)
+    db_pool=Depends(get_db_pool),
 ) -> Optional[AuthenticatedUser]:
     """
     Optional authentication - returns user if authenticated, None otherwise.
-    
+
     Use for endpoints that work for both authenticated and unauthenticated users,
     but may return additional data when authenticated (e.g., viewer context).
-    
+
     Does NOT raise exceptions for missing/invalid tokens.
     """
-    # Get token from header or cookie
-    token = None
-    if credentials and credentials.credentials:
-        token = credentials.credentials
-    elif request:
-        token = request.cookies.get("access_token")
-    
-    if not token:
+    tokens = _extract_tokens(credentials, request)
+    if not tokens:
         return None
-    
-    # Decode JWT
-    payload = decode_access_token(token)
-    if not payload:
-        return None
-    
-    # Validate required fields exist
-    sub = payload.get("sub")
-    session_id_str = payload.get("session_id")
-    
-    if not sub or not session_id_str:
-        return None
-    
-    try:
-        user_id = UUID(sub)
-        session_id = UUID(session_id_str)
-    except (ValueError, TypeError):
-        return None
-    
-    # Verify session is not revoked
-    session_service = SessionService(db_pool)
-    session = await session_service.verify_session(session_id)
-    
-    if not session:
-        return None
-    
-    # Re-verify user status and roles from database
-    async with db_pool.acquire() as conn:
-        user = await conn.fetchrow(
-            """
-            SELECT id, status
-            FROM users
-            WHERE id = $1
-            """,
-            user_id
-        )
-        
-        if not user:
-            return None
-        
-        # Only return user context if ACTIVE
-        if user['status'] != 'ACTIVE':
-            return None
-        
-        # Load user roles from database
-        roles = await conn.fetch(
-            """
-            SELECT r.name
-            FROM user_roles ur
-            JOIN roles r ON ur.role_id = r.id
-            WHERE ur.user_id = $1
-            """,
-            user_id
-        )
-        
-        role_names = [role['name'] for role in roles]
-    
-    return AuthenticatedUser(
-        user_id=user_id,
-        session_id=session_id,
-        status=user['status'],
-        roles=role_names
-    )
 
+    for token in tokens:
+        context = await _build_user_context(token, db_pool)
+        if context and context.status == "ACTIVE":
+            return context
 
+    return None

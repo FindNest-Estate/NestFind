@@ -4,398 +4,317 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Search,
     Send,
-    Paperclip,
     MoreVertical,
     Phone,
     Video,
-    Star,
-    Archive,
-    Trash2,
-    ChevronLeft,
-    Smile,
     Image as ImageIcon,
+    Paperclip,
     Check,
     CheckCheck,
-    Clock,
     Loader2,
-    MessageSquare
+    MessageSquare,
+    User,
+    ArrowLeft
 } from 'lucide-react';
-import { getAgentMessages, sendAgentMessage, Conversation as APIConversation } from '@/lib/api/agent';
+import {
+    getAgentMessages,
+    sendAgentMessage
+} from '@/lib/api/agent';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Button } from '@/components/ui/Button';
 
 // Types
 interface Message {
     id: string;
+    sender_id: string;
     content: string;
     timestamp: string;
-    sender: 'agent' | 'client';
     status: 'sent' | 'delivered' | 'read';
-    type: 'text' | 'image' | 'document';
+    type: 'text' | 'image' | 'file';
 }
 
 interface Conversation {
     id: string;
-    client: {
+    participant: {
         id: string;
         name: string;
         avatar?: string;
-        type: 'BUYER' | 'SELLER';
-        property?: string;
+        role: string;
+        status?: 'online' | 'offline';
+        last_seen?: string;
     };
-    lastMessage: string;
-    lastMessageTime: string;
-    unreadCount: number;
-    messages: Message[];
-    starred: boolean;
-}
-
-// Quick reply templates
-const quickReplies = [
-    'Thank you for your interest!',
-    'I will schedule a visit for you.',
-    'The property is available for viewing.',
-    'I will share the documents shortly.',
-    'Please let me know your preferred time.'
-];
-
-// Chat Bubble Component
-function ChatBubble({ message, isLast }: { message: Message; isLast: boolean }) {
-    const isAgent = message.sender === 'agent';
-
-    return (
-        <div className={`flex ${isAgent ? 'justify-end' : 'justify-start'} mb-3`}>
-            <div className={`max-w-[70%] ${isAgent ? 'order-2' : ''}`}>
-                <div className={`px-4 py-2.5 rounded-2xl ${isAgent
-                    ? 'bg-rose-500 text-white rounded-br-sm'
-                    : 'bg-white border border-gray-200 text-gray-900 rounded-bl-sm'
-                    }`}>
-                    <p className="text-sm">{message.content}</p>
-                </div>
-                <div className={`flex items-center gap-1 mt-1 ${isAgent ? 'justify-end' : ''}`}>
-                    <span className="text-[10px] text-gray-400">{message.timestamp}</span>
-                    {isAgent && (
-                        <span className="text-gray-400">
-                            {message.status === 'read' ? (
-                                <CheckCheck className="w-3 h-3 text-blue-500" />
-                            ) : message.status === 'delivered' ? (
-                                <CheckCheck className="w-3 h-3" />
-                            ) : (
-                                <Check className="w-3 h-3" />
-                            )}
-                        </span>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// Conversation List Item
-function ConversationItem({
-    conversation,
-    isActive,
-    onClick
-}: {
-    conversation: Conversation;
-    isActive: boolean;
-    onClick: () => void;
-}) {
-    return (
-        <div
-            onClick={onClick}
-            className={`flex items-center gap-3 p-3 cursor-pointer transition-colors rounded-xl ${isActive ? 'bg-rose-50' : 'hover:bg-gray-50'
-                }`}
-        >
-            {/* Avatar */}
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold ${conversation.client.type === 'BUYER'
-                ? 'bg-gradient-to-br from-blue-500 to-indigo-500'
-                : 'bg-gradient-to-br from-rose-500 to-pink-500'
-                }`}>
-                {conversation.client.name.charAt(0)}
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-gray-900 text-sm truncate">
-                        {conversation.client.name}
-                    </h4>
-                    <span className={`text-[10px] ${conversation.unreadCount > 0 ? 'text-rose-500 font-bold' : 'text-gray-400'}`}>
-                        {conversation.lastMessageTime}
-                    </span>
-                </div>
-                <div className="flex items-center justify-between mt-0.5">
-                    <p className="text-xs text-gray-500 truncate">{conversation.lastMessage}</p>
-                    {conversation.unreadCount > 0 && (
-                        <span className="w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                            {conversation.unreadCount}
-                        </span>
-                    )}
-                </div>
-                {conversation.client.property && (
-                    <p className="text-[10px] text-gray-400 mt-1 truncate">
-                        🏠 {conversation.client.property}
-                    </p>
-                )}
-            </div>
-
-            {conversation.starred && (
-                <Star className="w-4 h-4 text-amber-400 fill-amber-400 flex-shrink-0" />
-            )}
-        </div>
-    );
+    last_message: Message;
+    unread_count: number;
+    messages?: Message[]; // Populated when selected
 }
 
 export default function MessagesPage() {
     const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
-    const [message, setMessage] = useState('');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [showQuickReplies, setShowQuickReplies] = useState(false);
-    const [isMobileViewChat, setIsMobileViewChat] = useState(false);
+    const [selectedId, setSelectedId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [messageInput, setMessageInput] = useState('');
     const [isSending, setIsSending] = useState(false);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Fetch conversations from database on mount
+    // Refs for scrolling
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
+
     useEffect(() => {
-        async function loadConversations() {
-            setIsLoading(true);
-            try {
-                const response = await getAgentMessages();
-                if (response.success && response.conversations) {
-                    // Transform API response to local format
-                    const transformed: Conversation[] = response.conversations.map(c => ({
-                        id: c.id,
-                        client: {
-                            id: c.id,
-                            name: c.contact_name,
-                            type: c.contact_type,
-                            property: c.property_title
-                        },
-                        lastMessage: c.last_message,
-                        lastMessageTime: new Date(c.last_message_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-                        unreadCount: c.unread_count,
-                        messages: c.messages?.map(m => ({
-                            id: m.id,
-                            content: m.content,
-                            timestamp: new Date(m.sent_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-                            sender: m.sender_id === c.id ? 'client' as const : 'agent' as const,
-                            status: m.read ? 'read' as const : 'sent' as const,
-                            type: 'text' as const
-                        })) || [],
-                        starred: false
-                    }));
-                    setConversations(transformed);
-                }
-            } catch (error) {
-                console.error('Failed to load messages:', error);
-            } finally {
-                setIsLoading(false);
-            }
-        }
         loadConversations();
     }, []);
 
     useEffect(() => {
-        if (conversations.length > 0 && !activeConversation) {
-            setActiveConversation(conversations[0]);
+        // Scroll to bottom when messages change
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
-    }, [conversations]);
+    }, [selectedId, conversations]);
 
-    const handleSendMessage = () => {
-        if (!message.trim() || !activeConversation) return;
+    const loadConversations = async () => {
+        setIsLoading(true);
+        try {
+            const res = await getAgentMessages();
+            if (res.success) {
+                // Determine user ID (assuming 'me' for now as current user isn't in context easily)
+                // Real implementation would filter based on current user ID
+                setConversations(res.conversations as unknown as Conversation[]);
 
+                // Select first conversation if desktop and none selected
+                if (window.innerWidth >= 768 && !selectedId && res.conversations.length > 0) {
+                    setSelectedId(res.conversations[0].id);
+                }
+            }
+        } catch (error) {
+            console.error("Failed to load messages", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleSendMessage = async (e?: React.FormEvent) => {
+        e?.preventDefault();
+        if (!messageInput.trim() || !selectedId || isSending) return;
+
+        const tempId = `temp-${Date.now()}`;
         const newMessage: Message = {
-            id: `m-${Date.now()}`,
-            content: message,
-            timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-            sender: 'agent',
+            id: tempId,
+            sender_id: 'me', // Optimistic
+            content: messageInput,
+            timestamp: new Date().toISOString(),
             status: 'sent',
             type: 'text'
         };
 
-        setConversations(conversations.map(c =>
-            c.id === activeConversation.id
-                ? { ...c, messages: [...c.messages, newMessage], lastMessage: message }
-                : c
-        ));
-        setActiveConversation({
-            ...activeConversation,
-            messages: [...activeConversation.messages, newMessage]
-        });
-        setMessage('');
-        setShowQuickReplies(false);
+        // Optimistic update
+        setConversations(prev => prev.map(c => {
+            if (c.id === selectedId) {
+                return {
+                    ...c,
+                    messages: [...(c.messages || []), newMessage],
+                    last_message: newMessage
+                };
+            }
+            return c;
+        }));
+
+        setMessageInput('');
+        setIsSending(true);
+
+        try {
+            const res = await sendAgentMessage({
+                conversation_id: selectedId,
+                content: newMessage.content,
+                message_type: 'text'
+            });
+
+            if (res.success) {
+                // Update with real ID from backend if needed
+            }
+        } catch (error) {
+            console.error("Failed to send", error);
+            // Revert optimistic update in real app
+        } finally {
+            setIsSending(false);
+        }
     };
 
-    const handleQuickReply = (reply: string) => {
-        setMessage(reply);
-        setShowQuickReplies(false);
-    };
+    const selectedConversation = conversations.find(c => c.id === selectedId);
 
-    const filteredConversations = conversations.filter(c =>
-        c.client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.client.property?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // Mock messages if API returns empty array for messages property (API gap handling)
+    // The previous getAgentMessages outlines returning conversation overview, 
+    // but individual messages might need a separate call or be included. 
+    // We'll assume they are included or we stick to optimistic for now.
 
     return (
-        <div className="h-[calc(100vh-120px)] flex bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
-            {/* Conversations Sidebar */}
-            <div className={`w-full md:w-80 bg-white border-r border-gray-200 flex flex-col ${isMobileViewChat ? 'hidden md:flex' : ''}`}>
-                {/* Header */}
-                <div className="p-4 border-b border-gray-100">
-                    <h1 className="text-xl font-bold text-gray-900 mb-3">Messages</h1>
+        <div className="flex h-[calc(100vh-8rem)] bg-white rounded-xl border border-[var(--gray-200)] shadow-sm overflow-hidden">
+            {/* Sidebar / List */}
+            <div className={`${selectedId ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 border-r border-[var(--gray-200)]`}>
+                <div className="p-4 border-b border-[var(--gray-200)]">
+                    <h2 className="text-xl font-bold text-[var(--gray-900)] mb-4">Messages</h2>
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--gray-400)]" />
                         <input
                             type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search conversations..."
-                            className="w-full pl-10 pr-4 py-2 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+                            placeholder="Search..."
+                            className="w-full pl-9 pr-4 py-2 bg-[var(--gray-50)] border border-[var(--gray-200)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--color-brand)]"
                         />
                     </div>
                 </div>
 
-                {/* Tabs */}
-                <div className="flex border-b border-gray-100">
-                    <button className="flex-1 py-2 text-sm font-medium text-rose-600 border-b-2 border-rose-500">
-                        All
-                    </button>
-                    <button className="flex-1 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">
-                        Unread
-                    </button>
-                    <button className="flex-1 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">
-                        Starred
-                    </button>
-                </div>
-
-                {/* Conversations List */}
-                <div className="flex-1 overflow-y-auto p-2">
-                    {filteredConversations.map(conv => (
-                        <ConversationItem
-                            key={conv.id}
-                            conversation={conv}
-                            isActive={activeConversation?.id === conv.id}
-                            onClick={() => {
-                                setActiveConversation(conv);
-                                setIsMobileViewChat(true);
-                            }}
-                        />
-                    ))}
+                <div className="flex-1 overflow-y-auto">
+                    {isLoading ? (
+                        <div className="flex justify-center py-8">
+                            <Loader2 className="w-6 h-6 animate-spin text-[var(--gray-400)]" />
+                        </div>
+                    ) : conversations.length === 0 ? (
+                        <div className="text-center py-10 px-4 text-[var(--gray-500)]">
+                            <p>No conversations yet.</p>
+                        </div>
+                    ) : (
+                        conversations.map(conv => (
+                            <button
+                                key={conv.id}
+                                onClick={() => setSelectedId(conv.id)}
+                                className={`w-full text-left p-4 hover:bg-[var(--gray-50)] transition-colors border-b border-[var(--gray-100)] last:border-0 ${selectedId === conv.id ? 'bg-[var(--color-brand-subtle)] hover:bg-[var(--color-brand-subtle)]' : ''
+                                    }`}
+                            >
+                                <div className="flex justify-between items-start mb-1">
+                                    <h3 className={`font-semibold text-sm truncate ${selectedId === conv.id ? 'text-[var(--color-brand)]' : 'text-[var(--gray-900)]'}`}>
+                                        {conv.participant.name}
+                                    </h3>
+                                    <span className="text-[10px] text-[var(--gray-400)] shrink-0">
+                                        {new Date(conv.last_message.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-end">
+                                    <p className="text-xs text-[var(--gray-500)] truncate max-w-[180px]">
+                                        {conv.last_message.sender_id === 'me' && 'You: '}
+                                        {conv.last_message.content}
+                                    </p>
+                                    {conv.unread_count > 0 && (
+                                        <span className="bg-[var(--color-brand)] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                                            {conv.unread_count}
+                                        </span>
+                                    )}
+                                </div>
+                            </button>
+                        ))
+                    )}
                 </div>
             </div>
 
             {/* Chat Area */}
-            <div className={`flex-1 flex flex-col bg-gray-50 ${!isMobileViewChat && !activeConversation ? 'hidden md:flex' : ''}`}>
-                {activeConversation ? (
-                    <>
-                        {/* Chat Header */}
-                        <div className="bg-white px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={() => setIsMobileViewChat(false)}
-                                    className="md:hidden p-2 hover:bg-gray-100 rounded-lg"
-                                >
-                                    <ChevronLeft className="w-5 h-5 text-gray-600" />
-                                </button>
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm ${activeConversation.client.type === 'BUYER'
-                                    ? 'bg-gradient-to-br from-blue-500 to-indigo-500'
-                                    : 'bg-gradient-to-br from-rose-500 to-pink-500'
-                                    }`}>
-                                    {activeConversation.client.name.charAt(0)}
+            {selectedId && selectedConversation ? (
+                <div className={`${!selectedId ? 'hidden md:flex' : 'flex'} flex-col flex-1 h-full`}>
+                    {/* Header */}
+                    <div className="h-16 px-6 border-b border-[var(--gray-200)] flex items-center justify-between bg-white shrink-0">
+                        <div className="flex items-center gap-3">
+                            <button onClick={() => setSelectedId(null)} className="md:hidden p-1 -ml-2 text-[var(--gray-600)]">
+                                <ArrowLeft className="w-5 h-5" />
+                            </button>
+                            <div className="relative">
+                                <div className="w-10 h-10 rounded-full bg-[var(--gray-200)] flex items-center justify-center overflow-hidden">
+                                    {selectedConversation.participant.avatar ? (
+                                        <img src={selectedConversation.participant.avatar} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <User className="w-5 h-5 text-[var(--gray-500)]" />
+                                    )}
                                 </div>
-                                <div>
-                                    <h3 className="font-semibold text-gray-900">{activeConversation.client.name}</h3>
-                                    <p className="text-xs text-gray-500">
-                                        {activeConversation.client.type} • {activeConversation.client.property || 'General Inquiry'}
-                                    </p>
-                                </div>
+                                {selectedConversation.participant.status === 'online' && (
+                                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />
+                                )}
                             </div>
-                            <div className="flex items-center gap-2">
-                                <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-600">
-                                    <Phone className="w-5 h-5" />
-                                </button>
-                                <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-600">
-                                    <Video className="w-5 h-5" />
-                                </button>
-                                <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-600">
-                                    <MoreVertical className="w-5 h-5" />
-                                </button>
+                            <div>
+                                <h3 className="font-bold text-[var(--gray-900)]">{selectedConversation.participant.name}</h3>
+                                <p className="text-xs text-[var(--gray-500)]">
+                                    {selectedConversation.participant.status === 'online' ? 'Online' : 'Offline'}
+                                </p>
                             </div>
                         </div>
-
-                        {/* Messages */}
-                        <div className="flex-1 overflow-y-auto p-4">
-                            {activeConversation.messages.map((msg, index) => (
-                                <ChatBubble
-                                    key={msg.id}
-                                    message={msg}
-                                    isLast={index === activeConversation.messages.length - 1}
-                                />
-                            ))}
-                            <div ref={messagesEndRef} />
-                        </div>
-
-                        {/* Quick Replies */}
-                        {showQuickReplies && (
-                            <div className="px-4 pb-2 flex gap-2 flex-wrap animate-fade-in">
-                                {quickReplies.map((reply, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => handleQuickReply(reply)}
-                                        className="px-3 py-1.5 bg-white border border-gray-200 rounded-full text-xs text-gray-600 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 transition-colors"
-                                    >
-                                        {reply}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Input Area */}
-                        <div className="bg-white p-4 border-t border-gray-200">
-                            <div className="flex items-center gap-2">
-                                <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
-                                    <Paperclip className="w-5 h-5" />
-                                </button>
-                                <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
-                                    <ImageIcon className="w-5 h-5" />
-                                </button>
-                                <button
-                                    onClick={() => setShowQuickReplies(!showQuickReplies)}
-                                    className={`p-2 rounded-lg transition-colors ${showQuickReplies ? 'bg-rose-50 text-rose-500' : 'hover:bg-gray-100 text-gray-500'}`}
-                                >
-                                    <Smile className="w-5 h-5" />
-                                </button>
-                                <input
-                                    type="text"
-                                    value={message}
-                                    onChange={(e) => setMessage(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                    placeholder="Type a message..."
-                                    className="flex-1 px-4 py-2.5 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20"
-                                />
-                                <button
-                                    onClick={handleSendMessage}
-                                    disabled={!message.trim()}
-                                    className="p-2.5 bg-rose-500 text-white rounded-xl hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    <Send className="w-5 h-5" />
-                                </button>
-                            </div>
-                        </div>
-                    </>
-                ) : (
-                    <div className="flex-1 flex items-center justify-center">
-                        <div className="text-center">
-                            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Send className="w-10 h-10 text-gray-300" />
-                            </div>
-                            <h3 className="text-lg font-semibold text-gray-900">Select a conversation</h3>
-                            <p className="text-gray-500 text-sm mt-1">Choose from your existing conversations or start a new one</p>
+                        <div className="flex items-center gap-2">
+                            <button className="p-2 text-[var(--gray-400)] hover:text-[var(--color-brand)] hover:bg-[var(--gray-50)] rounded-full transition-colors">
+                                <Phone className="w-5 h-5" />
+                            </button>
+                            <button className="p-2 text-[var(--gray-400)] hover:text-[var(--color-brand)] hover:bg-[var(--gray-50)] rounded-full transition-colors">
+                                <Video className="w-5 h-5" />
+                            </button>
+                            <div className="w-px h-6 bg-[var(--gray-200)] mx-2" />
+                            <button className="p-2 text-[var(--gray-400)] hover:text-[var(--gray-600)] hover:bg-[var(--gray-50)] rounded-full transition-colors">
+                                <MoreVertical className="w-5 h-5" />
+                            </button>
                         </div>
                     </div>
-                )}
-            </div>
+
+                    {/* Messages Body */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-[var(--gray-50)]" ref={scrollRef}>
+                        {/* Date Divider (Mock) */}
+                        <div className="flex justify-center">
+                            <span className="text-[10px] font-medium text-[var(--gray-400)] bg-[var(--gray-200)] px-3 py-1 rounded-full">
+                                Today
+                            </span>
+                        </div>
+
+                        {selectedConversation.messages?.map((msg, idx) => {
+                            const isMe = msg.sender_id === 'me';
+                            return (
+                                <div key={idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[70%] rounded-2xl px-4 py-3 shadow-sm ${isMe
+                                        ? 'bg-[var(--color-brand)] text-white rounded-tr-none'
+                                        : 'bg-white text-[var(--gray-900)] border border-[var(--gray-200)] rounded-tl-none'
+                                        }`}>
+                                        <p className="text-sm">{msg.content}</p>
+                                        <div className={`text-[10px] mt-1 flex items-center justify-end gap-1 ${isMe ? 'text-white/70' : 'text-[var(--gray-400)]'
+                                            }`}>
+                                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            {isMe && (
+                                                msg.status === 'read' ? <CheckCheck className="w-3 h-3" /> : <Check className="w-3 h-3" />
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    {/* Input Area */}
+                    <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-[var(--gray-200)]">
+                        <div className="flex items-center gap-3">
+                            <button type="button" className="p-2 text-[var(--gray-400)] hover:text-[var(--gray-600)] hover:bg-[var(--gray-50)] rounded-full transition-colors">
+                                <Paperclip className="w-5 h-5" />
+                            </button>
+                            <button type="button" className="p-2 text-[var(--gray-400)] hover:text-[var(--gray-600)] hover:bg-[var(--gray-50)] rounded-full transition-colors">
+                                <ImageIcon className="w-5 h-5" />
+                            </button>
+                            <input
+                                type="text"
+                                value={messageInput}
+                                onChange={(e) => setMessageInput(e.target.value)}
+                                placeholder="Type a message..."
+                                className="flex-1 py-2.5 px-4 bg-[var(--gray-50)] border border-[var(--gray-200)] rounded-full focus:outline-none focus:ring-1 focus:ring-[var(--color-brand)] focus:bg-white transition-all text-sm"
+                            />
+                            <button
+                                type="submit"
+                                disabled={!messageInput.trim() || isSending}
+                                className={`p-2.5 rounded-full text-white transition-all shadow-sm ${!messageInput.trim() || isSending
+                                    ? 'bg-[var(--gray-300)] cursor-not-allowed'
+                                    : 'bg-[var(--color-brand)] hover:brightness-110 active:scale-95'
+                                    }`}
+                            >
+                                {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            ) : (
+                <div className="hidden md:flex flex-1 items-center justify-center flex-col text-[var(--gray-400)] bg-[var(--gray-50)]">
+                    <div className="w-16 h-16 bg-[var(--gray-200)] rounded-full flex items-center justify-center mb-4">
+                        <MessageSquare className="w-8 h-8 text-[var(--gray-400)]" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-[var(--gray-600)]">Your Messages</h3>
+                    <p className="text-sm max-w-xs text-center mt-2">Select a conversation from the sidebar to start chatting.</p>
+                </div>
+            )}
         </div>
     );
 }

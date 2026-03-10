@@ -12,7 +12,7 @@ from uuid import UUID
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 
-from ..middleware.auth_middleware import get_current_user, AuthenticatedUser
+from ..middleware.auth_middleware import get_current_user, AuthenticatedUser, require_role
 from ..core.database import get_db_pool
 
 
@@ -110,7 +110,7 @@ def get_activity_icon(activity_type: str) -> str:
 
 @router.get("/dashboard/stats", response_model=PortfolioStats)
 async def get_dashboard_stats(
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(require_role("SELLER")),
     db_pool = Depends(get_db_pool)
 ):
     """
@@ -197,7 +197,7 @@ async def get_dashboard_stats(
 @router.get("/dashboard/activity", response_model=ActivityResponse)
 async def get_dashboard_activity(
     limit: int = 10,
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(require_role("SELLER")),
     db_pool = Depends(get_db_pool)
 ):
     """
@@ -300,7 +300,7 @@ async def get_dashboard_activity(
 @router.get("/analytics", response_model=AnalyticsData)
 async def get_analytics(
     days: int = 30,
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(require_role("SELLER")),
     db_pool = Depends(get_db_pool)
 ):
     """

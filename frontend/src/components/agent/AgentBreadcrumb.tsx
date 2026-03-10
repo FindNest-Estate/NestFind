@@ -22,7 +22,13 @@ export default function AgentBreadcrumb() {
         'calendar': 'Calendar',
         'analytics': 'Analytics',
         'profile': 'Profile',
-        'verification': 'Verification'
+        'verification': 'Verification',
+        'offers': 'Offers',
+        'transactions': 'Deals',
+        'crm': 'CRM Pipeline',
+        'messages': 'Messages',
+        'documents': 'Documents',
+        'marketing': 'Marketing Studio'
     };
 
     const getLabel = (segment: string) => {

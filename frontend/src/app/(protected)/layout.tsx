@@ -11,14 +11,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getCurrentUser } from '@/lib/authApi';
 import NotificationsProvider from '@/components/providers/NotificationsProvider';
-
-interface User {
-    id: string;
-    full_name: string;
-    email: string;
-    role: 'USER' | 'AGENT' | 'ADMIN';
-    status: 'PENDING_VERIFICATION' | 'ACTIVE' | 'IN_REVIEW' | 'DECLINED' | 'SUSPENDED';
-}
+import { AuthUser } from '@/lib/auth/types';
 
 export default function ProtectedLayout({
     children,
@@ -27,7 +20,7 @@ export default function ProtectedLayout({
 }) {
     const router = useRouter();
     const pathname = usePathname();
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<AuthUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {

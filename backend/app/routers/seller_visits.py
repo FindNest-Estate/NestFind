@@ -11,7 +11,7 @@ from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel
 
-from ..middleware.auth_middleware import get_current_user, AuthenticatedUser
+from ..middleware.auth_middleware import get_current_user, AuthenticatedUser, require_role
 from ..core.database import get_db_pool
 
 
@@ -90,7 +90,7 @@ async def get_seller_visits(
     status: Optional[str] = None,
     page: int = 1,
     per_page: int = 20,
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(require_role("SELLER")),
     db_pool = Depends(get_db_pool)
 ):
     """
@@ -210,7 +210,7 @@ async def get_seller_visits(
 @router.get("/visits/{visit_id}", response_model=VisitDetailResponse)
 async def get_visit_detail(
     visit_id: UUID,
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(require_role("SELLER")),
     db_pool = Depends(get_db_pool)
 ):
     """Get detailed information about a specific visit."""

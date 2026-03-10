@@ -1,485 +1,354 @@
-"""
-Dispute Service implementing ADMIN_DISPUTE_RESOLUTION workflow.
-
-State Machine:
-    OPEN → UNDER_REVIEW → RESOLVED → CLOSED
-"""
 from typing import Dict, Any, Optional, List
 from uuid import UUID
-from datetime import datetime, timezone
 import asyncpg
-
-from ..services.notifications_service import NotificationsService
+import json
 
 
 class DisputeService:
-    """
-    Service for managing disputes.
-    
-    Implements user dispute raising and admin resolution workflow.
-    """
-    
-    # Valid state transitions
-    VALID_TRANSITIONS = {
-        'OPEN': ['UNDER_REVIEW', 'CLOSED'],
-        'UNDER_REVIEW': ['RESOLVED', 'CLOSED'],
-        'RESOLVED': ['CLOSED'],
-        'CLOSED': []
-    }
-    
-    # Display status labels
-    DISPLAY_STATUS = {
-        'OPEN': 'Open',
-        'UNDER_REVIEW': 'Under Review',
-        'RESOLVED': 'Resolved',
-        'CLOSED': 'Closed'
-    }
-    
-    # Valid categories
-    VALID_CATEGORIES = [
-        'PROPERTY_MISREPRESENTATION',
-        'PAYMENT_ISSUE',
-        'AGENT_MISCONDUCT',
-        'VISIT_ISSUE',
-        'VERIFICATION_ISSUE',
-        'OTHER'
-    ]
-    
-    def __init__(self, db: asyncpg.Pool):
-        self.db = db
-    
-    def _can_transition(self, current_status: str, new_status: str) -> bool:
-        """Check if state transition is valid."""
-        return new_status in self.VALID_TRANSITIONS.get(current_status, [])
-    
-    def _get_display_status(self, status: str) -> str:
-        """Get human-readable status label."""
-        return self.DISPLAY_STATUS.get(status, status)
-    
-    def _compute_allowed_actions(
-        self, 
-        status: str, 
-        is_raiser: bool = False, 
-        is_admin: bool = False
-    ) -> List[str]:
-        """Compute allowed actions based on status and role."""
-        actions = []
-        
-        if is_admin:
-            if status == 'OPEN':
-                actions.extend(['assign', 'close'])
-            elif status == 'UNDER_REVIEW':
-                actions.extend(['resolve', 'close'])
-            elif status == 'RESOLVED':
-                actions.append('close')
-        
-        if is_raiser and status == 'OPEN':
-            actions.append('close')  # Can withdraw dispute
-        
-        return actions
-    
+    def __init__(self, db_pool: asyncpg.Pool):
+        self.db = db_pool
+
     async def raise_dispute(
         self,
+        deal_id: UUID,
         raised_by_id: UUID,
-        against_id: UUID,
-        category: str,
-        title: str,
+        dispute_type: str,
         description: str,
-        property_id: Optional[UUID] = None,
-        transaction_id: Optional[UUID] = None,
-        visit_id: Optional[UUID] = None,
-        offer_id: Optional[UUID] = None,
         evidence_urls: Optional[List[str]] = None,
-        ip_address: Optional[str] = None
+        conn: Optional[asyncpg.Connection] = None,
     ) -> Dict[str, Any]:
         """
-        User raises a dispute.
-        
-        Requirements:
-        - At least one related entity must be provided
-        - Cannot raise dispute against self
-        - Valid category required
+        Creates a new dispute and AUTOMATICALLY FREEZES the deal.
+        Phase 5A: Also freezes commission if in an active lifecycle state.
         """
-        if raised_by_id == against_id:
-            return {"success": False, "error": "Cannot raise dispute against yourself"}
-        
-        if category not in self.VALID_CATEGORIES:
-            return {"success": False, "error": f"Invalid category. Must be one of: {', '.join(self.VALID_CATEGORIES)}"}
-        
-        if not any([property_id, transaction_id, visit_id, offer_id]):
-            return {
-                "success": False,
-                "error": "At least one related entity (property, transaction, visit, or offer) must be provided"
-            }
-        
-        async with self.db.acquire() as conn:
-            # Verify against_id exists
-            against_user = await conn.fetchrow("""
-                SELECT id, full_name FROM users WHERE id = $1
-            """, against_id)
-            
-            if not against_user:
-                return {"success": False, "error": "The user you're raising dispute against does not exist"}
-            
-            # Create dispute
-            dispute = await conn.fetchrow("""
+        valid_types = [
+            "BOOKING_PROOF_DISPUTED",
+            "AMOUNT_MISMATCH",
+            "COMMISSION_DISPUTE",
+            "DOCUMENT_INCOMPLETE",
+            "OTHER",
+            # Phase 5A additions
+            "AGENT_MISCONDUCT",
+            "PAYMENT_NOT_RECEIVED",
+            "FORFEITURE_DISPUTE",
+        ]
+        if dispute_type not in valid_types:
+            return {"success": False, "error": f"Invalid dispute type. Must be one of {valid_types}"}
+
+        evidence = evidence_urls or []
+
+        async def _execute(connection: asyncpg.Connection) -> Dict[str, Any]:
+            deal = await connection.fetchrow(
+                """
+                SELECT id, buyer_id, seller_id, agent_id
+                FROM deals
+                WHERE id = $1
+                """,
+                deal_id,
+            )
+            if not deal:
+                return {"success": False, "error": "Deal not found"}
+
+            is_participant = raised_by_id in (deal["buyer_id"], deal["seller_id"], deal["agent_id"])
+            if not is_participant:
+                return {"success": False, "error": "Only deal participants can raise disputes"}
+
+            dispute = await connection.fetchrow(
+                """
                 INSERT INTO disputes (
-                    raised_by_id, against_id, category,
-                    title, description,
-                    property_id, transaction_id, visit_id, offer_id,
-                    evidence_urls, status
+                    deal_id, raised_by_id, dispute_type, status,
+                    description, evidence_urls_jsonb
                 )
-                VALUES ($1, $2, $3::dispute_category, $4, $5, $6, $7, $8, $9, $10, 'OPEN')
-                RETURNING id, created_at
-            """, raised_by_id, against_id, category,
-                title, description,
-                property_id, transaction_id, visit_id, offer_id,
-                evidence_urls)
-            
+                VALUES ($1, $2, $3, 'OPEN', $4, $5)
+                RETURNING id
+                """,
+                deal_id,
+                raised_by_id,
+                dispute_type,
+                description,
+                json.dumps(evidence),
+            )
+
+            await connection.execute(
+                """
+                UPDATE deals
+                SET is_frozen = TRUE,
+                    freeze_reason = $2
+                WHERE id = $1
+                """,
+                deal_id,
+                f"Auto-frozen due to Open Dispute ({dispute_type})",
+            )
+
             return {
                 "success": True,
-                "dispute": {
-                    "id": str(dispute['id']),
-                    "raised_by_id": str(raised_by_id),
-                    "against_id": str(against_id),
-                    "against_name": against_user['full_name'],
-                    "category": category,
-                    "title": title,
-                    "status": "OPEN",
-                    "display_status": "Open",
-                    "created_at": dispute['created_at'].isoformat()
-                },
-                "message": "Dispute raised successfully. Our team will review it shortly."
+                "dispute_id": dispute["id"],
+                "message": "Dispute raised and deal frozen.",
             }
-    
-    async def get_disputes(
+
+        if conn:
+            result = await _execute(conn)
+        else:
+            async with self.db.acquire() as acquired_conn:
+                async with acquired_conn.transaction():
+                    result = await _execute(acquired_conn)
+
+        # Phase 5A: Freeze commission if in active lifecycle state
+        if result.get("success"):
+            try:
+                from .commission_service import CommissionService
+
+                commission_svc = CommissionService(self.db)
+                await commission_svc.handle_dispute_raised(deal_id)
+            except Exception:
+                pass  # Non-blocking hook
+
+        return result
+
+    async def resolve_dispute(
         self,
-        user_id: UUID,
-        is_admin: bool = False,
-        status_filter: Optional[str] = None,
-        page: int = 1,
-        per_page: int = 20
+        dispute_id: UUID,
+        resolution_status: str,  # RESOLVED, REJECTED
+        admin_notes: str,
+        resolution_entry_id: Optional[UUID] = None,
     ) -> Dict[str, Any]:
         """
-        Get list of disputes.
-        
-        - Regular users see disputes they raised or are against
-        - Admin sees all disputes
+        Admin resolves a dispute.
+        If ALL disputes for the deal are closed, unfreezes the deal.
+        Phase 5A: Also unfreezes commission and resets cooling-off.
         """
-        offset = (page - 1) * per_page
-        
+        if resolution_status not in ["RESOLVED", "REJECTED"]:
+            return {"success": False, "error": "Invalid resolution status"}
+
         async with self.db.acquire() as conn:
-            if is_admin:
-                base_query = "1=1"
-                params = []
-            else:
-                base_query = "(d.raised_by_id = $1 OR d.against_id = $1)"
-                params = [user_id]
-            
-            if status_filter:
-                base_query += f" AND d.status = ${len(params) + 1}::dispute_status"
-                params.append(status_filter)
-            
-            # Get total count
-            count_row = await conn.fetchrow(f"""
-                SELECT COUNT(*) as total FROM disputes d WHERE {base_query}
-            """, *params)
-            
-            # Get disputes
-            params.extend([per_page, offset])
-            disputes = await conn.fetch(f"""
-                SELECT 
-                    d.*,
-                    raiser.full_name as raiser_name,
-                    against.full_name as against_name,
-                    p.title as property_title
+            async with conn.transaction():
+                dispute = await conn.fetchrow(
+                    """
+                    UPDATE disputes
+                    SET status = $2,
+                        admin_notes = $3,
+                        resolution_entry_id = $4,
+                        resolved_at = NOW(),
+                        updated_at = NOW()
+                    WHERE id = $1
+                    RETURNING deal_id
+                    """,
+                    dispute_id,
+                    resolution_status,
+                    admin_notes,
+                    resolution_entry_id,
+                )
+
+                if not dispute:
+                    return {"success": False, "error": "Dispute not found"}
+
+                deal_id = dispute["deal_id"]
+
+                open_count = await conn.fetchval(
+                    """
+                    SELECT COUNT(*) FROM disputes
+                    WHERE deal_id = $1 AND status IN ('OPEN', 'UNDER_REVIEW')
+                    """,
+                    deal_id,
+                )
+
+                if open_count == 0:
+                    await conn.execute(
+                        """
+                        UPDATE deals
+                        SET is_frozen = FALSE,
+                            freeze_reason = NULL
+                        WHERE id = $1
+                        """,
+                        deal_id,
+                    )
+
+                    try:
+                        from .commission_service import CommissionService
+
+                        commission_svc = CommissionService(self.db)
+                        await commission_svc.handle_dispute_resolved(deal_id)
+                    except Exception:
+                        pass  # Non-blocking hook
+
+                    return {
+                        "success": True,
+                        "status": resolution_status,
+                        "deal_unfrozen": True,
+                    }
+
+                return {
+                    "success": True,
+                    "status": resolution_status,
+                    "deal_unfrozen": False,
+                }
+
+    async def update_status(
+        self,
+        dispute_id: UUID,
+        status: str,
+        admin_notes: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Update dispute status to OPEN/UNDER_REVIEW/RESOLVED/REJECTED."""
+        valid_statuses = ["OPEN", "UNDER_REVIEW", "RESOLVED", "REJECTED"]
+        if status not in valid_statuses:
+            return {"success": False, "error": "Invalid status"}
+
+        async with self.db.acquire() as conn:
+            if admin_notes is None:
+                current_notes = await conn.fetchval(
+                    "SELECT admin_notes FROM disputes WHERE id = $1", dispute_id
+                )
+                if current_notes is None:
+                    exists = await conn.fetchval("SELECT 1 FROM disputes WHERE id = $1", dispute_id)
+                    if not exists:
+                        return {"success": False, "error": "Dispute not found"}
+                admin_notes = current_notes
+
+            row = await conn.fetchrow(
+                """
+                UPDATE disputes
+                SET status = $2,
+                    admin_notes = $3,
+                    updated_at = NOW()
+                WHERE id = $1
+                RETURNING id
+                """,
+                dispute_id,
+                status,
+                admin_notes,
+            )
+
+            if not row:
+                return {"success": False, "error": "Dispute not found"}
+
+            return {"success": True, "status": status}
+
+    async def toggle_freeze(self, deal_id: UUID, freeze: bool, reason: Optional[str] = None) -> Dict[str, Any]:
+        """Manual Admin Override to freeze/unfreeze actions."""
+        async with self.db.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                UPDATE deals
+                SET is_frozen = $2,
+                    freeze_reason = $3
+                WHERE id = $1
+                RETURNING id
+                """,
+                deal_id,
+                freeze,
+                reason if freeze else None,
+            )
+
+            if not row:
+                return {"success": False, "error": "Deal not found"}
+
+            return {"success": True, "is_frozen": freeze}
+
+    async def get_disputes_for_deal(self, deal_id: UUID) -> Dict[str, Any]:
+        async with self.db.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT d.id, d.dispute_type, d.status, d.description,
+                       d.created_at, d.admin_notes, d.evidence_urls_jsonb,
+                       u.full_name as raised_by_name, u.role as raised_by_role
                 FROM disputes d
-                JOIN users raiser ON raiser.id = d.raised_by_id
-                JOIN users against ON against.id = d.against_id
-                LEFT JOIN properties p ON p.id = d.property_id
-                WHERE {base_query}
+                JOIN users u ON u.id = d.raised_by_id
+                WHERE d.deal_id = $1
                 ORDER BY d.created_at DESC
-                LIMIT ${len(params) - 1} OFFSET ${len(params)}
-            """, *params)
-            
+                """,
+                deal_id,
+            )
+
             return {
                 "success": True,
                 "disputes": [
                     {
-                        "id": str(d['id']),
-                        "raised_by": {
-                            "id": str(d['raised_by_id']),
-                            "name": d['raiser_name']
-                        },
-                        "against": {
-                            "id": str(d['against_id']),
-                            "name": d['against_name']
-                        },
-                        "category": d['category'],
-                        "title": d['title'],
-                        "property_title": d['property_title'],
-                        "status": d['status'],
-                        "display_status": self._get_display_status(d['status']),
-                        "created_at": d['created_at'].isoformat(),
-                        "resolved_at": d['resolved_at'].isoformat() if d['resolved_at'] else None,
-                        "allowed_actions": self._compute_allowed_actions(
-                            d['status'], 
-                            is_raiser=(d['raised_by_id'] == user_id),
-                            is_admin=is_admin
-                        )
+                        "id": str(r["id"]),
+                        "type": r["dispute_type"],
+                        "status": r["status"],
+                        "description": r["description"],
+                        "raised_by_name": r["raised_by_name"],
+                        "raised_by_role": r["raised_by_role"],
+                        "created_at": r["created_at"].isoformat(),
+                        "admin_notes": r["admin_notes"],
+                        "evidence_urls": json.loads(r["evidence_urls_jsonb"]) if r["evidence_urls_jsonb"] else [],
                     }
-                    for d in disputes
+                    for r in rows
                 ],
-                "pagination": {
-                    "page": page,
-                    "per_page": per_page,
-                    "total": count_row['total'],
-                    "total_pages": (count_row['total'] + per_page - 1) // per_page
-                }
             }
-    
-    async def get_dispute_by_id(
-        self,
-        dispute_id: UUID,
-        user_id: UUID,
-        is_admin: bool = False
-    ) -> Dict[str, Any]:
-        """Get dispute details."""
+
+    async def get_all_disputes(self) -> Dict[str, Any]:
+        """Admin: Get all disputes across all deals."""
         async with self.db.acquire() as conn:
-            dispute = await conn.fetchrow("""
-                SELECT 
-                    d.*,
-                    raiser.full_name as raiser_name, raiser.email as raiser_email,
-                    against.full_name as against_name, against.email as against_email,
-                    p.title as property_title,
-                    admin.full_name as admin_name
+            rows = await conn.fetch(
+                """
+                SELECT d.id, d.deal_id, d.dispute_type, d.status, d.description,
+                       d.created_at, d.evidence_urls_jsonb,
+                       u.full_name as raised_by_name, u.role as raised_by_role
                 FROM disputes d
-                JOIN users raiser ON raiser.id = d.raised_by_id
-                JOIN users against ON against.id = d.against_id
-                LEFT JOIN properties p ON p.id = d.property_id
-                LEFT JOIN users admin ON admin.id = d.assigned_admin_id
+                JOIN users u ON u.id = d.raised_by_id
+                WHERE d.deal_id IS NOT NULL
+                ORDER BY d.created_at DESC
+                """
+            )
+
+            return {
+                "success": True,
+                "disputes": [
+                    {
+                        "id": str(r["id"]),
+                        "deal_id": str(r["deal_id"]),
+                        "type": r["dispute_type"],
+                        "status": r["status"],
+                        "description": r["description"],
+                        "raised_by_name": r["raised_by_name"],
+                        "raised_by_role": r["raised_by_role"],
+                        "created_at": r["created_at"].isoformat(),
+                        "evidence_urls": json.loads(r["evidence_urls_jsonb"]) if r["evidence_urls_jsonb"] else [],
+                    }
+                    for r in rows
+                ],
+            }
+
+    async def get_dispute_by_id(self, dispute_id: UUID) -> Dict[str, Any]:
+        """Get single dispute details."""
+        async with self.db.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT d.id, d.deal_id, d.dispute_type, d.status, d.description,
+                       d.admin_notes, d.created_at, d.resolved_at, d.evidence_urls_jsonb,
+                       u.full_name as raised_by_name, u.role as raised_by_role,
+                       deal.buyer_id, deal.seller_id, deal.agent_id,
+                       deal.is_frozen, deal.freeze_reason
+                FROM disputes d
+                JOIN users u ON u.id = d.raised_by_id
+                JOIN deals deal ON deal.id = d.deal_id
                 WHERE d.id = $1
-            """, dispute_id)
-            
-            if not dispute:
+                """,
+                dispute_id,
+            )
+
+            if not row:
                 return {"success": False, "error": "Dispute not found"}
-            
-            # Check access
-            is_raiser = dispute['raised_by_id'] == user_id
-            is_against = dispute['against_id'] == user_id
-            
-            if not is_admin and not is_raiser and not is_against:
-                return {"success": False, "error": "Access denied"}
-            
+
             return {
                 "success": True,
                 "dispute": {
-                    "id": str(dispute['id']),
-                    "raised_by": {
-                        "id": str(dispute['raised_by_id']),
-                        "name": dispute['raiser_name'],
-                        "email": dispute['raiser_email'] if is_admin else None
+                    "id": str(row["id"]),
+                    "deal_id": str(row["deal_id"]),
+                    "type": row["dispute_type"],
+                    "status": row["status"],
+                    "description": row["description"],
+                    "admin_notes": row["admin_notes"],
+                    "created_at": row["created_at"].isoformat(),
+                    "resolved_at": row["resolved_at"].isoformat() if row["resolved_at"] else None,
+                    "raised_by_name": row["raised_by_name"],
+                    "raised_by_role": row["raised_by_role"],
+                    "evidence_urls": json.loads(row["evidence_urls_jsonb"]) if row["evidence_urls_jsonb"] else [],
+                    "deal_info": {
+                        "is_frozen": row["is_frozen"],
+                        "freeze_reason": row["freeze_reason"],
                     },
-                    "against": {
-                        "id": str(dispute['against_id']),
-                        "name": dispute['against_name'],
-                        "email": dispute['against_email'] if is_admin else None
-                    },
-                    "category": dispute['category'],
-                    "title": dispute['title'],
-                    "description": dispute['description'],
-                    "evidence_urls": dispute['evidence_urls'],
-                    "property_id": str(dispute['property_id']) if dispute['property_id'] else None,
-                    "property_title": dispute['property_title'],
-                    "transaction_id": str(dispute['transaction_id']) if dispute['transaction_id'] else None,
-                    "visit_id": str(dispute['visit_id']) if dispute['visit_id'] else None,
-                    "offer_id": str(dispute['offer_id']) if dispute['offer_id'] else None,
-                    "status": dispute['status'],
-                    "display_status": self._get_display_status(dispute['status']),
-                    "assigned_admin": {
-                        "id": str(dispute['assigned_admin_id']),
-                        "name": dispute['admin_name']
-                    } if dispute['assigned_admin_id'] else None,
-                    "decision": dispute['decision'],
-                    "resolution_notes": dispute['resolution_notes'],
-                    "created_at": dispute['created_at'].isoformat(),
-                    "resolved_at": dispute['resolved_at'].isoformat() if dispute['resolved_at'] else None,
-                    "allowed_actions": self._compute_allowed_actions(
-                        dispute['status'], 
-                        is_raiser=is_raiser,
-                        is_admin=is_admin
-                    )
-                }
-            }
-    
-    async def assign_dispute(
-        self,
-        dispute_id: UUID,
-        admin_id: UUID,
-        ip_address: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Admin assigns dispute to themselves for review."""
-        async with self.db.acquire() as conn:
-            dispute = await conn.fetchrow("""
-                SELECT * FROM disputes WHERE id = $1
-            """, dispute_id)
-            
-            if not dispute:
-                return {"success": False, "error": "Dispute not found"}
-            
-            if not self._can_transition(dispute['status'], 'UNDER_REVIEW'):
-                return {
-                    "success": False,
-                    "error": f"Cannot assign dispute in {dispute['status']} status"
-                }
-            
-            await conn.execute("""
-                UPDATE disputes 
-                SET status = 'UNDER_REVIEW', 
-                    assigned_admin_id = $2
-                WHERE id = $1
-            """, dispute_id, admin_id)
-            
-            # Notify parties
-            try:
-                notifications_service = NotificationsService(self.db)
-                for user_id in [dispute['raised_by_id'], dispute['against_id']]:
-                    await notifications_service.create_notification(
-                        user_id=user_id,
-                        notification_type='DISPUTE_UNDER_REVIEW',
-                        title='Dispute Under Review',
-                        message='Your dispute is now being reviewed by our team.',
-                        related_entity_type='dispute',
-                        related_entity_id=dispute_id
-                    )
-            except Exception:
-                pass
-            
-            return {
-                "success": True,
-                "message": "Dispute assigned for review",
-                "dispute": {
-                    "id": str(dispute_id),
-                    "status": "UNDER_REVIEW",
-                    "display_status": "Under Review"
-                }
-            }
-    
-    async def resolve_dispute(
-        self,
-        dispute_id: UUID,
-        admin_id: UUID,
-        decision: str,
-        resolution_notes: str,
-        ip_address: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Admin resolves a dispute with a decision."""
-        valid_decisions = ['FAVOR_BUYER', 'FAVOR_SELLER', 'FAVOR_AGENT', 'NO_ACTION', 'PARTIAL_REFUND']
-        
-        if decision not in valid_decisions:
-            return {
-                "success": False,
-                "error": f"Invalid decision. Must be one of: {', '.join(valid_decisions)}"
-            }
-        
-        async with self.db.acquire() as conn:
-            dispute = await conn.fetchrow("""
-                SELECT * FROM disputes WHERE id = $1
-            """, dispute_id)
-            
-            if not dispute:
-                return {"success": False, "error": "Dispute not found"}
-            
-            if not self._can_transition(dispute['status'], 'RESOLVED'):
-                return {
-                    "success": False,
-                    "error": f"Cannot resolve dispute in {dispute['status']} status"
-                }
-            
-            await conn.execute("""
-                UPDATE disputes 
-                SET status = 'RESOLVED',
-                    decision = $2::dispute_decision,
-                    resolution_notes = $3,
-                    resolved_at = NOW(),
-                    assigned_admin_id = COALESCE(assigned_admin_id, $4)
-                WHERE id = $1
-            """, dispute_id, decision, resolution_notes, admin_id)
-            
-            # Log admin action
-            await conn.execute("""
-                INSERT INTO admin_actions (
-                    admin_id, action, target_type, target_id,
-                    reason, previous_state, new_state
-                )
-                VALUES ($1, 'RESOLVE_DISPUTE', 'dispute', $2, $3, $4, 'RESOLVED')
-            """, admin_id, dispute_id, resolution_notes, dispute['status'])
-            
-            # Notify parties
-            try:
-                notifications_service = NotificationsService(self.db)
-                for user_id in [dispute['raised_by_id'], dispute['against_id']]:
-                    await notifications_service.create_notification(
-                        user_id=user_id,
-                        notification_type='DISPUTE_RESOLVED',
-                        title='Dispute Resolved',
-                        message=f'Your dispute has been resolved. Decision: {decision.replace("_", " ").title()}',
-                        related_entity_type='dispute',
-                        related_entity_id=dispute_id
-                    )
-            except Exception:
-                pass
-            
-            return {
-                "success": True,
-                "message": "Dispute resolved successfully",
-                "dispute": {
-                    "id": str(dispute_id),
-                    "status": "RESOLVED",
-                    "display_status": "Resolved",
-                    "decision": decision
-                }
-            }
-    
-    async def close_dispute(
-        self,
-        dispute_id: UUID,
-        user_id: UUID,
-        is_admin: bool = False,
-        ip_address: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Close a dispute (admin or raiser can close)."""
-        async with self.db.acquire() as conn:
-            dispute = await conn.fetchrow("""
-                SELECT * FROM disputes WHERE id = $1
-            """, dispute_id)
-            
-            if not dispute:
-                return {"success": False, "error": "Dispute not found"}
-            
-            # Raiser can only close OPEN disputes
-            if not is_admin and dispute['raised_by_id'] != user_id:
-                return {"success": False, "error": "Access denied"}
-            
-            if not is_admin and dispute['status'] != 'OPEN':
-                return {"success": False, "error": "You can only close open disputes"}
-            
-            if not self._can_transition(dispute['status'], 'CLOSED'):
-                return {
-                    "success": False,
-                    "error": f"Cannot close dispute in {dispute['status']} status"
-                }
-            
-            await conn.execute("""
-                UPDATE disputes SET status = 'CLOSED' WHERE id = $1
-            """, dispute_id)
-            
-            return {
-                "success": True,
-                "message": "Dispute closed",
-                "dispute": {
-                    "id": str(dispute_id),
-                    "status": "CLOSED",
-                    "display_status": "Closed"
-                }
+                },
             }

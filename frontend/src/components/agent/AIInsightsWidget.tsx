@@ -73,38 +73,38 @@ function InsightCard({ insight, onAction }: { insight: AIInsight; onAction?: () 
 
     return (
         <div
-            className={`group p-4 rounded-xl border ${style.bg} ${style.border} transition-all hover:shadow-md hover:scale-[1.01] cursor-pointer`}
+            className={`group p-4 rounded-[var(--card-radius)] border bg-white ${style.border} transition-all hover:shadow-[var(--shadow-sm)] hover:scale-[1.01] cursor-pointer`}
             onClick={onAction}
         >
             <div className="flex items-start gap-3">
-                <div className={`p-2 rounded-lg ${style.iconBg} flex-shrink-0`}>
+                <div className={`p-2 rounded-[var(--radius-sm)] ${style.iconBg} flex-shrink-0`}>
                     <Icon className={`w-5 h-5 ${style.iconColor}`} />
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-semibold text-gray-900 text-sm">{insight.title}</h4>
+                        <h4 className="font-bold text-[var(--gray-900)] text-[13px]">{insight.title}</h4>
                         {insight.priority === 'high' && (
-                            <span className="px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] font-bold rounded">
-                                URGENT
+                            <span className="px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] font-black rounded uppercase">
+                                Urgent
                             </span>
                         )}
                     </div>
-                    <p className="text-xs text-gray-600 mt-1 line-clamp-2">{insight.description}</p>
+                    <p className="text-[11px] text-[var(--gray-600)] mt-1 font-medium leading-relaxed line-clamp-2">{insight.description}</p>
 
                     {insight.metric && (
-                        <div className="mt-2 inline-flex items-center gap-2 bg-white/60 px-2 py-1 rounded-lg">
-                            <span className="text-lg font-bold text-gray-900">{insight.metric.value}</span>
-                            <span className="text-xs text-gray-500">{insight.metric.label}</span>
+                        <div className="mt-2.5 inline-flex items-center gap-2 bg-[var(--gray-50)] px-2.5 py-1 rounded-[var(--radius-sm)] border border-[var(--gray-100)]">
+                            <span className="text-sm font-black text-[var(--gray-900)]">{insight.metric.value}</span>
+                            <span className="text-[10px] font-bold text-[var(--gray-500)] uppercase tracking-tight">{insight.metric.label}</span>
                             {insight.metric.trend && (
-                                <TrendingUp className={`w-3 h-3 ${insight.metric.trend === 'up' ? 'text-emerald-500' :
-                                        insight.metric.trend === 'down' ? 'text-red-500 rotate-180' :
-                                            'text-gray-400'
+                                <TrendingUp className={`w-3 h-3 ${insight.metric.trend === 'up' ? 'text-[var(--color-success)]' :
+                                    insight.metric.trend === 'down' ? 'text-[var(--color-error)] rotate-180' :
+                                        'text-[var(--gray-400)]'
                                     }`} />
                             )}
                         </div>
                     )}
 
-                    <button className="mt-2 text-xs font-semibold flex items-center gap-1 text-gray-700 group-hover:text-rose-600 transition-colors">
+                    <button className="mt-3 text-[11px] font-bold flex items-center gap-1 text-[var(--gray-500)] group-hover:text-[var(--color-brand)] transition-colors uppercase tracking-wider">
                         {insight.action}
                         <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                     </button>
@@ -140,32 +140,31 @@ export default function AIInsightsWidget({ insights, onActionClick, isLoading }:
     return (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             {/* Header */}
-            <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-pink-50">
+            <div className="p-4 border-b border-[var(--gray-200)] bg-[var(--gray-50)]">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg">
+                    <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 bg-[var(--color-brand)] rounded-[var(--radius-sm)]">
                             <Sparkles className="w-4 h-4 text-white" />
                         </div>
                         <div>
-                            <h3 className="font-bold text-gray-900">AI Insights</h3>
-                            <p className="text-xs text-gray-500">Personalized recommendations</p>
+                            <h3 className="font-bold text-[var(--gray-900)] text-sm">AI Insights</h3>
+                            <p className="text-[10px] font-bold text-[var(--gray-400)] uppercase tracking-wider">Smart Recommendations</p>
                         </div>
                     </div>
-                    <span className="text-xs font-medium text-purple-600 bg-purple-100 px-2 py-1 rounded-full">
-                        {insights.length} new
+                    <span className="text-[11px] font-black text-[var(--color-brand)] bg-[var(--color-brand-subtle)] px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                        {insights.length} New
                     </span>
                 </div>
             </div>
 
-            {/* Filter Tabs */}
-            <div className="flex gap-1 p-2 bg-gray-50 border-b border-gray-100">
+            <div className="flex gap-1 p-2 bg-[var(--gray-50)] border-b border-[var(--gray-100)]">
                 {(['all', 'opportunity', 'warning', 'prediction'] as const).map((f) => (
                     <button
                         key={f}
                         onClick={() => setFilter(f)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${filter === f
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
+                        className={`px-3 py-1.5 rounded-[var(--radius-sm)] text-[11px] font-bold uppercase transition-all tracking-tight ${filter === f
+                            ? 'bg-white text-[var(--gray-900)] border border-[var(--gray-200)] shadow-[var(--shadow-xs)]'
+                            : 'text-[var(--gray-400)] hover:text-[var(--gray-600)]'
                             }`}
                     >
                         {f}
@@ -191,8 +190,8 @@ export default function AIInsightsWidget({ insights, onActionClick, isLoading }:
             </div>
 
             {/* Footer */}
-            <div className="p-3 border-t border-gray-100 bg-gray-50">
-                <button className="w-full text-center text-xs font-medium text-gray-500 hover:text-rose-600 transition-colors">
+            <div className="p-3 border-t border-[var(--gray-100)] bg-[var(--gray-50)]">
+                <button className="w-full text-center text-[11px] font-bold text-[var(--gray-500)] hover:text-[var(--color-brand)] transition-colors uppercase tracking-wider">
                     View All Insights →
                 </button>
             </div>

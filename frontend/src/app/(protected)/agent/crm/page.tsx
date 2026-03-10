@@ -3,453 +3,572 @@
 import React, { useState, useEffect } from 'react';
 import {
     Search,
-    Filter,
-    Plus,
-    MoreHorizontal,
-    Phone,
     Mail,
+    Phone,
+    Clock,
     User,
-    LayoutGrid,
-    Columns,
+    AlertCircle,
+    RefreshCw,
     Loader2,
-    X
+    Plus,
+    X,
+    MoreVertical,
+    Edit2,
+    Trash2,
+    GripVertical,
+    DollarSign,
+    Thermometer
 } from 'lucide-react';
-import { getAgentCRMLeads, CRMLead } from '@/lib/api/agent';
-import LeadPipeline, { PipelineLead, LeadStage, LeadScore } from '@/components/agent/LeadPipeline';
-import LeadDetailModal from '@/components/agent/LeadDetailModal';
+import {
+    getAgentCRMLeads,
+    createAgentCRMLead,
+    updateAgentCRMLead,
+    deleteAgentCRMLead,
+    CRMLead
+} from '@/lib/api/agent';
 
-// Transform CRMLead to PipelineLead
-function transformToPipelineLead(lead: CRMLead): PipelineLead {
-    // Map old stage format to new
-    const stageMap: Record<string, LeadStage> = {
-        'New': 'new',
-        'Contacted': 'contacted',
-        'Qualified': 'qualified',
-        'Showing': 'showing',
-        'Negotiating': 'negotiating',
-        'Closed': 'closed'
-    };
+/* ──────────────────────────────────────────────────────── */
+/*  TYPES & CONSTANTS                                       */
+/* ──────────────────────────────────────────────────────── */
 
-    // Calculate score based on activity (simple heuristic)
-    const daysSinceContact = Math.floor(
-        (Date.now() - new Date(lead.last_contact).getTime()) / (1000 * 60 * 60 * 24)
-    );
-    let score: LeadScore = 'cold';
-    if (daysSinceContact <= 2) score = 'hot';
-    else if (daysSinceContact <= 7) score = 'warm';
+const PIPELINE_STAGES = ['NEW', 'CONTACTED', 'SHOWING', 'OFFER', 'CLOSED'] as const;
+type PipelineStage = typeof PIPELINE_STAGES[number];
 
-    return {
-        id: lead.id,
-        name: lead.name,
-        email: lead.email,
-        phone: lead.phone,
-        type: lead.type,
-        stage: stageMap[lead.stage] || 'new',
-        score,
-        interest: lead.interest,
-        last_contact: lead.last_contact,
-        created_at: lead.last_contact, // Using last_contact as proxy
-        activity_count: Math.floor(Math.random() * 10) // Mock for now
-    };
-}
+const STAGE_LABELS: Record<PipelineStage, string> = {
+    NEW: 'New Leads',
+    CONTACTED: 'Contacted',
+    SHOWING: 'Showing / Active',
+    OFFER: 'In Negotiation',
+    CLOSED: 'Closed Won/Lost'
+};
 
-// Simple Card for Grid View
-function LeadCard({ lead, onClick }: { lead: PipelineLead; onClick: () => void }) {
-    return (
-        <div
-            onClick={onClick}
-            className="bg-white/70 backdrop-blur-xl border border-white/20 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all group cursor-pointer hover:border-rose-200"
-        >
-            <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm ${lead.type === 'BUYER' ? 'bg-gradient-to-br from-blue-500 to-indigo-500' : 'bg-gradient-to-br from-rose-500 to-pink-500'
-                        }`}>
-                        {lead.name.charAt(0)}
-                    </div>
-                    <div>
-                        <h3 className="font-semibold text-gray-900 leading-tight">{lead.name}</h3>
-                        <p className="text-xs text-gray-400 mt-0.5 capitalize">{lead.type.toLowerCase()} Lead</p>
-                    </div>
-                </div>
-                <button className="text-gray-400 hover:text-gray-600" onClick={(e) => e.stopPropagation()}>
-                    <MoreHorizontal className="w-5 h-5" />
-                </button>
-            </div>
+const STAGE_COLORS: Record<PipelineStage, string> = {
+    NEW: 'bg-blue-50 text-blue-700 border-blue-200',
+    CONTACTED: 'bg-amber-50 text-amber-700 border-amber-200',
+    SHOWING: 'bg-purple-50 text-purple-700 border-purple-200',
+    OFFER: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    CLOSED: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+};
 
-            <div className="space-y-2 mb-4">
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <Mail className="w-3.5 h-3.5" />
-                    <span className="truncate">{lead.email}</span>
-                </div>
-                {lead.phone && (
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <Phone className="w-3.5 h-3.5" />
-                        <span>{lead.phone}</span>
-                    </div>
-                )}
-            </div>
+const TEMP_COLORS: Record<string, string> = {
+    HOT: 'bg-red-50 text-red-700 border-red-200',
+    WARM: 'bg-orange-50 text-orange-700 border-orange-200',
+    COLD: 'bg-slate-50 text-slate-700 border-slate-200'
+};
 
-            <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-gray-700 mb-1">
-                    <User className="w-3.5 h-3.5 text-gray-400" />
-                    Interest
-                </div>
-                <p className="text-sm text-gray-600 truncate">{lead.interest}</p>
-            </div>
+/* ──────────────────────────────────────────────────────── */
+/*  MODAL COMPONENTS                                        */
+/* ──────────────────────────────────────────────────────── */
 
-            <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-100">
-                <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${lead.stage === 'new' ? 'bg-blue-50 text-blue-600' :
-                            lead.stage === 'contacted' ? 'bg-amber-50 text-amber-600' :
-                                lead.stage === 'closed' ? 'bg-emerald-50 text-emerald-600' :
-                                    'bg-purple-50 text-purple-600'
-                        }`}>
-                        {lead.stage}
-                    </span>
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${lead.score === 'hot' ? 'bg-red-50 text-red-500' :
-                            lead.score === 'warm' ? 'bg-amber-50 text-amber-500' :
-                                'bg-blue-50 text-blue-400'
-                        }`}>
-                        {lead.score === 'hot' ? '🔥' : lead.score === 'warm' ? '📈' : '❄️'}
-                    </span>
-                </div>
-                <span className="text-xs text-gray-400">
-                    {lead.last_contact}
-                </span>
-            </div>
-        </div>
-    );
-}
-
-// Add Lead Modal
-function AddLeadModal({ isOpen, onClose, onAdd }: {
+interface LeadModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onAdd: (lead: Partial<PipelineLead>) => void;
-}) {
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [phone, setPhone] = useState('');
-    const [type, setType] = useState<'BUYER' | 'SELLER'>('BUYER');
-    const [interest, setInterest] = useState('');
+    onSave: (lead: Partial<CRMLead>) => Promise<void>;
+    initialData?: CRMLead | null;
+}
 
-    const handleSubmit = () => {
-        if (!name || !email) return;
-        onAdd({
-            name,
-            email,
-            phone: phone || null,
-            type,
-            interest: interest || 'General inquiry',
-            stage: 'new',
-            score: 'warm'
-        });
-        setName('');
-        setEmail('');
-        setPhone('');
-        setInterest('');
-        onClose();
-    };
+function LeadModal({ isOpen, onClose, onSave, initialData }: LeadModalProps) {
+    const [formData, setFormData] = useState<Partial<CRMLead>>({
+        name: '',
+        email: '',
+        phone: '',
+        type: 'BUYER',
+        stage: 'NEW',
+        temperature: 'WARM',
+        notes: '',
+        expected_value: undefined
+    });
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            if (initialData) {
+                setFormData(initialData);
+            } else {
+                setFormData({
+                    name: '',
+                    email: '',
+                    phone: '',
+                    type: 'BUYER',
+                    stage: 'NEW',
+                    temperature: 'WARM',
+                    notes: '',
+                    expected_value: undefined
+                });
+            }
+        }
+    }, [isOpen, initialData]);
 
     if (!isOpen) return null;
 
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+            await onSave(formData);
+            onClose();
+        } catch (err) {
+            console.error("Failed to save", err);
+            alert("Failed to save lead. Please try again.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in">
-                <div className="flex items-center justify-between p-6 border-b border-gray-100">
-                    <h3 className="text-xl font-bold text-gray-900">Add New Lead</h3>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-                        <X className="w-5 h-5 text-gray-500" />
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden border border-[var(--gray-200)] flex flex-col max-h-[90vh]">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--gray-200)] bg-[var(--gray-50)]">
+                    <h2 className="text-lg font-bold text-[var(--gray-900)]">
+                        {initialData ? 'Edit Lead' : 'Add New Lead'}
+                    </h2>
+                    <button onClick={onClose} className="p-1 text-[var(--gray-400)] hover:text-[var(--gray-700)] rounded-md hover:bg-[var(--gray-200)] transition-colors">
+                        <X className="w-5 h-5" />
                     </button>
                 </div>
-                <div className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none"
-                            placeholder="John Doe"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none"
-                            placeholder="john@example.com"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                        <input
-                            type="tel"
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none"
-                            placeholder="+91 98765 43210"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Lead Type</label>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => setType('BUYER')}
-                                className={`flex-1 py-2 rounded-xl font-medium transition-all ${type === 'BUYER'
-                                        ? 'bg-blue-50 text-blue-600 ring-2 ring-blue-500'
-                                        : 'bg-gray-100 text-gray-600'
-                                    }`}
-                            >
-                                Buyer
-                            </button>
-                            <button
-                                onClick={() => setType('SELLER')}
-                                className={`flex-1 py-2 rounded-xl font-medium transition-all ${type === 'SELLER'
-                                        ? 'bg-rose-50 text-rose-600 ring-2 ring-rose-500'
-                                        : 'bg-gray-100 text-gray-600'
-                                    }`}
-                            >
-                                Seller
-                            </button>
+
+                <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex flex-col gap-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="col-span-2">
+                            <label className="block text-[11px] font-bold text-[var(--gray-500)] uppercase tracking-wider mb-1.5">Full Name *</label>
+                            <input
+                                required
+                                type="text"
+                                value={formData.name || ''}
+                                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                disabled={!!(initialData && !initialData.is_explicit)}
+                                className="w-full px-3 py-2 text-[13px] border border-[var(--gray-200)] rounded-lg focus:ring-1 focus:ring-[var(--gray-900)] focus:border-[var(--gray-900)] outline-none disabled:bg-[var(--gray-50)] disabled:text-[var(--gray-500)]"
+                                placeholder="e.g. John Doe"
+                            />
                         </div>
+
+                        <div className="col-span-2 sm:col-span-1">
+                            <label className="block text-[11px] font-bold text-[var(--gray-500)] uppercase tracking-wider mb-1.5">Email Address *</label>
+                            <input
+                                required
+                                type="email"
+                                value={formData.email || ''}
+                                onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                disabled={!!(initialData && !initialData.is_explicit)}
+                                className="w-full px-3 py-2 text-[13px] border border-[var(--gray-200)] rounded-lg focus:ring-1 focus:ring-[var(--gray-900)] focus:border-[var(--gray-900)] outline-none disabled:bg-[var(--gray-50)] disabled:text-[var(--gray-500)]"
+                                placeholder="john@example.com"
+                            />
+                        </div>
+
+                        <div className="col-span-2 sm:col-span-1">
+                            <label className="block text-[11px] font-bold text-[var(--gray-500)] uppercase tracking-wider mb-1.5">Phone Number</label>
+                            <input
+                                type="tel"
+                                value={formData.phone || ''}
+                                onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                                disabled={!!(initialData && !initialData.is_explicit)}
+                                className="w-full px-3 py-2 text-[13px] border border-[var(--gray-200)] rounded-lg focus:ring-1 focus:ring-[var(--gray-900)] focus:border-[var(--gray-900)] outline-none disabled:bg-[var(--gray-50)] disabled:text-[var(--gray-500)]"
+                                placeholder="+1 (555) 000-0000"
+                            />
+                        </div>
+
+                        <div className="col-span-2 sm:col-span-1">
+                            <label className="block text-[11px] font-bold text-[var(--gray-500)] uppercase tracking-wider mb-1.5">Type</label>
+                            <select
+                                value={formData.type || 'BUYER'}
+                                onChange={e => setFormData({ ...formData, type: e.target.value as 'BUYER' | 'SELLER' })}
+                                disabled={!!(initialData && !initialData.is_explicit)}
+                                className="w-full px-3 py-2 text-[13px] border border-[var(--gray-200)] rounded-lg focus:ring-1 focus:ring-[var(--gray-900)] focus:border-[var(--gray-900)] outline-none disabled:bg-[var(--gray-50)] disabled:text-[var(--gray-500)]"
+                            >
+                                <option value="BUYER">Buyer</option>
+                                <option value="SELLER">Seller</option>
+                            </select>
+                        </div>
+
+                        <div className="col-span-2 sm:col-span-1">
+                            <label className="block text-[11px] font-bold text-[var(--gray-500)] uppercase tracking-wider mb-1.5">Temperature</label>
+                            <select
+                                value={formData.temperature || 'WARM'}
+                                onChange={e => setFormData({ ...formData, temperature: e.target.value })}
+                                className="w-full px-3 py-2 text-[13px] border border-[var(--gray-200)] rounded-lg focus:ring-1 focus:ring-[var(--gray-900)] focus:border-[var(--gray-900)] outline-none"
+                            >
+                                <option value="HOT">Hot (Ready to act)</option>
+                                <option value="WARM">Warm (Browsing)</option>
+                                <option value="COLD">Cold (Future prospect)</option>
+                            </select>
+                        </div>
+
+                        <div className="col-span-2 sm:col-span-1">
+                            <label className="block text-[11px] font-bold text-[var(--gray-500)] uppercase tracking-wider mb-1.5">Pipeline Stage</label>
+                            <select
+                                value={formData.stage || 'NEW'}
+                                onChange={e => setFormData({ ...formData, stage: e.target.value })}
+                                className="w-full px-3 py-2 text-[13px] border border-[var(--gray-200)] rounded-lg focus:ring-1 focus:ring-[var(--gray-900)] focus:border-[var(--gray-900)] outline-none"
+                            >
+                                {PIPELINE_STAGES.map(s => (
+                                    <option key={s} value={s}>{STAGE_LABELS[s]}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="col-span-2 sm:col-span-1">
+                            <label className="block text-[11px] font-bold text-[var(--gray-500)] uppercase tracking-wider mb-1.5">Expected Value ($)</label>
+                            <input
+                                type="number"
+                                value={formData.expected_value || ''}
+                                onChange={e => setFormData({ ...formData, expected_value: e.target.value ? parseFloat(e.target.value) : undefined })}
+                                className="w-full px-3 py-2 text-[13px] border border-[var(--gray-200)] rounded-lg focus:ring-1 focus:ring-[var(--gray-900)] focus:border-[var(--gray-900)] outline-none"
+                                placeholder="e.g. 500000"
+                            />
+                        </div>
+
+                        <div className="col-span-2">
+                            <label className="block text-[11px] font-bold text-[var(--gray-500)] uppercase tracking-wider mb-1.5">Notes</label>
+                            <textarea
+                                value={formData.notes || ''}
+                                onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                                rows={3}
+                                className="w-full px-3 py-2 text-[13px] border border-[var(--gray-200)] rounded-lg focus:ring-1 focus:ring-[var(--gray-900)] focus:border-[var(--gray-900)] outline-none resize-none"
+                                placeholder="Add any relevant notes about this lead..."
+                            />
+                        </div>
+
+                        {initialData && !initialData.is_explicit && (
+                            <div className="col-span-2 p-3 bg-blue-50 border border-blue-100 rounded-lg flex gap-2 text-[12px] text-blue-800">
+                                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                <p>Some fields cannot be edited because this lead is automatically synced from an active assignment or visit request.</p>
+                            </div>
+                        )}
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Interest</label>
-                        <textarea
-                            value={interest}
-                            onChange={(e) => setInterest(e.target.value)}
-                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none resize-none"
-                            rows={2}
-                            placeholder="Looking for 3BHK in Bangalore..."
-                        />
+
+                    <div className="mt-4 flex items-center justify-end gap-3 pt-4 border-t border-[var(--gray-200)]">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={saving}
+                            className="px-4 py-2 text-[13px] font-semibold text-[var(--gray-600)] bg-white border border-[var(--gray-200)] rounded-lg hover:bg-[var(--gray-50)] transition-colors disabled:opacity-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={saving}
+                            className="px-4 py-2 text-[13px] font-semibold text-white bg-[var(--gray-900)] rounded-lg hover:bg-black transition-colors disabled:opacity-50 flex items-center gap-2"
+                        >
+                            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                            {initialData ? 'Save Changes' : 'Create Lead'}
+                        </button>
                     </div>
-                </div>
-                <div className="p-6 bg-gray-50 flex justify-end gap-3">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl font-medium"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={!name || !email}
-                        className="px-6 py-2 bg-rose-500 text-white rounded-xl font-medium hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-rose-200"
-                    >
-                        Add Lead
-                    </button>
-                </div>
+                </form>
             </div>
         </div>
     );
 }
 
-export default function CRMPage() {
-    const [leads, setLeads] = useState<PipelineLead[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<'pipeline' | 'grid'>('pipeline');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedLead, setSelectedLead] = useState<PipelineLead | null>(null);
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [filterType, setFilterType] = useState<'all' | 'BUYER' | 'SELLER'>('all');
+/* ──────────────────────────────────────────────────────── */
+/*  PAGE COMPONENT                                          */
+/* ──────────────────────────────────────────────────────── */
 
-    useEffect(() => {
-        async function fetchLeads() {
-            try {
-                const response = await getAgentCRMLeads();
-                if (response.success) {
-                    setLeads(response.leads.map(transformToPipelineLead));
-                }
-            } catch (error) {
-                console.error("Failed to fetch leads", error);
-            } finally {
-                setIsLoading(false);
+export default function CRMPage() {
+    const [leads, setLeads] = useState<CRMLead[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Modal state
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingLead, setEditingLead] = useState<CRMLead | null>(null);
+
+    const loadLeads = async () => {
+        setLoading(true);
+        try {
+            const res = await getAgentCRMLeads();
+            if (res.success) {
+                setLeads(res.leads);
+                setError(null);
+            } else {
+                setError("Failed to load CRM data.");
+            }
+        } catch (err: any) {
+            console.error(err);
+            setError("An unexpected error occurred.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { loadLeads(); }, []);
+
+    // Drag and Drop Handlers
+    const handleDragStart = (e: React.DragEvent, leadId: string) => {
+        e.dataTransfer.setData('leadId', leadId);
+        // Add styling for dragged item
+        const el = e.currentTarget as HTMLElement;
+        el.style.opacity = '0.5';
+    };
+
+    const handleDragEnd = (e: React.DragEvent) => {
+        const el = e.currentTarget as HTMLElement;
+        el.style.opacity = '1';
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault(); // Necessary to allow dropping
+    };
+
+    const handleDrop = async (e: React.DragEvent, targetStage: PipelineStage) => {
+        e.preventDefault();
+        const leadId = e.dataTransfer.getData('leadId');
+        if (!leadId) return;
+
+        const lead = leads.find(l => l.id === leadId);
+        if (!lead || lead.stage === targetStage) return;
+
+        // Optimistic UI update
+        const previousLeads = [...leads];
+        setLeads(leads.map(l => l.id === leadId ? { ...l, stage: targetStage } : l));
+
+        try {
+            const res = await updateAgentCRMLead(leadId, { stage: targetStage });
+            if (!res.success) throw new Error("Failed to update");
+            await loadLeads(); // Optional refresh
+        } catch (err) {
+            console.error(err);
+            setLeads(previousLeads);
+            alert("Could not update lead stage.");
+        }
+    };
+
+    // CRUD Handlers
+    const handleSaveLead = async (data: Partial<CRMLead>) => {
+        if (editingLead) {
+            const res = await updateAgentCRMLead(editingLead.id, data);
+            if (res.success) {
+                await loadLeads();
+            } else {
+                throw new Error("Update failed");
+            }
+        } else {
+            const res = await createAgentCRMLead(data);
+            if (res.success) {
+                await loadLeads();
+            } else {
+                throw new Error("Creation failed");
             }
         }
-        fetchLeads();
-    }, []);
-
-    const handleStageChange = (leadId: string, newStage: LeadStage) => {
-        setLeads(leads.map(l =>
-            l.id === leadId ? { ...l, stage: newStage } : l
-        ));
-        // TODO: API call to persist stage change
     };
 
-    const handleLeadSave = (updatedLead: PipelineLead) => {
-        setLeads(leads.map(l =>
-            l.id === updatedLead.id ? updatedLead : l
-        ));
-        // TODO: API call to persist changes
+    const handleDelete = async (leadId: string) => {
+        if (!confirm("Are you sure you want to delete this lead?")) return;
+        try {
+            const res = await deleteAgentCRMLead(leadId);
+            if (res.success) {
+                setLeads(leads.filter(l => l.id !== leadId));
+            } else {
+                alert("Cannot delete this lead (might not be an explicit lead).");
+            }
+        } catch (err) {
+            alert("Failed to delete lead.");
+        }
     };
 
-    const handleAddLead = (newLead: Partial<PipelineLead>) => {
-        const lead: PipelineLead = {
-            id: `temp-${Date.now()}`,
-            name: newLead.name || '',
-            email: newLead.email || '',
-            phone: newLead.phone || null,
-            type: newLead.type || 'BUYER',
-            stage: 'new',
-            score: 'warm',
-            interest: newLead.interest || '',
-            last_contact: new Date().toISOString(),
-            created_at: new Date().toISOString(),
-            activity_count: 0
-        };
-        setLeads([lead, ...leads]);
-        // TODO: API call to create lead
+    const handleEditClick = (lead: CRMLead) => {
+        setEditingLead(lead);
+        setIsModalOpen(true);
     };
 
-    // Filter leads
-    const filteredLeads = leads.filter(lead => {
-        const matchesSearch = lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            lead.email.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesType = filterType === 'all' || lead.type === filterType;
-        return matchesSearch && matchesType;
+    // Filtering
+    const filteredLeads = leads.filter(l => {
+        const matchesSearch =
+            l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            l.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (l.phone && l.phone.includes(searchQuery));
+        return matchesSearch;
     });
 
-    // Stats
-    const stats = {
-        total: leads.length,
-        hot: leads.filter(l => l.score === 'hot').length,
-        new: leads.filter(l => l.stage === 'new').length,
-        closed: leads.filter(l => l.stage === 'closed').length
-    };
-
     return (
-        <div className="min-h-screen pb-20 space-y-6 animate-fade-in">
-            {/* Header */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="max-w-[1600px] mx-auto pb-10 flex flex-col h-[calc(100vh-80px)]">
+            {/* ── Header ── */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 shrink-0">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Lead Pipeline</h1>
-                    <p className="text-gray-500 mt-1">Track and manage your potential clients with AI-powered insights.</p>
+                    <h1 className="text-xl font-bold text-[var(--gray-900)] flex items-center gap-2">
+                        <UsersIcon className="w-5 h-5 text-[var(--gray-400)]" />
+                        CRM Pipeline
+                    </h1>
+                    <p className="text-[13px] text-[var(--gray-500)] mt-0.5">
+                        Manage your leads and track them through the negotiation funnel
+                    </p>
                 </div>
+
                 <div className="flex items-center gap-3">
-                    {/* View Toggle */}
-                    <div className="bg-gray-100 p-1 rounded-lg flex">
-                        <button
-                            onClick={() => setViewMode('pipeline')}
-                            className={`p-2 rounded-md transition-all ${viewMode === 'pipeline' ? 'bg-white shadow-sm text-rose-600' : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                            title="Pipeline View"
-                        >
-                            <Columns className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => setViewMode('grid')}
-                            className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-rose-600' : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                            title="Grid View"
-                        >
-                            <LayoutGrid className="w-4 h-4" />
-                        </button>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--gray-400)]" />
+                        <input
+                            type="text"
+                            placeholder="Search leads..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full sm:w-[240px] pl-9 pr-4 py-2 text-[13px] bg-white border border-[var(--gray-200)] rounded-lg focus:ring-1 focus:ring-[var(--gray-900)] focus:border-[var(--gray-900)] outline-none shadow-sm transition-all placeholder:text-[var(--gray-400)]"
+                        />
                     </div>
                     <button
-                        onClick={() => setIsAddModalOpen(true)}
-                        className="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white px-5 py-2.5 rounded-xl font-medium shadow-lg shadow-rose-200 transition-all active:scale-95"
+                        onClick={loadLeads}
+                        disabled={loading}
+                        className="flex items-center justify-center w-9 h-9 bg-white border border-[var(--gray-200)] rounded-lg text-[var(--gray-500)] hover:bg-[var(--gray-50)] hover:text-[var(--gray-900)] transition-colors disabled:opacity-50 shadow-sm"
+                        title="Refresh"
                     >
-                        <Plus className="w-5 h-5" />
+                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
+                        onClick={() => { setEditingLead(null); setIsModalOpen(true); }}
+                        className="flex items-center gap-2 px-4 py-2 bg-[var(--gray-900)] text-white text-[13px] font-semibold rounded-lg hover:bg-black transition-colors shadow-sm"
+                    >
+                        <Plus className="w-4 h-4" />
                         Add Lead
                     </button>
                 </div>
             </div>
 
-            {/* Stats Bar */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-                    <p className="text-sm text-gray-500">Total Leads</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-                </div>
-                <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-                    <p className="text-sm text-gray-500">🔥 Hot Leads</p>
-                    <p className="text-2xl font-bold text-red-500">{stats.hot}</p>
-                </div>
-                <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-                    <p className="text-sm text-gray-500">New This Week</p>
-                    <p className="text-2xl font-bold text-blue-500">{stats.new}</p>
-                </div>
-                <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-                    <p className="text-sm text-gray-500">Closed Won</p>
-                    <p className="text-2xl font-bold text-emerald-500">{stats.closed}</p>
-                </div>
-            </div>
-
-            {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search leads by name or email..."
-                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 shadow-sm"
-                    />
-                </div>
-                <div className="flex gap-2">
-                    {(['all', 'BUYER', 'SELLER'] as const).map((type) => (
-                        <button
-                            key={type}
-                            onClick={() => setFilterType(type)}
-                            className={`px-4 py-2.5 rounded-xl font-medium transition-colors ${filterType === type
-                                    ? 'bg-rose-50 text-rose-600 ring-1 ring-rose-200'
-                                    : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-                                }`}
-                        >
-                            {type === 'all' ? 'All' : type === 'BUYER' ? 'Buyers' : 'Sellers'}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* Content */}
-            {isLoading ? (
-                <div className="flex items-center justify-center py-20">
-                    <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
-                </div>
-            ) : viewMode === 'pipeline' ? (
-                <LeadPipeline
-                    leads={filteredLeads}
-                    onLeadClick={setSelectedLead}
-                    onStageChange={handleStageChange}
-                    onAddLead={() => setIsAddModalOpen(true)}
-                />
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {filteredLeads.map(lead => (
-                        <LeadCard
-                            key={lead.id}
-                            lead={lead}
-                            onClick={() => setSelectedLead(lead)}
-                        />
-                    ))}
-                    {filteredLeads.length === 0 && (
-                        <div className="col-span-full text-center py-20 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                            <p className="text-gray-400">No leads found matching your criteria.</p>
+            {/* ── Main Kanban Board ── */}
+            <div className="flex-1 flex overflow-x-auto gap-4 pb-4 snap-x relative">
+                {loading && leads.length === 0 ? (
+                    <div className="w-full h-full flex items-center justify-center">
+                        <Loader2 className="w-8 h-8 animate-spin text-[var(--gray-300)]" />
+                    </div>
+                ) : error ? (
+                    <div className="w-full flex items-center justify-center">
+                        <div className="text-center">
+                            <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+                            <p className="text-sm font-medium text-red-600">{error}</p>
                         </div>
-                    )}
-                </div>
-            )}
+                    </div>
+                ) : (
+                    PIPELINE_STAGES.map(stage => {
+                        const stageLeads = filteredLeads.filter(l => l.stage === stage || (stage === 'NEW' && !PIPELINE_STAGES.includes(l.stage as any)));
 
-            {/* Lead Detail Modal */}
-            <LeadDetailModal
-                lead={selectedLead}
-                isOpen={!!selectedLead}
-                onClose={() => setSelectedLead(null)}
-                onSave={handleLeadSave}
-                onAddNote={(leadId, note) => console.log('Add note:', leadId, note)}
-            />
+                        return (
+                            <div
+                                key={stage}
+                                className="flex flex-col min-w-[320px] w-[320px] bg-[var(--gray-50)] border border-[var(--gray-200)] rounded-xl shrink-0 snap-start h-full"
+                                onDragOver={handleDragOver}
+                                onDrop={(e) => handleDrop(e, stage)}
+                            >
+                                {/* Column Header */}
+                                <div className="p-3 border-b border-[var(--gray-200)] flex items-center justify-between rounded-t-xl bg-[var(--gray-100)]">
+                                    <div className="flex items-center gap-2">
+                                        {/* Color Indicator */}
+                                        <div className={`w-2 h-2 rounded-full ${STAGE_COLORS[stage].split(' ')[0]}`} />
+                                        <h3 className="font-bold text-[12px] text-[var(--gray-900)] uppercase tracking-wider">{STAGE_LABELS[stage]}</h3>
+                                        <span className="flex items-center justify-center px-1.5 py-0.5 rounded-full bg-white border border-[var(--gray-200)] text-[var(--gray-600)] text-[10px] font-bold shadow-sm">
+                                            {stageLeads.length}
+                                        </span>
+                                    </div>
+                                </div>
 
-            {/* Add Lead Modal */}
-            <AddLeadModal
-                isOpen={isAddModalOpen}
-                onClose={() => setIsAddModalOpen(false)}
-                onAdd={handleAddLead}
+                                {/* Column Body */}
+                                <div className="flex-1 p-3 overflow-y-auto flex flex-col gap-3 min-h-[150px]">
+                                    {stageLeads.length === 0 ? (
+                                        <div className="h-20 flex items-center justify-center border-2 border-dashed border-[var(--gray-200)] rounded-lg">
+                                            <span className="text-[12px] text-[var(--gray-400)] font-medium">Drop leads here</span>
+                                        </div>
+                                    ) : (
+                                        stageLeads.map(lead => (
+                                            <div
+                                                key={lead.id}
+                                                id={`lead-${lead.id}`}
+                                                draggable
+                                                onDragStart={(e) => handleDragStart(e, lead.id)}
+                                                onDragEnd={handleDragEnd}
+                                                className="group bg-white border border-[var(--gray-200)] rounded-lg p-3 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing relative"
+                                            >
+                                                {/* Drag Handle & Type */}
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <GripVertical className="w-3.5 h-3.5 text-[var(--gray-300)] group-hover:text-[var(--gray-500)] transition-colors cursor-grab" />
+                                                        <span className={`px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold uppercase tracking-wider border ${lead.type === 'BUYER' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-violet-50 text-violet-700 border-violet-200'}`}>
+                                                            {lead.type}
+                                                        </span>
+                                                        {lead.temperature && (
+                                                            <span className={`px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold uppercase tracking-wider border ${TEMP_COLORS[lead.temperature] || TEMP_COLORS['WARM']}`}>
+                                                                {lead.temperature}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Actions */}
+                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => handleEditClick(lead)} className="p-1 text-[var(--gray-400)] hover:text-blue-600 rounded bg-[var(--gray-50)] hover:bg-blue-50 transition-colors" title="Edit">
+                                                            <Edit2 className="w-3 h-3" />
+                                                        </button>
+                                                        {lead.is_explicit && (
+                                                            <button onClick={() => handleDelete(lead.id)} className="p-1 text-[var(--gray-400)] hover:text-red-600 rounded bg-[var(--gray-50)] hover:bg-red-50 transition-colors" title="Delete">
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Info */}
+                                                <h4 className="text-[13px] font-bold text-[var(--gray-900)] leading-tight mb-1 truncate" title={lead.name}>
+                                                    {lead.name}
+                                                </h4>
+
+                                                <div className="flex flex-col gap-1.5 mt-2">
+                                                    <div className="flex items-center gap-2 text-[11px] text-[var(--gray-600)]" title={lead.interest}>
+                                                        <Search className="w-3 h-3 text-[var(--gray-400)] shrink-0" />
+                                                        <span className="truncate">{lead.interest || 'General Inquiry'}</span>
+                                                    </div>
+                                                    {lead.expected_value ? (
+                                                        <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-700">
+                                                            <DollarSign className="w-3 h-3 text-emerald-500 shrink-0" />
+                                                            <span>{lead.expected_value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+
+                                                <div className="mt-3 pt-3 border-t border-[var(--gray-100)] flex items-center justify-between text-[10px] text-[var(--gray-500)]">
+                                                    <div className="flex items-center gap-1 font-medium">
+                                                        <Clock className="w-3 h-3" />
+                                                        <span>{lead.last_contact === 'N/A' ? 'Never' : new Date(lead.last_contact).toLocaleDateString()}</span>
+                                                    </div>
+                                                    {!lead.is_explicit && (
+                                                        <span className="font-bold uppercase tracking-wider text-[var(--gray-400)] bg-[var(--gray-100)] px-1 rounded-sm" title="Auto-imported from properties/visits">Auto</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })
+                )}
+            </div>
+
+            {/* Modal */}
+            <LeadModal
+                isOpen={isModalOpen}
+                onClose={() => { setIsModalOpen(false); setEditingLead(null); }}
+                onSave={handleSaveLead}
+                initialData={editingLead}
             />
         </div>
     );
+}
+
+function UsersIcon(props: React.SVGProps<SVGSVGElement>) {
+    return (
+        <svg
+            {...props}
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+    )
 }

@@ -18,8 +18,16 @@ export interface Offer {
     buyer_message?: string;
     seller_response?: string;
     counter_to_offer_id?: string;
+    counter_price?: number;
     created_at: string;
     updated_at: string;
+
+    // Phase 1: Buyer commitment details
+    earnest_amount?: number;
+    possession_date?: string;
+    loan_required?: boolean;
+    inspection_required?: boolean;
+    conditions_notes?: string;
 
     // Joined data
     property?: {
@@ -42,6 +50,12 @@ export interface CreateOfferRequest {
     property_id: string;
     amount: number;
     buyer_message?: string;
+    // Phase 1 additions
+    earnest_amount?: number;
+    possession_date?: string;
+    loan_required?: boolean;
+    inspection_required?: boolean;
+    conditions_notes?: string;
 }
 
 export interface OfferListResponse {

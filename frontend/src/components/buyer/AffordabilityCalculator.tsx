@@ -33,7 +33,7 @@ export default function AffordabilityCalculator() {
         >
             {/* Header */}
             <div
-                className="p-6 cursor-pointer hover:bg-gray-50/50 transition-colors"
+                className="p-6 cursor-pointer hover:bg-gray-50 transition-colors"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
                 <div className="flex items-center justify-between">

@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import Optional
 from uuid import UUID
 
-from ..middleware.auth_middleware import get_current_user, AuthenticatedUser
+from ..middleware.auth_middleware import get_current_user, AuthenticatedUser, require_role
 from ..core.database import get_db_pool
 from ..services.property_service import PropertyService
 from ..schemas.property_schemas import (
@@ -37,7 +37,7 @@ router = APIRouter(tags=["Seller Properties"])
 async def get_seller_properties(
     page: int = 1,
     per_page: int = 20,
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(require_role("SELLER")),
     db_pool = Depends(get_db_pool)
 ):
     """
@@ -75,7 +75,7 @@ async def get_seller_properties(
 async def create_property(
     request_body: CreatePropertyRequest,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(require_role("SELLER")),
     db_pool = Depends(get_db_pool)
 ):
     """
@@ -119,7 +119,7 @@ async def create_property(
 @router.get("/properties/{property_id}", response_model=PropertyResponse)
 async def get_property(
     property_id: UUID,
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(require_role("SELLER")),
     db_pool = Depends(get_db_pool)
 ):
     """
@@ -158,7 +158,7 @@ async def update_property(
     property_id: UUID,
     request_body: UpdatePropertyRequest,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(require_role("SELLER")),
     db_pool = Depends(get_db_pool)
 ):
     """
@@ -199,6 +199,10 @@ async def update_property(
         else:
             raise HTTPException(status_code=code, detail=error)
     
+    # No-op case: success but no fields were updated (e.g. all values were null)
+    if "property" not in result:
+        return {"id": str(property_id), "status": "unchanged"}
+    
     return result["property"]
 
 
@@ -210,7 +214,7 @@ async def update_property(
 async def delete_property(
     property_id: UUID,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(require_role("SELLER")),
     db_pool = Depends(get_db_pool)
 ):
     """

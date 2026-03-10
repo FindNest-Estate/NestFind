@@ -2,242 +2,207 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { getCurrentUser, logout } from '@/lib/authApi';
+import { useAuth } from '@/lib/auth';
 import NotificationBell from './NotificationBell';
-import ThemeToggle from './ThemeToggle';
-
-interface User {
-    id: string;
-    full_name: string;
-    email: string;
-    role: string;
-    status: string;
-}
+import ContextSwitcher from './ContextSwitcher';
+import BecomeSellerButton from './BecomeSellerButton';
+import { UserRole } from '@/lib/auth/types';
+import {
+    Menu,
+    User,
+    Settings,
+    LogOut,
+    LayoutDashboard,
+    Search,
+    Home as HomeIcon,
+    Handshake,
+    Building2,
+    Users,
+    ClipboardList,
+    Shield,
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function Navbar() {
-    const router = useRouter();
-    const [user, setUser] = useState<User | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const { user, isLoading, logout, activeContext, switchContext } = useAuth();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const router = useRouter();
 
-    useEffect(() => {
-        // Check if user is logged in
-        const checkAuth = async () => {
-            try {
-                const userData = await getCurrentUser();
-                setUser(userData);
-            } catch {
-                // Not logged in
-                setUser(null);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        checkAuth();
-    }, []);
-
-    // Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsDropdownOpen(false);
             }
         };
-
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const handleLogout = async () => {
+    const handleLogout = () => {
         setIsLoggingOut(true);
-        try {
-            await logout();
-        } catch {
-            // Ignore errors
-        }
-        setUser(null);
         setIsDropdownOpen(false);
-        router.push('/');
-        router.refresh();
+        logout();
     };
 
-    const getInitials = (name: string) => {
-        return name
-            .split(' ')
-            .map(n => n[0])
-            .join('')
-            .toUpperCase()
-            .slice(0, 2);
+    const getInitials = (name: string) =>
+        name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+    const renderNavLinks = () => {
+        if (!activeContext) return null;
+        switch (activeContext) {
+            case UserRole.BUYER:
+                return (
+                    <>
+                        <li><Link href="/buyer/dashboard" className="nav-link"><LayoutDashboard className="w-4 h-4" />Dashboard</Link></li>
+                        <li><Link href="/properties" className="nav-link"><Search className="w-4 h-4" />Buy / Rent</Link></li>
+                        <li><Link href="/agents" className="nav-link"><Users className="w-4 h-4" />Find Agent</Link></li>
+                    </>
+                );
+            case UserRole.SELLER:
+                return (
+                    <>
+                        <li><Link href="/sell/dashboard" className="nav-link"><LayoutDashboard className="w-4 h-4" />Dashboard</Link></li>
+                        <li><Link href="/sell/properties" className="nav-link"><Building2 className="w-4 h-4" />My Properties</Link></li>
+                        <li><Link href="/sell/deals" className="nav-link"><Handshake className="w-4 h-4" />Deals</Link></li>
+                    </>
+                );
+            case UserRole.AGENT:
+                return (
+                    <>
+                        <li><Link href="/agent/dashboard" className="nav-link"><LayoutDashboard className="w-4 h-4" />Dashboard</Link></li>
+                        <li><Link href="/agent/crm" className="nav-link"><Users className="w-4 h-4" />CRM</Link></li>
+                        <li><Link href="/agent/listings" className="nav-link"><ClipboardList className="w-4 h-4" />Listings</Link></li>
+                    </>
+                );
+            default:
+                return <li><Link href="/properties" className="nav-link">Buy</Link></li>;
+        }
     };
+
+    /* Menu items for dropdown */
+    const menuItems = [
+        ...(user?.roles?.includes(UserRole.BUYER) ? [
+            { label: 'Buyer Dashboard', icon: LayoutDashboard, action: 'BUYER', href: '/buyer/dashboard' },
+        ] : []),
+        ...(user?.roles?.includes(UserRole.SELLER) ? [
+            { label: 'Seller Dashboard', icon: HomeIcon, action: 'SELLER', href: '/sell/dashboard' },
+        ] : []),
+        ...(user?.roles?.includes(UserRole.ADMIN) ? [
+            { href: '/admin/agents', label: 'Admin Panel', icon: Shield },
+        ] : []),
+        { href: '/profile', label: 'My Profile', icon: User },
+        { href: '/settings', label: 'Settings', icon: Settings },
+    ];
 
     return (
         <nav className="navbar">
             <div className="navbar-container">
-                <Link href="/" className="logo" style={{ color: '#FF385C', fontWeight: 700, fontSize: '1.5rem' }}>
-                    NestFind
+                {/* Logo */}
+                <Link
+                    href={
+                        activeContext === UserRole.AGENT ? '/agent/dashboard' :
+                            activeContext === UserRole.SELLER ? '/sell/dashboard' : '/'
+                    }
+                    className="flex items-center gap-2 font-bold text-xl tracking-tight transition-transform hover:scale-[1.02]"
+                >
+                    <span style={{ background: 'linear-gradient(to right, var(--color-brand), #ff6b81)', WebkitBackgroundClip: 'text', color: 'transparent' }}>
+                        NestFind
+                    </span>
                 </Link>
-                <ul className="nav-links">
-                    <li><Link href="/sell">Sell</Link></li>
-                    <li><Link href="/properties">Buy</Link></li>
-                    <li><Link href="/properties">Rent</Link></li>
-                    <li><Link href="/properties">Loans</Link></li>
-                    <li><Link href="/agents">Find Agent</Link></li>
-                </ul>
+
+                {/* Nav links */}
+                <ul className="nav-links">{renderNavLinks()}</ul>
+
+                {/* Right side */}
                 <div className="auth-buttons">
                     {isLoading ? (
-                        <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse" />
+                        <div className="w-9 h-9 rounded-full bg-[var(--gray-200)] animate-pulse" />
                     ) : user ? (
-                        // Logged in - show profile dropdown
-                        <div className="flex items-center gap-4">
-                            <ThemeToggle />
+                        <div className="flex items-center gap-3">
+                            <BecomeSellerButton />
+                            <ContextSwitcher />
                             <NotificationBell />
+
+                            {/* Profile trigger */}
                             <div className="relative" ref={dropdownRef}>
                                 <button
                                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                    className="flex items-center gap-3 rounded-full border border-gray-300 hover:shadow-lg transition-all duration-200 bg-white"
-                                    style={{
-                                        padding: '8px 8px 8px 14px',
-                                        borderWidth: '1.5px'
-                                    }}
+                                    className="flex items-center gap-2 rounded-full border border-[var(--gray-200)] hover:shadow-md transition-all hover:-translate-y-0.5 bg-white pl-3 pr-1.5 py-1.5"
                                 >
-                                    {/* Hamburger menu icon */}
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4 text-gray-700">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                                    </svg>
-                                    {/* Profile avatar with initials */}
+                                    <Menu className="w-4 h-4 text-[var(--gray-600)]" />
                                     <div
-                                        className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold"
-                                        style={{
-                                            background: 'linear-gradient(135deg, #FF385C 0%, #BD1E59 100%)',
-                                            boxShadow: '0 2px 8px rgba(255, 56, 92, 0.3)'
-                                        }}
+                                        className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                                        style={{ background: 'var(--color-brand)' }}
                                     >
                                         {getInitials(user.full_name)}
                                     </div>
                                 </button>
 
-                                {/* Dropdown menu */}
+                                {/* Dropdown */}
                                 {isDropdownOpen && (
                                     <div
-                                        className="absolute right-0 top-full mt-3 w-80 bg-white rounded-2xl overflow-hidden z-50"
-                                        style={{
-                                            boxShadow: '0 4px 32px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04)',
-                                            animation: 'fadeIn 0.15s ease-out'
-                                        }}
+                                        className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl overflow-hidden z-[var(--z-dropdown)] shadow-xl border border-[var(--gray-200)] origin-top-right transition-all duration-200"
                                     >
-                                        {/* User info header */}
-                                        <div style={{ padding: '20px 24px', background: 'linear-gradient(135deg, #FAFAFA 0%, #F5F5F5 100%)' }}>
-                                            <div className="flex items-center gap-4">
-                                                <div
-                                                    className="w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold flex-shrink-0"
-                                                    style={{
-                                                        background: 'linear-gradient(135deg, #FF385C 0%, #BD1E59 100%)',
-                                                        boxShadow: '0 2px 8px rgba(255, 56, 92, 0.25)'
-                                                    }}
-                                                >
-                                                    {getInitials(user.full_name)}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="font-semibold text-gray-900 text-lg truncate">{user.full_name}</p>
-                                                    <p className="text-sm text-gray-500 truncate">{user.email}</p>
-                                                </div>
+                                        {/* User header */}
+                                        <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--gray-200)] bg-[var(--gray-50)]">
+                                            <div
+                                                className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+                                                style={{ background: 'var(--color-brand)' }}
+                                            >
+                                                {getInitials(user.full_name)}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="font-semibold text-[var(--gray-900)] text-sm truncate">{user.full_name}</p>
+                                                <p className="text-xs text-[var(--gray-500)] truncate">{user.email}</p>
                                             </div>
                                         </div>
 
-                                        {/* Menu items */}
-                                        <div style={{ padding: '12px 16px' }}>
-                                            {user.role === 'USER' && (
-                                                <>
+                                        {/* Links */}
+                                        <div className="py-1">
+                                            {menuItems.map(item => {
+                                                if (item.action) {
+                                                    return (
+                                                        <button
+                                                            key={item.label}
+                                                            onClick={async () => {
+                                                                if (activeContext !== item.action) {
+                                                                    switchContext(item.action as UserRole);
+                                                                }
+                                                                setIsDropdownOpen(false);
+                                                                router.push(item.href as string);
+                                                            }}
+                                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--gray-700)] hover:bg-[var(--gray-50)] transition-colors"
+                                                        >
+                                                            <item.icon className="w-4 h-4 text-[var(--gray-400)]" />
+                                                            {item.label}
+                                                        </button>
+                                                    );
+                                                }
+                                                return (
                                                     <Link
-                                                        href="/buyer/dashboard"
-                                                        className="flex items-center gap-4 rounded-xl text-gray-800 hover:bg-gray-50 transition-colors"
-                                                        style={{ padding: '14px 12px' }}
+                                                        key={item.label}
+                                                        href={item.href as string}
+                                                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--gray-700)] hover:bg-[var(--gray-50)] transition-colors"
                                                         onClick={() => setIsDropdownOpen(false)}
                                                     >
-                                                        <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-blue-600">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                                                            </svg>
-                                                        </div>
-                                                        <span className="font-medium text-base">Buyer Dashboard</span>
+                                                        <item.icon className="w-4 h-4 text-[var(--gray-400)]" />
+                                                        {item.label}
                                                     </Link>
-                                                    <Link
-                                                        href="/sell/dashboard"
-                                                        className="flex items-center gap-4 rounded-xl text-gray-800 hover:bg-gray-50 transition-colors"
-                                                        style={{ padding: '14px 12px' }}
-                                                        onClick={() => setIsDropdownOpen(false)}
-                                                    >
-                                                        <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-emerald-600">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
-                                                            </svg>
-                                                        </div>
-                                                        <span className="font-medium text-base">Seller Dashboard</span>
-                                                    </Link>
-                                                </>
-                                            )}
-                                            {user.role === 'ADMIN' && (
-                                                <Link
-                                                    href="/admin/agents"
-                                                    className="flex items-center gap-4 rounded-xl text-gray-800 hover:bg-gray-50 transition-colors"
-                                                    style={{ padding: '14px 12px' }}
-                                                    onClick={() => setIsDropdownOpen(false)}
-                                                >
-                                                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-600">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                        </svg>
-                                                    </div>
-                                                    <span className="font-medium text-base">Admin Panel</span>
-                                                </Link>
-                                            )}
-                                            <Link
-                                                href="/profile"
-                                                className="flex items-center gap-4 rounded-xl text-gray-800 hover:bg-gray-50 transition-colors"
-                                                style={{ padding: '14px 12px' }}
-                                                onClick={() => setIsDropdownOpen(false)}
-                                            >
-                                                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-600">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                                                    </svg>
-                                                </div>
-                                                <span className="font-medium text-base">My Profile</span>
-                                            </Link>
-                                            <Link
-                                                href="/settings"
-                                                className="flex items-center gap-4 rounded-xl text-gray-800 hover:bg-gray-50 transition-colors"
-                                                style={{ padding: '14px 12px' }}
-                                                onClick={() => setIsDropdownOpen(false)}
-                                            >
-                                                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-600">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                    </svg>
-                                                </div>
-                                                <span className="font-medium text-base">Settings</span>
-                                            </Link>
+                                                );
+                                            })}
                                         </div>
 
                                         {/* Logout */}
-                                        <div style={{ borderTop: '1px solid #E5E7EB', padding: '12px 16px' }}>
+                                        <div className="border-t border-[var(--gray-200)] py-1">
                                             <button
                                                 onClick={handleLogout}
                                                 disabled={isLoggingOut}
-                                                className="flex items-center gap-4 w-full rounded-xl text-gray-800 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
-                                                style={{ padding: '14px 12px' }}
+                                                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-[var(--gray-700)] hover:bg-[var(--color-error-bg)] hover:text-[var(--color-error)] transition-colors disabled:opacity-50"
                                             >
-                                                <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-red-500">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-                                                    </svg>
-                                                </div>
-                                                <span className="font-medium text-base">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+                                                <LogOut className="w-4 h-4" />
+                                                {isLoggingOut ? 'Logging out…' : 'Sign Out'}
                                             </button>
                                         </div>
                                     </div>
@@ -245,7 +210,6 @@ export default function Navbar() {
                             </div>
                         </div>
                     ) : (
-                        // Not logged in - show auth buttons
                         <>
                             <Link href="/login" className="login-btn">Login</Link>
                             <Link href="/register" className="signup-btn">Sign up</Link>

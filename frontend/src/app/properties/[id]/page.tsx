@@ -40,15 +40,18 @@ import {
     ArrowUpRight,
     LayoutTemplate,
     Bookmark,
-    Activity
+    Activity,
+    DollarSign
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { getCurrentUser } from '@/lib/authApi';
+import { useAuth } from '@/lib/auth';
+import { UserRole } from '@/lib/auth/types';
 import { getPropertyDetail, PropertyDetail } from '@/lib/api/public';
 import { post } from '@/lib/api';
 import AdminPropertyControls from '@/components/admin/AdminPropertyControls';
 import { saveProperty, unsaveProperty, checkIfSaved } from '@/lib/propertiesApi';
 import ScheduleTourModal from '@/components/property/ScheduleTourModal';
+import MakeOfferModal from '@/components/offers/MakeOfferModal';
 import {
     getPropertyStats,
     getSimilarProperties,
@@ -56,6 +59,7 @@ import {
     PropertyStats,
     SimilarProperty
 } from '@/lib/api/propertyStats';
+import { getImageUrl } from '@/lib/api';
 
 /**
  * Property Detail Page - /properties/[id]
@@ -86,11 +90,7 @@ function formatPrice(price: number | null): string {
     }).format(price);
 }
 
-// Helper to get full image URL
-function getImageUrl(fileUrl: string): string {
-    if (fileUrl.startsWith('http')) return fileUrl;
-    return `http://localhost:8000${fileUrl}`;
-}
+
 
 // Format number in Indian style
 function formatIndianNumber(num: number): string {
@@ -539,10 +539,12 @@ interface PageParams {
 export default function PropertyDetailPage({ params }: { params: Promise<PageParams> }) {
     const router = useRouter();
     const resolvedParams = use(params);
+    const { user } = useAuth();
     const [property, setProperty] = useState<PropertyDetail | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isContacting, setIsContacting] = useState(false);
+    const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
 
     // Property Stats
     const [propertyStats, setPropertyStats] = useState<PropertyStats | null>(null);
@@ -551,9 +553,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<PagePar
     const handleContactAgent = async () => {
         if (!property?.agent) return;
 
-        try {
-            await getCurrentUser(); // Check if logged in
-        } catch {
+        if (!user) {
             router.push(`/login?redirect=/properties/${property.id}`);
             return;
         }
@@ -628,7 +628,6 @@ export default function PropertyDetailPage({ params }: { params: Promise<PagePar
             }
         } catch (error) {
             // Check if it's auth error, redirect to login
-            const user = await getCurrentUser().catch(() => null);
             if (!user) {
                 router.push(`/login?redirect=/properties/${resolvedParams.id}`);
             } else {
@@ -639,14 +638,27 @@ export default function PropertyDetailPage({ params }: { params: Promise<PagePar
         }
     };
 
-    const handleScheduleTour = async () => {
-        try {
-            await getCurrentUser();
-            setIsTourModalOpen(true);
-        } catch {
+    const handleScheduleTour = () => {
+        if (!user) {
             router.push(`/login?redirect=/properties/${resolvedParams.id}`);
+            return;
         }
+        setIsTourModalOpen(true);
     };
+
+    const handleMakeOffer = () => {
+        if (!user) {
+            router.push(`/login?redirect=/properties/${resolvedParams.id}`);
+            return;
+        }
+        setIsOfferModalOpen(true);
+    };
+
+    // Show Make Offer CTA only for authenticated buyers on active properties
+    const canMakeOffer = user?.roles?.includes(UserRole.BUYER)
+        && !property?.viewer?.is_owner
+        && !property?.viewer?.is_agent
+        && property?.status === 'ACTIVE';
 
     if (isLoading) {
         return (
@@ -991,6 +1003,36 @@ export default function PropertyDetailPage({ params }: { params: Promise<PagePar
                             {/* Buyer View - Premium Design */}
                             {!property.viewer?.is_owner && !property.viewer?.is_agent && (
                                 <>
+                                    {/* Make Offer CTA — Primary */}
+                                    {canMakeOffer && (
+                                        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-4 shadow-sm border border-emerald-200 mb-4">
+                                            <h3 className="text-base font-bold text-gray-900 mb-2">Interested in this property?</h3>
+                                            <p className="text-sm text-gray-600 mb-3">Submit a formal offer to start the negotiation process.</p>
+                                            <button
+                                                onClick={handleMakeOffer}
+                                                className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-all shadow-sm hover:shadow-md text-sm"
+                                            >
+                                                <DollarSign className="w-4 h-4" />
+                                                Make an Offer
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Make Offer CTA — Disabled (non-active property) */}
+                                    {user?.roles?.includes(UserRole.BUYER) && !property.viewer?.is_owner && !property.viewer?.is_agent && property.status !== 'ACTIVE' && (
+                                        <div className="bg-gray-50 rounded-xl p-4 shadow-sm border border-gray-200 mb-4">
+                                            <button
+                                                disabled
+                                                title="This property is not currently accepting offers"
+                                                className="w-full flex items-center justify-center gap-2 py-3 bg-gray-300 text-gray-500 rounded-lg font-semibold cursor-not-allowed text-sm"
+                                            >
+                                                <DollarSign className="w-4 h-4" />
+                                                Make an Offer
+                                            </button>
+                                            <p className="text-xs text-gray-500 text-center mt-2">This property is not currently accepting offers</p>
+                                        </div>
+                                    )}
+
                                     {property.agent ? (
                                         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                                             <h3 className="text-base font-bold text-gray-900 mb-3">Contact Agent</h3>
@@ -1043,7 +1085,12 @@ export default function PropertyDetailPage({ params }: { params: Promise<PagePar
                                                     className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-amber-50 border-2 border-amber-200 text-amber-700 rounded-lg font-medium hover:bg-amber-100 transition-colors mb-3 text-sm"
                                                 >
                                                     <Clock className="w-4 h-4" />
-                                                    Visit Requested
+                                                    {property.viewer.visit_status === 'REQUESTED' ? 'Request Sent' :
+                                                        property.viewer.visit_status === 'APPROVED' ? 'Visit Scheduled' :
+                                                            property.viewer.visit_status === 'COMPLETED' ? 'Visit Completed' :
+                                                                property.viewer.visit_status === 'CHECKED_IN' ? 'Visit In Progress' :
+                                                                    property.viewer.visit_status === 'NO_SHOW' ? 'Visit Missed' :
+                                                                        property.viewer.visit_status === 'COUNTERED' ? 'Counter Offer' : 'Visit Requested'}
                                                 </Link>
                                             ) : (
                                                 <button
@@ -1140,8 +1187,35 @@ export default function PropertyDetailPage({ params }: { params: Promise<PagePar
             <ScheduleTourModal
                 isOpen={isTourModalOpen}
                 onClose={() => setIsTourModalOpen(false)}
+                onSuccess={(visitId) => {
+                    if (property) {
+                        setProperty({
+                            ...property,
+                            viewer: {
+                                is_owner: property.viewer?.is_owner || false,
+                                is_agent: property.viewer?.is_agent || false,
+                                ...property.viewer,
+                                visit_id: visitId,
+                                visit_status: 'REQUESTED'
+                            }
+                        });
+                    }
+                    setIsTourModalOpen(false);
+                }}
                 propertyId={property.id}
                 propertyTitle={property.title || 'Property'}
+            />
+
+            <MakeOfferModal
+                isOpen={isOfferModalOpen}
+                onClose={() => setIsOfferModalOpen(false)}
+                onSuccess={() => {
+                    setIsOfferModalOpen(false);
+                    router.push('/offers');
+                }}
+                propertyId={property.id}
+                propertyTitle={property.title || 'Property'}
+                propertyPrice={property.price || 0}
             />
         </div>
     );

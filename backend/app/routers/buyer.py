@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional, Dict, Any
 from app.core.database import get_db_pool
-from app.middleware.auth_middleware import get_current_user, AuthenticatedUser
+from app.middleware.auth_middleware import get_current_user, AuthenticatedUser, require_role, require_any_role
 from uuid import UUID
 from datetime import datetime, timezone
 
@@ -9,7 +9,7 @@ router = APIRouter()
 
 @router.get("/buyer/dashboard", tags=["buyer"])
 async def get_buyer_dashboard(
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(require_any_role("BUYER", "USER")),
     db_pool = Depends(get_db_pool)
 ):
     """
@@ -30,31 +30,64 @@ async def get_buyer_dashboard(
             """
             stats = await conn.fetchrow(stats_query, user_id)
             
-            # 2. Get Recent Activity (Union of recent actions)
+            # 2. Get Recent Activity & Actionable Items
             
-            # Recent Visits
+            # Actionable Items: Countered Offers
+            countered_offers = await conn.fetch("""
+                SELECT 
+                    o.id as target_id, 'offer' as type, 'ACTION_REQUIRED' as urgency,
+                    'Counter Offer Received' as title,
+                    'You have a pending counter-offer for ' || p.title as message,
+                    '/offers/' || o.id as link, o.updated_at as created_at
+                FROM offers o
+                JOIN properties p ON o.property_id = p.id
+                WHERE o.buyer_id = $1 AND o.status = 'COUNTERED'
+            """, user_id)
+
+            # Actionable Items: Urgent Visits (Next 24 Hours)
+            urgent_visits = await conn.fetch("""
+                SELECT 
+                    vr.id as target_id, 'visit' as type, 'ACTION_REQUIRED' as urgency,
+                    'Upcoming Tour Today' as title,
+                    'You have a property tour scheduled for ' || p.title as message,
+                    '/visits/' || vr.id as link, vr.preferred_date as created_at
+                FROM visit_requests vr
+                JOIN properties p ON vr.property_id = p.id
+                WHERE vr.buyer_id = $1 AND vr.status = 'APPROVED'
+                  AND vr.preferred_date BETWEEN NOW() AND NOW() + INTERVAL '24 hours'
+            """, user_id)
+            
+            # Recent Visits (For Timeline)
             visits = await conn.fetch("""
                 SELECT 
-                    vr.id, vr.status, vr.preferred_date as visit_date, p.title as property_title, 'visit' as type
+                    vr.id, vr.status, vr.preferred_date as action_date, p.title as property_title, 
+                    p.city as property_city, 'visit' as type, vr.updated_at,
+                    (SELECT file_url FROM property_media pm WHERE pm.property_id = p.id AND pm.is_primary = TRUE LIMIT 1) as thumbnail
                 FROM visit_requests vr
                 JOIN properties p ON vr.property_id = p.id
                 WHERE vr.buyer_id = $1
-                ORDER BY vr.created_at DESC
-                LIMIT 3
+                ORDER BY vr.updated_at DESC
+                LIMIT 5
             """, user_id)
             
-            # Recent Offers
+            # Recent Offers (For Timeline)
             offers = await conn.fetch("""
                 SELECT 
-                    o.id, o.status, o.offered_price as amount, p.title as property_title, 'offer' as type, o.created_at
+                    o.id, o.status, o.offered_price as amount, p.title as property_title, 
+                    p.city as property_city, 'offer' as type, o.updated_at as action_date, o.updated_at,
+                    (SELECT file_url FROM property_media pm WHERE pm.property_id = p.id AND pm.is_primary = TRUE LIMIT 1) as thumbnail
                 FROM offers o
                 JOIN properties p ON o.property_id = p.id
                 WHERE o.buyer_id = $1
-                ORDER BY o.created_at DESC
-                LIMIT 3
+                ORDER BY o.updated_at DESC
+                LIMIT 5
             """, user_id)
             
-            # 3. Recommended Properties (Mock logic: just random active properties)
+            # Combine and sort activity by updated_at
+            all_activity = list(visits) + list(offers)
+            all_activity.sort(key=lambda x: x['updated_at'], reverse=True)
+            
+            # 3. Recommended Properties
             recommended = await conn.fetch("""
                 SELECT 
                     p.id, p.title, p.price, p.city, p.bedrooms, p.bathrooms, p.area_sqft,
@@ -65,7 +98,6 @@ async def get_buyer_dashboard(
                 LIMIT 4
             """)
             
-            
             return {
                 "success": True,
                 "stats": {
@@ -74,14 +106,28 @@ async def get_buyer_dashboard(
                     "saved_properties": stats["saved_properties"],
                     "unread_messages": stats["unread_messages"]
                 },
+                "action_required": [
+                    {
+                        "id": str(r["target_id"]),
+                        "type": r["type"],
+                        "urgency": r["urgency"],
+                        "title": r["title"],
+                        "message": r["message"],
+                        "link": r["link"],
+                        "created_at": r["created_at"].isoformat() if r["created_at"] else None
+                    } for r in (countered_offers + urgent_visits)
+                ],
                 "recent_activity": [
                     {
                         "id": str(r["id"]),
                         "type": r["type"],
                         "title": r["property_title"],
+                        "location": r["property_city"],
                         "status": r["status"],
-                        "date": r["visit_date"].isoformat() if r["type"] == 'visit' else r["created_at"].isoformat()
-                    } for r in (visits + offers)[:5]
+                        "amount": float(r["amount"]) if r["type"] == 'offer' else None,
+                        "date": r["action_date"].isoformat() if r["action_date"] else None,
+                        "image": r["thumbnail"] or ""
+                    } for r in all_activity[:10]
                 ],
                 "recommended": [
                     {
@@ -102,7 +148,7 @@ async def get_buyer_dashboard(
 
 @router.get("/buyer/market-insights", tags=["buyer"])
 async def get_market_insights(
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(require_any_role("BUYER", "USER")),
     db_pool = Depends(get_db_pool)
 ):
     """

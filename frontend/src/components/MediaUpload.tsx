@@ -7,6 +7,7 @@ import {
     deletePropertyMedia,
     setMediaPrimary
 } from '@/lib/api/seller';
+import { getImageUrl } from '@/lib/api';
 import { PropertyMediaResponse } from '@/lib/types/property';
 
 interface MediaUploadProps {
@@ -16,7 +17,6 @@ interface MediaUploadProps {
     disabled?: boolean;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function MediaUpload({ propertyId, media, onMediaChange, disabled = false }: MediaUploadProps) {
     const [uploading, setUploading] = useState(false);
@@ -108,13 +108,6 @@ export default function MediaUpload({ propertyId, media, onMediaChange, disabled
         }
     };
 
-    const getImageUrl = (fileUrl: string) => {
-        // If URL is relative, prepend API base URL
-        if (fileUrl.startsWith('/')) {
-            return `${API_BASE_URL}${fileUrl}`;
-        }
-        return fileUrl;
-    };
 
     return (
         <div className="space-y-4">

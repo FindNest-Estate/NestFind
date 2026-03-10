@@ -33,6 +33,7 @@ interface PropertyEditorProps {
 export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
     const router = useRouter();
     const [property, setProperty] = useState<PropertyDetail | null>(null);
+    const [localValues, setLocalValues] = useState<Record<string, any>>({});
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -55,6 +56,19 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
             setLoading(true);
             const data = await getProperty(propertyId);
             setProperty(data);
+            // Sync local state from backend data
+            setLocalValues({
+                title: data.title || '',
+                description: data.description || '',
+                type: data.type || '',
+                city: data.city || '',
+                state: data.state || '',
+                pincode: data.pincode || '',
+                bedrooms: data.bedrooms ?? '',
+                bathrooms: data.bathrooms ?? '',
+                area_sqft: data.area_sqft ?? '',
+                price: data.price ?? '',
+            });
             setError(null);
         } catch (err: any) {
             setError(err.message || 'Failed to load property');
@@ -64,9 +78,16 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
         }
     };
 
-    // Auto-save helper
+    // Update local state only — no API call. Use for onChange on inputs.
+    const handleLocalChange = (field: string, value: any) => {
+        setLocalValues(prev => ({ ...prev, [field]: value }));
+    };
+
+    // Save to backend — only called on onBlur or select onChange.
     const handleFieldUpdate = async (field: keyof UpdatePropertyRequest, value: any) => {
         if (!property) return;
+        // Skip saving empty / null values to avoid spurious updates
+        if (value === null || value === '' || (typeof value === 'number' && isNaN(value))) return;
 
         try {
             setSaving(true);
@@ -181,7 +202,7 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                     {/* Left Column - Form Sections */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Basic Details Section */}
-                        <section className="bg-white rounded-xl border border-gray-200 p-6">
+                        <section className="bg-white rounded-xl border border-slate-200/60 p-6 shadow-sm">
                             <div className="flex items-center gap-3 mb-6">
                                 <div className="p-2 bg-rose-50 rounded-lg">
                                     <FileText className="w-5 h-5 text-[#ff385c]" />
@@ -197,11 +218,11 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                     </label>
                                     <input
                                         type="text"
-                                        value={property.title || ''}
-                                        onChange={(e) => handleFieldUpdate('title', e.target.value)}
+                                        value={localValues.title ?? ''}
+                                        onChange={(e) => handleLocalChange('title', e.target.value)}
                                         onBlur={(e) => handleFieldUpdate('title', e.target.value)}
                                         placeholder="e.g., Spacious 3BHK Apartment in Koramangala"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c] focus:border-transparent"
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c]/50 focus:border-[#ff385c] transition-all"
                                     />
                                 </div>
 
@@ -211,9 +232,12 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                         Property Type *
                                     </label>
                                     <select
-                                        value={property.type || ''}
-                                        onChange={(e) => handleFieldUpdate('type', e.target.value as PropertyType)}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c] focus:border-transparent"
+                                        value={localValues.type ?? ''}
+                                        onChange={(e) => {
+                                            handleLocalChange('type', e.target.value);
+                                            handleFieldUpdate('type', e.target.value as PropertyType);
+                                        }}
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c]/50 focus:border-[#ff385c] transition-all"
                                     >
                                         <option value="">Select type</option>
                                         <option value={PropertyType.LAND}>Land</option>
@@ -229,12 +253,12 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                         Description *
                                     </label>
                                     <textarea
-                                        value={property.description || ''}
-                                        onChange={(e) => handleFieldUpdate('description', e.target.value)}
+                                        value={localValues.description ?? ''}
+                                        onChange={(e) => handleLocalChange('description', e.target.value)}
                                         onBlur={(e) => handleFieldUpdate('description', e.target.value)}
                                         placeholder="Describe your property, key features, amenities..."
                                         rows={5}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c] focus:border-transparent resize-none"
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c]/50 focus:border-[#ff385c] transition-all resize-none"
                                     />
                                     <p className="text-xs text-gray-500 mt-1">
                                         Be detailed - buyers want to know what makes your property special.
@@ -244,7 +268,7 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                         </section>
 
                         {/* Location Section */}
-                        <section className="bg-white rounded-xl border border-gray-200 p-6">
+                        <section className="bg-white rounded-xl border border-slate-200/60 p-6 shadow-sm">
                             <div className="flex items-center gap-3 mb-6">
                                 <div className="p-2 bg-rose-50 rounded-lg">
                                     <MapPin className="w-5 h-5 text-[#ff385c]" />
@@ -307,11 +331,11 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                 </label>
                                 <input
                                     type="text"
-                                    value={property.city || ''}
-                                    onChange={(e) => handleFieldUpdate('city', e.target.value)}
+                                    value={localValues.city ?? ''}
+                                    onChange={(e) => handleLocalChange('city', e.target.value)}
                                     onBlur={(e) => handleFieldUpdate('city', e.target.value)}
                                     placeholder="e.g., Bangalore"
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c] focus:border-transparent"
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c]/50 focus:border-[#ff385c] transition-all"
                                 />
                             </div>
 
@@ -322,11 +346,11 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                 </label>
                                 <input
                                     type="text"
-                                    value={property.state || ''}
-                                    onChange={(e) => handleFieldUpdate('state', e.target.value)}
+                                    value={localValues.state ?? ''}
+                                    onChange={(e) => handleLocalChange('state', e.target.value)}
                                     onBlur={(e) => handleFieldUpdate('state', e.target.value)}
                                     placeholder="e.g., Karnataka"
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c] focus:border-transparent"
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c]/50 focus:border-[#ff385c] transition-all"
                                 />
                             </div>
 
@@ -337,18 +361,18 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                 </label>
                                 <input
                                     type="text"
-                                    value={property.pincode || ''}
-                                    onChange={(e) => handleFieldUpdate('pincode', e.target.value)}
+                                    value={localValues.pincode ?? ''}
+                                    onChange={(e) => handleLocalChange('pincode', e.target.value)}
                                     onBlur={(e) => handleFieldUpdate('pincode', e.target.value)}
                                     placeholder="e.g., 560001"
                                     maxLength={10}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c] focus:border-transparent"
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c]/50 focus:border-[#ff385c] transition-all"
                                 />
                             </div>
                         </section>
 
                         {/* Property Details Section */}
-                        <section className="bg-white rounded-xl border border-gray-200 p-6">
+                        <section className="bg-white rounded-xl border border-slate-200/60 p-6 shadow-sm">
                             <div className="flex items-center gap-3 mb-6">
                                 <div className="p-2 bg-rose-50 rounded-lg">
                                     <Home className="w-5 h-5 text-[#ff385c]" />
@@ -366,11 +390,11 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                         <input
                                             type="number"
                                             min="0"
-                                            value={property.bedrooms || ''}
-                                            onChange={(e) => handleFieldUpdate('bedrooms', parseInt(e.target.value) || null)}
+                                            value={localValues.bedrooms ?? ''}
+                                            onChange={(e) => handleLocalChange('bedrooms', e.target.value)}
                                             onBlur={(e) => handleFieldUpdate('bedrooms', parseInt(e.target.value) || null)}
                                             placeholder="0"
-                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c] focus:border-transparent"
+                                            className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c]/50 focus:border-[#ff385c] transition-all"
                                         />
                                     </div>
                                 )}
@@ -384,11 +408,11 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                         <input
                                             type="number"
                                             min="0"
-                                            value={property.bathrooms || ''}
-                                            onChange={(e) => handleFieldUpdate('bathrooms', parseInt(e.target.value) || null)}
+                                            value={localValues.bathrooms ?? ''}
+                                            onChange={(e) => handleLocalChange('bathrooms', e.target.value)}
                                             onBlur={(e) => handleFieldUpdate('bathrooms', parseInt(e.target.value) || null)}
                                             placeholder="0"
-                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c] focus:border-transparent"
+                                            className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c]/50 focus:border-[#ff385c] transition-all"
                                         />
                                     </div>
                                 )}
@@ -401,11 +425,11 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                     <input
                                         type="number"
                                         min="0"
-                                        value={property.area_sqft || ''}
-                                        onChange={(e) => handleFieldUpdate('area_sqft', parseFloat(e.target.value) || null)}
+                                        value={localValues.area_sqft ?? ''}
+                                        onChange={(e) => handleLocalChange('area_sqft', e.target.value)}
                                         onBlur={(e) => handleFieldUpdate('area_sqft', parseFloat(e.target.value) || null)}
                                         placeholder="1500"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c] focus:border-transparent"
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c]/50 focus:border-[#ff385c] transition-all"
                                     />
                                 </div>
 
@@ -417,11 +441,11 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                                     <input
                                         type="number"
                                         min="0"
-                                        value={property.price || ''}
-                                        onChange={(e) => handleFieldUpdate('price', parseFloat(e.target.value) || null)}
+                                        value={localValues.price ?? ''}
+                                        onChange={(e) => handleLocalChange('price', e.target.value)}
                                         onBlur={(e) => handleFieldUpdate('price', parseFloat(e.target.value) || null)}
                                         placeholder="5000000"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c] focus:border-transparent"
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff385c]/50 focus:border-[#ff385c] transition-all"
                                     />
                                 </div>
                             </div>
@@ -435,7 +459,7 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                         </section>
 
                         {/* Photos Section */}
-                        <section className="bg-white rounded-xl border border-gray-200 p-6">
+                        <section className="bg-white rounded-xl border border-slate-200/60 p-6 shadow-sm">
                             <div className="flex items-center gap-3 mb-6">
                                 <div className="p-2 bg-rose-50 rounded-lg">
                                     <Camera className="w-5 h-5 text-[#ff385c]" />
@@ -465,11 +489,12 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                         />
 
                         {/* Actions */}
-                        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-3">
+                        <div className="bg-white rounded-xl border border-slate-200/60 p-6 shadow-sm space-y-3">
                             <button
                                 onClick={handleHireAgent}
                                 disabled={!completeness.can_hire_agent || saving}
-                                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#ff385c] text-white font-semibold rounded-lg hover:bg-[#d9324e] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-br from-[#ff385c] to-rose-600 text-white font-semibold rounded-lg hover:shadow-lg hover:-translate-y-0.5 disabled:from-slate-300 disabled:to-slate-300 disabled:shadow-none disabled:transform-none disabled:cursor-not-allowed transition-all"
+                                style={{ color: 'white' }}
                             >
                                 <Send className="w-5 h-5" />
                                 Hire Agent
@@ -477,7 +502,7 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
 
                             <Link
                                 href="/sell/dashboard"
-                                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
                             >
                                 <Save className="w-5 h-5" />
                                 Save & Exit
@@ -486,7 +511,7 @@ export default function PropertyEditor({ propertyId }: PropertyEditorProps) {
                             <button
                                 onClick={handleDelete}
                                 disabled={saving}
-                                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white border-2 border-red-300 text-red-600 font-semibold rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white border border-red-200 text-red-600 font-semibold rounded-lg hover:bg-red-50 hover:border-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                             >
                                 <Trash2 className="w-5 h-5" />
                                 Delete Draft

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional
 from pydantic import BaseModel
 
-from ..middleware.auth_middleware import get_current_user, AuthenticatedUser
+from ..middleware.auth_middleware import get_current_user, AuthenticatedUser, require_role
 from ..core.database import get_db_pool
 
 
@@ -72,7 +72,7 @@ class UpdateNotificationsRequest(BaseModel):
 
 @router.get("/settings", response_model=SettingsResponse)
 async def get_seller_settings(
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(require_role("SELLER")),
     db_pool = Depends(get_db_pool)
 ):
     """
@@ -134,7 +134,7 @@ async def get_seller_settings(
 @router.put("/settings", response_model=SettingsResponse)
 async def update_seller_settings(
     request: UpdateSettingsRequest,
-    current_user: AuthenticatedUser = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(require_role("SELLER")),
     db_pool = Depends(get_db_pool)
 ):
     """

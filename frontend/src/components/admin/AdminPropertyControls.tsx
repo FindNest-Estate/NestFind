@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ShieldAlert, RefreshCw } from 'lucide-react';
-import { getCurrentUser } from '@/lib/authApi';
+import { useAuth } from '@/lib/auth';
+import { UserRole } from '@/lib/auth/types';
 import StatusOverrideModal from './StatusOverrideModal';
 
 interface AdminPropertyControlsProps {
@@ -16,27 +17,11 @@ export default function AdminPropertyControls({
     currentStatus,
     onStatusChange
 }: AdminPropertyControlsProps) {
-    const [isAdmin, setIsAdmin] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
+    const { user, isLoading } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    useEffect(() => {
-        const checkAdmin = async () => {
-            try {
-                const user = await getCurrentUser();
-                if (user && user.role === 'ADMIN') {
-                    setIsAdmin(true);
-                }
-            } catch {
-                setIsAdmin(false);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        checkAdmin();
-    }, []);
-
-    if (isLoading || !isAdmin) return null;
+    // Only show for admins
+    if (isLoading || !user || user.role !== UserRole.ADMIN) return null;
 
     return (
         <>

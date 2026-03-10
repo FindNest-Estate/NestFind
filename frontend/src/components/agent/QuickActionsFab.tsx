@@ -123,9 +123,9 @@ export default function QuickActionsFab({
             {/* Main FAB */}
             <motion.button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all ${isOpen
-                        ? 'bg-gray-800 hover:bg-gray-900 rotate-45'
-                        : 'bg-gradient-to-br from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600'
+                className={`w-14 h-14 rounded-full flex items-center justify-center shadow-[var(--shadow-md)] transition-all ${isOpen
+                    ? 'bg-[var(--gray-900)] hover:bg-[var(--gray-800)] rotate-45'
+                    : 'bg-[var(--color-brand)] hover:opacity-90'
                     }`}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}

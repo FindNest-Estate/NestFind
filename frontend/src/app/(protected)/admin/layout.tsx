@@ -2,11 +2,15 @@
  * Admin Dashboard Layout
  * 
  * Shell layout for ADMIN role
- * Assumes route protection already handled by parent layout
+ * Role enforcement via RoleGuard component
  */
+
+'use client';
 
 import { ReactNode } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
+import RoleGuard from '@/components/guards/RoleGuard';
+import { UserRole } from '@/lib/auth/types';
 
 export default function AdminDashboardLayout({
     children,
@@ -14,8 +18,10 @@ export default function AdminDashboardLayout({
     children: ReactNode;
 }) {
     return (
-        <AdminLayout>
-            {children}
-        </AdminLayout>
+        <RoleGuard allowedRoles={[UserRole.ADMIN]}>
+            <AdminLayout>
+                {children}
+            </AdminLayout>
+        </RoleGuard>
     );
 }

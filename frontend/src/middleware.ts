@@ -101,13 +101,9 @@ export function middleware(request: NextRequest) {
         return NextResponse.next();
     }
 
-    // Auth routes (login/register) - redirect to dashboard if already authenticated
+    // Auth routes (login/register) - allow access even if token exists
+    // This prevents stale cookie redirect loops and is generally safer
     if (isAuthRoute(pathname)) {
-        if (hasToken) {
-            // Has token - redirect to dashboard
-            // Note: If token is expired/invalid, Server Component will handle it
-            return NextResponse.redirect(new URL('/dashboard', request.url));
-        }
         return NextResponse.next();
     }
 

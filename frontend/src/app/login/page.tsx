@@ -9,7 +9,8 @@
 import { useState, useEffect, FormEvent, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { login } from '@/lib/authApi';
+import { login as loginApi } from '@/lib/authApi';
+import { useAuth } from '@/lib/auth';
 import { RateLimitError } from '@/lib/api';
 import PasswordInput from '@/components/PasswordInput';
 
@@ -22,9 +23,10 @@ interface LockoutState {
 function LoginContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { login: authLogin } = useAuth();
     const returnUrl = searchParams.get('returnUrl') || '/dashboard';
     const isAdminLogin = returnUrl.includes('admin') || returnUrl.includes('Admin');
-    const sessionExpired = searchParams.get('session_expired') === 'true';
+    const sessionExpired = false; // Removed per user request
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -71,7 +73,7 @@ function LoginContent() {
         setIsSubmitting(true);
 
         try {
-            const response = await login({ email, password, portal: 'user' });
+            const response = await loginApi({ email, password, portal: 'user' });
 
             // Check if response is error with lockout
             if ('locked_until' in response && response.locked_until) {
@@ -108,10 +110,8 @@ function LoginContent() {
 
             // Success - has access_token
             if ('access_token' in response) {
-                // Tokens are set via HTTP-only cookies by backend
-                // AND we store them in localStorage for fallback (especially for cross-origin PUT/POST)
-                if (response.access_token) localStorage.setItem('access_token', response.access_token);
-                if (response.refresh_token) localStorage.setItem('refresh_token', response.refresh_token);
+                // Use centralized auth context to persist token and update state
+                authLogin(response.access_token, response.user, response.refresh_token);
 
                 // Redirect based on user status ONLY
                 // Role-based routing is handled by Server Component in protected layout
@@ -205,14 +205,6 @@ function LoginContent() {
                             {isAdminLogin ? 'Secure access for administrators.' : 'Please enter your details to sign in.'}
                         </p>
 
-                        {sessionExpired && (
-                            <div className="mt-6 p-4 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm flex items-start gap-3 animate-fadeIn">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-600">
-                                    <path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clipRule="evenodd" />
-                                </svg>
-                                <span className="font-medium">Session expired. Please log in again.</span>
-                            </div>
-                        )}
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-6">

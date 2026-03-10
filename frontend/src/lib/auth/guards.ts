@@ -117,7 +117,7 @@ export function requiresAdminRole(path: string): boolean {
 export function getRequiredRole(path: string): UserRole | null {
     if (requiresAdminRole(path)) return UserRole.ADMIN;
     if (requiresAgentRole(path)) return UserRole.AGENT;
-    if (requiresUserRole(path)) return UserRole.USER;
+    if (requiresUserRole(path)) return UserRole.BUYER;
     return null;
 }
 
@@ -259,8 +259,10 @@ export function getDashboardPath(role: UserRole): string {
             return '/admin/dashboard';
         case UserRole.AGENT:
             return '/agent/dashboard';
-        case UserRole.USER:
-            return '/dashboard';
+        case UserRole.SELLER:
+            return '/sell/dashboard';
+        case UserRole.BUYER:
+            return '/properties';
         default:
             return '/dashboard';
     }

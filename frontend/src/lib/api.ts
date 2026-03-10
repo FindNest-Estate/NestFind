@@ -1,13 +1,30 @@
 /**
  * Core API Client
- * 
+ *
  * Centralized fetch wrapper with:
  * - Automatic token refresh on 401
  * - Error handling
  * - Retry logic
  */
 
+import Cookies from 'js-cookie';
+import { getToken } from '@/lib/auth';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const TOKEN_KEY = 'access_token';
+const REFRESH_TOKEN_KEY = 'refresh_token';
+
+/**
+ * Helper to get full image URL from relative path
+ */
+export function getImageUrl(fileUrl: string | null): string | null {
+    if (!fileUrl) return null;
+    if (fileUrl.startsWith('http')) return fileUrl;
+    if (fileUrl.startsWith('/')) {
+        return `${API_BASE_URL}${fileUrl}`;
+    }
+    return `${API_BASE_URL}/${fileUrl}`;
+}
 
 export class ApiError extends Error {
     constructor(
@@ -35,6 +52,27 @@ interface FetchOptions extends RequestInit {
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
 
+function persistRefreshedTokens(data: any): void {
+    if (typeof window === 'undefined' || !data) return;
+
+    if (data.access_token) {
+        localStorage.setItem(TOKEN_KEY, data.access_token);
+        Cookies.set(TOKEN_KEY, data.access_token, { expires: 1, path: '/' });
+    }
+
+    if (data.refresh_token) {
+        localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
+    }
+}
+
+function clearClientTokens(): void {
+    if (typeof window === 'undefined') return;
+
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    Cookies.remove(TOKEN_KEY, { path: '/' });
+}
+
 /**
  * Attempt to refresh access token
  */
@@ -55,7 +93,12 @@ async function refreshAccessToken(): Promise<boolean> {
                 return false;
             }
 
-            return true;
+            const contentType = response.headers.get('content-type');
+            const isJson = contentType?.includes('application/json');
+            const data = isJson ? await response.json() : null;
+
+            persistRefreshedTokens(data);
+            return Boolean(data?.access_token);
         } catch {
             return false;
         } finally {
@@ -78,14 +121,13 @@ export async function apiClient<T = any>(
 
     const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
 
+    const token = getToken();
     const config: RequestInit = {
         ...fetchOptions,
         credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
-            ...(typeof window !== 'undefined' && localStorage.getItem('access_token')
-                ? { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-                : {}),
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             ...fetchOptions.headers,
         },
     };
@@ -98,28 +140,25 @@ export async function apiClient<T = any>(
             const refreshed = await refreshAccessToken();
 
             if (refreshed) {
-                // Retry original request once
+                // Retry original request once with refreshed token
                 return apiClient<T>(endpoint, { ...options, skipRetry: true });
-            } else {
-                // Refresh failed - redirect to login
-                if (typeof window !== 'undefined') {
-                    window.location.href = '/login?session_expired=true';
-                }
-                throw new ApiError('Session expired', 401);
             }
+
+            clearClientTokens();
+            if (typeof window !== 'undefined') {
+                window.location.href = '/login';
+            }
+            throw new ApiError('Session expired', 401);
         }
 
-        // Handle 403 - Forbidden (status change)
         if (response.status === 403) {
             throw new ApiError('Access forbidden', 403);
         }
 
-        // Handle 429 - Rate limited
         if (response.status === 429) {
             throw new RateLimitError();
         }
 
-        // Parse response
         const contentType = response.headers.get('content-type');
         const isJson = contentType?.includes('application/json');
 
@@ -130,7 +169,6 @@ export async function apiClient<T = any>(
             data = await response.text();
         }
 
-        // Handle non-2xx responses
         if (!response.ok) {
             throw new ApiError(
                 data?.error || data?.message || `Request failed with status ${response.status}`,
@@ -145,11 +183,7 @@ export async function apiClient<T = any>(
             throw error;
         }
 
-        // Network or other errors
-        throw new ApiError(
-            error instanceof Error ? error.message : 'Network error',
-            0
-        );
+        throw new ApiError(error instanceof Error ? error.message : 'Network error', 0);
     }
 }
 

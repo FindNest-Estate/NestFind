@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { getVisitById, cancelVisit, respondToCounter, getBuyerOTP, submitBuyerFeedback } from "@/lib/api/visits";
-import { Visit, VisitStatus, VisitOTP, BuyerFeedbackData } from "@/lib/types/visit";
+import { getVisitById, cancelVisit, respondToCounter, getBuyerOTP, submitBuyerFeedback, getFollowupContext } from "@/lib/api/visits";
+import { Visit, VisitStatus, VisitOTP, BuyerFeedbackData, FollowupContext } from "@/lib/types/visit";
 import { Loader2, MapPin, Calendar, User, Phone, Navigation, Key, Star, CheckCircle, MessageSquare } from "lucide-react";
+import { getImageUrl } from "@/lib/api";
 import Navbar from "@/components/Navbar";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
@@ -24,6 +25,7 @@ export default function VisitDetailPage({ params }: { params: Promise<PageParams
     const [showCounterModal, setShowCounterModal] = useState(false);
     const [isResponding, setIsResponding] = useState(false);
     const [showOfferModal, setShowOfferModal] = useState(false);
+    const [followupContext, setFollowupContext] = useState<FollowupContext | null>(null);
 
     // OTP State
     const [otp, setOtp] = useState<VisitOTP | null>(null);
@@ -56,15 +58,29 @@ export default function VisitDetailPage({ params }: { params: Promise<PageParams
         }
     }, [visit?.status]);
 
-    const loadData = () => {
+    const loadData = async () => {
         setIsLoading(true);
-        getVisitById(resolvedParams.id)
-            .then(data => setVisit(data.visit ?? null))
-            .catch(err => console.error(err))
-            .finally(() => setIsLoading(false));
-    };
+        try {
+            const result = await getVisitById(resolvedParams.id);
+            if (result.success && result.visit) {
+                setVisit(result.visit);
 
-    const fetchOTP = async () => {
+                // Fetch followup context if visit is completed
+                if (result.visit.status === VisitStatus.COMPLETED) {
+                    const ctxRes = await getFollowupContext(resolvedParams.id);
+                    if (ctxRes.success && ctxRes.context) {
+                        setFollowupContext(ctxRes.context);
+                    }
+                }
+            } else {
+                alert(result.error || 'Failed to load visit');
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsLoading(false);
+        }
+    }; const fetchOTP = async () => {
         setOtpLoading(true);
         setOtpError(null);
         try {
@@ -189,7 +205,7 @@ export default function VisitDetailPage({ params }: { params: Promise<PageParams
                     <div className="flex items-center gap-4 py-4 border-t border-b border-gray-100 mb-4">
                         {visit.property?.thumbnail_url && (
                             <img
-                                src={visit.property.thumbnail_url}
+                                src={getImageUrl(visit.property.thumbnail_url) || ''}
                                 className="w-16 h-16 rounded-lg object-cover"
                                 alt="Property"
                             />
@@ -202,6 +218,20 @@ export default function VisitDetailPage({ params }: { params: Promise<PageParams
                             </div>
                         </div>
                     </div>
+
+                    {visit.property?.latitude && visit.property?.longitude && (
+                        <div className="mb-6 aspect-video w-full rounded-xl overflow-hidden border border-gray-100 shadow-inner">
+                            <iframe
+                                width="100%"
+                                height="100%"
+                                style={{ border: 0 }}
+                                loading="lazy"
+                                allowFullScreen
+                                referrerPolicy="no-referrer-when-downgrade"
+                                src={`https://maps.google.com/maps?q=${visit.property.latitude},${visit.property.longitude}&z=15&output=embed`}
+                            ></iframe>
+                        </div>
+                    )}
 
                     {/* OTP Display - Show when visit is CHECKED_IN */}
                     {isCheckedIn && (
@@ -362,24 +392,42 @@ export default function VisitDetailPage({ params }: { params: Promise<PageParams
                     )}
                 </div>
 
-                {/* Make Offer Section - Show for completed visits */}
+                {/* Follow-up / Make Offer Section - Show for completed visits */}
                 {isCompleted && (
                     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100 mb-6">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                            <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shrink-0">
                                 <DollarSign className="w-6 h-6 text-white" />
                             </div>
                             <div className="flex-1">
-                                <h3 className="font-bold text-gray-900">Interested in this property?</h3>
-                                <p className="text-gray-600 text-sm">Make an offer to start the purchase process</p>
+                                <h3 className="font-bold text-gray-900">Next Steps</h3>
+                                <p className="text-gray-600 text-sm">
+                                    {followupContext?.suggested_actions.includes('MAKE_OFFER')
+                                        ? "Interested in this property? Make an offer or message the agent with questions."
+                                        : "Message the agent for further details or negotiation."}
+                                </p>
                             </div>
-                            <button
-                                onClick={() => setShowOfferModal(true)}
-                                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 flex items-center gap-2"
-                            >
-                                <DollarSign className="w-4 h-4" />
-                                Make Offer
-                            </button>
+                            <div className="flex flex-col sm:flex-row gap-2 mt-4 sm:mt-0 w-full sm:w-auto">
+                                {followupContext?.suggested_actions.includes('MESSAGE_AGENT') && (
+                                    <button
+                                        onClick={() => alert('Messaging UI coming soon! (Phase 3)')}
+                                        className="px-6 py-3 bg-white text-blue-700 border border-blue-200 rounded-xl font-medium hover:bg-blue-50 flex items-center justify-center gap-2 transition-colors"
+                                    >
+                                        <MessageSquare className="w-4 h-4" />
+                                        Message Agent
+                                    </button>
+                                )}
+
+                                {followupContext?.suggested_actions.includes('MAKE_OFFER') && (
+                                    <button
+                                        onClick={() => setShowOfferModal(true)}
+                                        className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors shadow-sm"
+                                    >
+                                        <DollarSign className="w-4 h-4" />
+                                        Make Offer
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
@@ -538,7 +586,6 @@ export default function VisitDetailPage({ params }: { params: Promise<PageParams
                 propertyId={visit.property_id}
                 propertyTitle={visit.property?.title || 'Property'}
                 propertyPrice={(visit.property as any)?.price || 0}
-                visitId={visit.id}
             />
         </div>
     );

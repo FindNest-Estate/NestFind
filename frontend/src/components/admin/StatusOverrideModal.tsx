@@ -2,9 +2,7 @@
 
 import { useState } from 'react';
 import { X, AlertTriangle, Loader2 } from 'lucide-react';
-import { getCurrentUser } from '@/lib/authApi';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { post } from '@/lib/api';
 
 interface StatusOverrideModalProps {
     isOpen: boolean;
@@ -54,39 +52,10 @@ export default function StatusOverrideModal({
         setError(null);
 
         try {
-            // Get token manually since we're in a specific component context
-            // In a real app we'd use a better fetch wrapper
-            const user = await getCurrentUser();
-            // We assume token is handled by cookie/interceptor in axios/fetch wrapper
-            // But here we need to make sure we send the request correctly.
-            // Let's assume common fetch pattern with cookies if available, 
-            // but for admin actions, we might need to be careful.
-
-            // NOTE: The previous API calls seem to rely on cookies or local implementation.
-            // I'll use a direct fetch here assuming standard auth handling.
-
-            // To be safe, let's look for a token in document.cookie if we need it
-            let token = '';
-            const match = document.cookie.match(/(^| )access_token=([^;]+)/);
-            if (match) token = match[2];
-
-            const response = await fetch(`${API_BASE_URL}/admin/properties/${propertyId}/override`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    new_status: newStatus,
-                    reason: reason.trim()
-                })
+            await post(`/admin/properties/${propertyId}/override`, {
+                new_status: newStatus,
+                reason: reason.trim()
             });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.detail || 'Failed to override status');
-            }
 
             onSuccess(newStatus);
             onClose();

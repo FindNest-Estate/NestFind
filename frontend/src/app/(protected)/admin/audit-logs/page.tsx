@@ -1,200 +1,117 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { History, User, Search, Filter, Calendar, Code, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format } from 'date-fns';
-import { getAuditLogs, AuditLogItem } from '@/lib/api/admin';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, History, ChevronLeft, ChevronRight, Users, Building2, DollarSign, Shield } from 'lucide-react';
+import { getAuditLogs, AuditLogItem, AuditLogResponse } from '@/lib/api/admin';
+import StatusBadge from '@/components/ui/StatusBadge';
+import { formatDistanceToNow } from 'date-fns';
 
-export default function AuditLogsPage() {
+export default function AdminAuditLogsPage() {
     const [logs, setLogs] = useState<AuditLogItem[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [filters, setFilters] = useState({
-        action: '',
-        user_id: '',
-        page: 1,
-        per_page: 20
-    });
-    const [pagination, setPagination] = useState({
-        total: 0,
-        pages: 1
-    });
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    const [entityFilter, setEntityFilter] = useState('');
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
 
-    const fetchLogs = async () => {
-        setIsLoading(true);
+    const loadLogs = useCallback(async () => {
+        setLoading(true);
         try {
-            const res = await getAuditLogs({
-                page: filters.page,
-                per_page: filters.per_page,
-                action: filters.action || undefined,
-                user_id: filters.user_id || undefined
-            });
-            setLogs(res.items);
-            setPagination({
-                total: res.total,
-                pages: res.pages
-            });
-        } catch (error) {
-            console.error('Failed to fetch audit logs', error);
-        } finally {
-            setIsLoading(false);
+            const res = await getAuditLogs({ page, per_page: 30, search: search || undefined, entity_type: entityFilter || undefined });
+            if (res) {
+                setLogs(res.items || []);
+                setTotalPages(res.total_pages || 1);
+            }
+        } catch { /* handled */ } finally { setLoading(false); }
+    }, [page, search, entityFilter]);
+
+    useEffect(() => { loadLogs(); }, [loadLogs]);
+
+    const getEntityIcon = (type: string) => {
+        switch (type) {
+            case 'user': return <Users className="w-3.5 h-3.5 text-[var(--color-info)]" />;
+            case 'property': return <Building2 className="w-3.5 h-3.5 text-[var(--color-success)]" />;
+            case 'transaction': return <DollarSign className="w-3.5 h-3.5 text-[var(--color-brand)]" />;
+            default: return <Shield className="w-3.5 h-3.5 text-[var(--gray-500)]" />;
         }
-    };
-
-    useEffect(() => {
-        fetchLogs();
-    }, [filters.page, filters.action, filters.user_id]); // Fetch when filters/page change
-
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        setFilters(prev => ({ ...prev, page: 1 }));
     };
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <History className="w-6 h-6 text-emerald-600" />
-                        Audit Logs
-                    </h1>
-                    <p className="text-gray-500">Track system activity and administrator actions</p>
-                </div>
+            <div>
+                <h1 className="text-xl font-bold text-[var(--gray-900)]">Audit Logs</h1>
+                <p className="text-sm text-[var(--gray-500)] mt-0.5">System activity and action history</p>
             </div>
 
             {/* Filters */}
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-wrap gap-4 items-center">
-                <div className="flex-1 min-w-[200px] relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Filter by Action (e.g. USER_LOGIN)"
-                        className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                        value={filters.action}
-                        onChange={(e) => setFilters(prev => ({ ...prev, action: e.target.value, page: 1 }))}
-                    />
+            <div className="bg-white rounded-[var(--card-radius)] border border-[var(--gray-200)] p-3 flex flex-wrap gap-3">
+                <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-[var(--gray-400)]" />
+                    <input type="text" placeholder="Search logs..." value={search}
+                        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                        className="w-full pl-9 pr-4 py-2 bg-white border border-[var(--gray-200)] rounded-[var(--radius-sm)] text-sm outline-none focus:border-[var(--color-brand)]" />
                 </div>
-                {/* User ID Filter (Optional) */}
-                <div className="min-w-[200px] relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Filter by User UUID"
-                        className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                        value={filters.user_id}
-                        onChange={(e) => setFilters(prev => ({ ...prev, user_id: e.target.value, page: 1 }))}
-                    />
-                </div>
-
-                <button
-                    onClick={() => fetchLogs()}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition-colors"
-                >
-                    Refresh
-                </button>
+                <select value={entityFilter} onChange={(e) => { setEntityFilter(e.target.value); setPage(1); }}
+                    className="px-3 py-2 bg-white border border-[var(--gray-200)] rounded-[var(--radius-sm)] text-sm outline-none cursor-pointer">
+                    <option value="">All Events</option>
+                    <option value="user">User</option>
+                    <option value="property">Property</option>
+                    <option value="transaction">Transaction</option>
+                    <option value="agent">Agent</option>
+                </select>
             </div>
 
-            {/* Table */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-medium">
-                            <tr>
-                                <th className="px-6 py-4">Action</th>
-                                <th className="px-6 py-4">User</th>
-                                <th className="px-6 py-4">Entity</th>
-                                <th className="px-6 py-4">IP Address</th>
-                                <th className="px-6 py-4">Date</th>
-                                <th className="px-6 py-4">Details</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {isLoading ? (
-                                Array.from({ length: 5 }).map((_, i) => (
-                                    <tr key={i} className="animate-pulse">
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-24"></div></td>
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-32"></div></td>
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-20"></div></td>
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-24"></div></td>
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-32"></div></td>
-                                        <td className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-16"></div></td>
-                                    </tr>
-                                ))
-                            ) : logs.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                                        <History className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                                        No audit logs found
-                                    </td>
-                                </tr>
-                            ) : (
-                                logs.map((log) => (
-                                    <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
-                                        <td className="px-6 py-4 font-medium text-gray-900">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                {log.action}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700 font-bold text-xs">
-                                                    {log.user_name.charAt(0).toUpperCase()}
-                                                </div>
-                                                <div>
-                                                    <div className="font-medium text-gray-900">{log.user_name}</div>
-                                                    <div className="text-xs text-gray-500">{log.user_email}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-600">
-                                            {log.entity_type} {log.entity_id && <span className="text-xs text-gray-400">#{log.entity_id.slice(0, 8)}</span>}
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-600 font-mono text-xs">
-                                            {log.ip_address || '-'}
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
-                                            {format(new Date(log.timestamp), 'MMM d, h:mm a')}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            {log.details ? (
-                                                <div className="group relative">
-                                                    <Code className="w-4 h-4 text-gray-400 cursor-help" />
-                                                    <div className="absolute right-0 bottom-full mb-2 w-64 bg-gray-900 text-white text-xs p-2 rounded shadow-xl hidden group-hover:block z-50 overflow-hidden break-words font-mono">
-                                                        {log.details}
-                                                    </div>
-                                                </div>
-                                            ) : '-'}
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Pagination */}
-                <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
-                    <p className="text-sm text-gray-500">
-                        Showing page <span className="font-medium">{filters.page}</span> of <span className="font-medium">{pagination.pages}</span>
-                    </p>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => setFilters(prev => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
-                            disabled={filters.page === 1}
-                            className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => setFilters(prev => ({ ...prev, page: Math.min(pagination.pages, prev.page + 1) }))}
-                            disabled={filters.page >= pagination.pages}
-                            className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <ChevronRight className="w-4 h-4" />
-                        </button>
+            {/* Logs */}
+            <div className="bg-white rounded-[var(--card-radius)] border border-[var(--gray-200)]">
+                {loading ? (
+                    <div className="py-16 text-center">
+                        <div className="h-6 w-6 animate-spin rounded-full border-3 border-[var(--color-brand)] border-t-transparent mx-auto" />
+                        <p className="text-sm text-[var(--gray-400)] mt-3">Loading logs...</p>
                     </div>
-                </div>
+                ) : logs.length === 0 ? (
+                    <div className="py-16 text-center">
+                        <History className="w-10 h-10 text-[var(--gray-300)] mx-auto mb-2" />
+                        <p className="text-sm font-medium text-[var(--gray-900)]">No audit logs found</p>
+                    </div>
+                ) : (
+                    <div className="p-5">
+                        <div className="space-y-4 relative before:absolute before:left-[15px] before:top-2 before:bottom-2 before:w-px before:bg-[var(--gray-100)]">
+                            {logs.map((item) => (
+                                <div key={item.id} className="flex gap-3 relative">
+                                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 bg-white border border-[var(--gray-200)]">
+                                        {getEntityIcon(item.entity_type)}
+                                    </div>
+                                    <div className="pt-1 min-w-0 flex-1">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <p className="text-xs text-[var(--gray-900)]">
+                                                <span className="font-semibold">{item.user_name}</span>{' '}
+                                                <span className="text-[var(--gray-600)]">{item.action.toLowerCase().replace(/_/g, ' ')}</span>
+                                                {item.entity_type && <span className="text-[var(--gray-500)]"> on {item.entity_type}</span>}
+                                            </p>
+                                            <span className="text-[11px] text-[var(--gray-400)] flex-shrink-0">
+                                                {item.timestamp ? formatDistanceToNow(new Date(item.timestamp), { addSuffix: true }) : ''}
+                                            </span>
+                                        </div>
+                                        {item.details && (
+                                            <p className="text-[11px] text-[var(--gray-400)] mt-0.5 line-clamp-1">{item.details}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                {totalPages > 1 && (
+                    <div className="px-5 py-3 border-t border-[var(--gray-100)] flex items-center justify-between text-xs text-[var(--gray-500)]">
+                        <span>Page {page} of {totalPages}</span>
+                        <div className="flex gap-1">
+                            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+                                className="p-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--gray-50)] disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
+                            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+                                className="p-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--gray-50)] disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

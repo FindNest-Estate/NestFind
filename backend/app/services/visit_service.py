@@ -28,7 +28,7 @@ class VisitService:
         'REQUESTED': ['APPROVED', 'REJECTED', 'CANCELLED', 'COUNTERED'],
         'COUNTERED': ['APPROVED', 'REJECTED', 'CANCELLED', 'COUNTERED'],
         'APPROVED': ['CHECKED_IN', 'NO_SHOW', 'CANCELLED'],
-        'CHECKED_IN': ['COMPLETED'],
+        'CHECKED_IN': ['COMPLETED', 'NO_SHOW'],
         'REJECTED': [],
         'COMPLETED': [],
         'NO_SHOW': [],
@@ -124,7 +124,7 @@ class VisitService:
             if not property_row:
                 return {"success": False, "error": "Property not found"}
             
-            if property_row['status'] != 'ACTIVE':
+            if property_row['status'] not in ('ACTIVE', 'UNDER_DEAL'):
                 return {
                     "success": False, 
                     "error": f"Property is not available for visits. Current status: {property_row['status']}"
@@ -151,17 +151,17 @@ class VisitService:
             preferred_date_naive = preferred_date.replace(tzinfo=None)
             now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
 
-            # Check for existing pending visit
+            # Check for existing active visit
             existing = await conn.fetchrow("""
-                SELECT id FROM visit_requests
+                SELECT id, status FROM visit_requests
                 WHERE property_id = $1 AND buyer_id = $2 
-                AND status IN ('REQUESTED', 'APPROVED')
+                AND status IN ('REQUESTED', 'APPROVED', 'CHECKED_IN', 'COUNTERED')
             """, property_id, buyer_id)
             
             if existing:
                 return {
                     "success": False, 
-                    "error": "You already have a pending visit request for this property"
+                    "error": f"You already have an active visit {existing['status'].lower()} for this property"
                 }
             
             # Create visit request
@@ -343,7 +343,10 @@ class VisitService:
                     p.address as property_address, p.latitude as property_lat,
                     p.longitude as property_lng, p.price as property_price,
                     buyer.full_name as buyer_name, buyer.email as buyer_email,
-                    agent.full_name as agent_name
+                    agent.full_name as agent_name,
+                    (SELECT file_url FROM property_media 
+                     WHERE property_id = p.id AND is_primary = true AND deleted_at IS NULL 
+                     LIMIT 1) as thumbnail_url
                 FROM visit_requests vr
                 JOIN properties p ON p.id = vr.property_id
                 JOIN users buyer ON buyer.id = vr.buyer_id
@@ -377,7 +380,8 @@ class VisitService:
                         "address": visit['property_address'] if is_agent else None,
                         "latitude": visit['property_lat'],
                         "longitude": visit['property_lng'],
-                        "price": float(visit['property_price']) if visit['property_price'] else None
+                        "price": float(visit['property_price']) if visit['property_price'] else None,
+                        "thumbnail_url": visit['thumbnail_url']
                     },
                     "buyer": {
                         "id": str(visit['buyer_id']),
@@ -406,6 +410,7 @@ class VisitService:
                         "gps_lat": verification['agent_gps_lat'] if verification else None,
                         "gps_lng": verification['agent_gps_lng'] if verification else None,
                         "gps_verified_at": verification['gps_verified_at'].isoformat() if verification and verification['gps_verified_at'] else None,
+                        "otp_verified_at": verification.get('otp_verified_at').isoformat() if verification and verification.get('otp_verified_at') else None,
                         "completed_at": verification['completed_at'].isoformat() if verification and verification['completed_at'] else None,
                         "duration_minutes": verification['duration_minutes'] if verification else None
                     } if verification else None
@@ -466,6 +471,46 @@ class VisitService:
                 )
             except Exception:
                 pass
+            
+            # ===================================================================
+            # DEAL INTEGRATION (Phase 1.5) - Silent orchestration
+            # ===================================================================
+            try:
+                from .deal_service import DealService
+                deal_service = DealService(self.db)
+                
+                # Get or create deal for this property + buyer
+                deal = await deal_service.get_or_create_deal(
+                    property_id=visit['property_id'],
+                    buyer_id=visit['buyer_id'],
+                    conn=conn
+                )
+                
+                if deal:
+                    # Transition to VISIT_SCHEDULED (if not already past it)
+                    if deal['status'] == 'INITIATED':
+                        await deal_service.transition_deal(
+                            deal_id=deal['id'],
+                            new_status='VISIT_SCHEDULED',
+                            actor_id=agent_id,
+                            actor_role='AGENT',
+                            notes=f'Visit approved for {visit["property_title"]}',
+                            metadata={'visit_id': str(visit_id)},
+                            ip_address=ip_address,
+                            existing_conn=conn
+                        )
+                    
+                    # Link visit to deal
+                    await deal_service.link_visit(
+                        deal_id=deal['id'],
+                        visit_request_id=visit_id,
+                        actor_id=agent_id,
+                        actor_role='AGENT',
+                        conn=conn
+                    )
+            except Exception as e:
+                # Silent failure - don't block legacy flow
+                print(f"[WARN] DEAL integration failed in approve_visit: {str(e)}")
             
             return {
                 "success": True,
@@ -636,6 +681,17 @@ class VisitService:
                     "error": f"Cannot complete visit in {visit['status']} status. Must check in first."
                 }
             
+            # Verify OTP has been verified
+            verification_record = await conn.fetchrow("""
+                SELECT otp_verified_at FROM visit_verifications WHERE visit_id = $1
+            """, visit_id)
+            
+            if not verification_record or not verification_record['otp_verified_at']:
+                return {
+                    "success": False,
+                    "error": "Cannot complete visit. Buyer identity must be verified via OTP first."
+                }
+            
             # Update visit status
             await conn.execute("""
                 UPDATE visit_requests SET status = 'COMPLETED' WHERE id = $1
@@ -735,7 +791,10 @@ class VisitService:
         """Agent marks buyer as no-show."""
         async with self.db.acquire() as conn:
             visit = await conn.fetchrow("""
-                SELECT * FROM visit_requests WHERE id = $1
+                SELECT vr.*, p.title as property_title
+                FROM visit_requests vr
+                JOIN properties p ON p.id = vr.property_id
+                WHERE vr.id = $1
             """, visit_id)
             
             if not visit:
@@ -753,6 +812,20 @@ class VisitService:
             await conn.execute("""
                 UPDATE visit_requests SET status = 'NO_SHOW' WHERE id = $1
             """, visit_id)
+            
+            # Notify buyer
+            try:
+                notifications_service = NotificationsService(self.db)
+                await notifications_service.create_notification(
+                    user_id=visit['buyer_id'],
+                    notification_type='VISIT_NO_SHOW',
+                    title='Visit Missed',
+                    message=f'You have been marked as a no-show for your visit to {visit["property_title"]}',
+                    related_entity_type='visit',
+                    related_entity_id=visit_id
+                )
+            except Exception:
+                pass
             
             return {
                 "success": True,
@@ -902,13 +975,18 @@ class VisitService:
                 if not visit['counter_date']:
                      return {"success": False, "error": "No counter date found"}
 
+                # Ensure we have a naive datetime for the TIMESTAMP column
+                confirmed_date = visit['counter_date']
+                if confirmed_date and confirmed_date.tzinfo is not None:
+                    confirmed_date = confirmed_date.astimezone(timezone.utc).replace(tzinfo=None)
+
                 await conn.execute("""
                     UPDATE visit_requests
                     SET status = 'APPROVED',
                         confirmed_date = $2,
                         responded_at = NOW()
                     WHERE id = $1
-                """, visit_id, visit['counter_date'])
+                """, visit_id, confirmed_date)
                 
                 new_status = 'APPROVED'
                 msg = "Visit approved/confirmed"
@@ -927,6 +1005,48 @@ class VisitService:
                     )
                 except Exception:
                     pass
+                
+                # ===================================================================
+                # DEAL INTEGRATION (Phase 1.5) - Silent orchestration
+                # ===================================================================
+                try:
+                    from .deal_service import DealService
+                    deal_service = DealService(self.db)
+                    
+                    # Determine actor role
+                    actor_role = 'AGENT' if visit['agent_id'] == user_id else 'BUYER'
+                    
+                    # Get or create deal
+                    deal = await deal_service.get_or_create_deal(
+                        property_id=visit['property_id'],
+                        buyer_id=visit['buyer_id'],
+                        conn=conn
+                    )
+                    
+                    if deal:
+                        # Transition to VISIT_SCHEDULED (if not already past it)
+                        if deal['status'] == 'INITIATED':
+                            await deal_service.transition_deal(
+                                deal_id=deal['id'],
+                                new_status='VISIT_SCHEDULED',
+                                actor_id=user_id,
+                                actor_role=actor_role,
+                                notes=f'Visit counter-offer accepted for {visit["property_title"]}',
+                                metadata={'visit_id': str(visit_id)},
+                                existing_conn=conn
+                            )
+                        
+                        # Link visit to deal
+                        await deal_service.link_visit(
+                            deal_id=deal['id'],
+                            visit_request_id=visit_id,
+                            actor_id=user_id,
+                            actor_role=actor_role,
+                            conn=conn
+                        )
+                except Exception as e:
+                    # Silent failure - don't block legacy flow
+                    print(f"[WARN] DEAL integration failed in respond_to_counter: {str(e)}")
 
             else:
                 # Reject counter -> REJECTED
@@ -1160,4 +1280,67 @@ This code is valid for 10 minutes.
                     "expires_at": otp_record['expires_at'].isoformat(),
                     "property_title": visit['property_title']
                 }
+            }
+
+    async def verify_visit_otp(
+        self,
+        visit_id: UUID,
+        agent_id: UUID,
+        otp_code: str
+    ) -> Dict[str, Any]:
+        """
+        Agent verifies the OTP provided by the buyer.
+        """
+        async with self.db.acquire() as conn:
+            # Get visit and latest active OTP
+            visit = await conn.fetchrow("""
+                SELECT vr.id, vr.agent_id, vr.status
+                FROM visit_requests vr
+                WHERE vr.id = $1
+            """, visit_id)
+            
+            if not visit:
+                return {"success": False, "error": "Visit not found"}
+            
+            if visit['agent_id'] != agent_id:
+                return {"success": False, "error": "Access denied"}
+            
+            if visit['status'] != 'CHECKED_IN':
+                return {
+                    "success": False,
+                    "error": f"Cannot verify OTP for visit in {visit['status']} status."
+                }
+            
+            # Match OTP
+            otp_record = await conn.fetchrow("""
+                SELECT otp_code, expires_at
+                FROM visit_otp
+                WHERE visit_id = $1 AND expires_at > NOW()
+                ORDER BY created_at DESC
+                LIMIT 1
+            """, visit_id)
+            
+            if not otp_record:
+                return {
+                    "success": False,
+                    "error": "No valid OTP found. It may have expired."
+                }
+            
+            if otp_record['otp_code'] != otp_code:
+                return {
+                    "success": False,
+                    "error": "Invalid verification code. Please check and try again."
+                }
+            
+            # Success - update verification record
+            await conn.execute("""
+                UPDATE visit_verifications
+                SET otp_verified_at = NOW()
+                WHERE visit_id = $1
+            """, visit_id)
+            
+            return {
+                "success": True,
+                "message": "OTP verified successfully. Buyer presence confirmed.",
+                "verified_at": datetime.now(timezone.utc).isoformat()
             }

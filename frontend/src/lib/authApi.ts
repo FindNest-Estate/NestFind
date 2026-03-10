@@ -174,6 +174,16 @@ export async function changePassword(
     return put('/user/password', data);
 }
 
+/**
+ * Activate SELLER role for current user
+ * 
+ * Endpoint: POST /user/activate-seller
+ * Idempotent: returns existing roles if already seller
+ */
+export async function activateSeller(): Promise<{ success: boolean; message: string; roles: string[] }> {
+    return post('/user/activate-seller');
+}
+
 // ============================================================================
 // Admin Actions
 // ============================================================================

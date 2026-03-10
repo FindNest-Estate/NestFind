@@ -7,9 +7,10 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCurrentUser } from '@/lib/authApi';
+import { useAuth } from '@/lib/auth';
+import { UserRole } from '@/lib/auth/types';
 
 interface User {
     id: string;
@@ -22,32 +23,31 @@ interface User {
 /**
  * Role-specific home pages
  */
-const ROLE_HOME_PAGES: Record<User['role'], string> = {
-    USER: '/buyer/dashboard',  // Users (buyers) go to dedicated dashboard
-    AGENT: '/agent/dashboard',
-    ADMIN: '/admin',
+const ROLE_HOME_PAGES: Record<string, string> = {
+    [UserRole.BUYER]: '/properties',      // Buyers go to properties (home)
+    [UserRole.SELLER]: '/sell/dashboard', // Sellers go to dashboard
+    [UserRole.AGENT]: '/agent/dashboard', // Agents go to dashboard
+    [UserRole.ADMIN]: '/admin',           // Admins go to admin panel
 };
 
 export default function DashboardRouterPage() {
     const router = useRouter();
-    const [isLoading, setIsLoading] = useState(true);
+    const { user, activeContext, isLoading } = useAuth();
 
     useEffect(() => {
-        async function redirectToRoleHome() {
-            try {
-                const user = await getCurrentUser();
-                const targetPage = ROLE_HOME_PAGES[user.role] || '/';
-                router.replace(targetPage);
-            } catch (error) {
-                console.error('[DashboardRouter] Auth check failed:', error);
-                router.replace('/login');
-            } finally {
-                setIsLoading(false);
-            }
+        if (isLoading) return;
+
+        if (!user) {
+            router.replace('/login');
+            return;
         }
 
-        redirectToRoleHome();
-    }, [router]);
+        // Use activeContext if available, otherwise fallback to primary role
+        const contextToUse = activeContext || user.role;
+        const targetPage = ROLE_HOME_PAGES[contextToUse] || '/';
+
+        router.replace(targetPage);
+    }, [user, activeContext, isLoading, router]);
 
     if (isLoading) {
         return (

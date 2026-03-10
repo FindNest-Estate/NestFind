@@ -139,8 +139,8 @@ export default function PropertyComparison({ properties, onClose }: PropertyComp
                             </tr>
 
                             {/* Type */}
-                            <tr className="border-t border-gray-200 bg-gray-50/50">
-                                <td className="p-4 font-semibold text-gray-700 sticky left-0 bg-gray-50/50">Type</td>
+                            <tr className="border-t border-gray-200 bg-gray-50">
+                                <td className="p-4 font-semibold text-gray-700 sticky left-0 bg-gray-50">Type</td>
                                 {properties.map((property) => (
                                     <td key={property.id} className="p-4">
                                         <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
@@ -164,8 +164,8 @@ export default function PropertyComparison({ properties, onClose }: PropertyComp
                             </tr>
 
                             {/* Bathrooms */}
-                            <tr className="border-t border-gray-200 bg-gray-50/50">
-                                <td className="p-4 font-semibold text-gray-700 sticky left-0 bg-gray-50/50">Bathrooms</td>
+                            <tr className="border-t border-gray-200 bg-gray-50">
+                                <td className="p-4 font-semibold text-gray-700 sticky left-0 bg-gray-50">Bathrooms</td>
                                 {properties.map((property) => (
                                     <td key={property.id} className="p-4">
                                         <div className="flex items-center gap-2 text-gray-700">
@@ -192,8 +192,8 @@ export default function PropertyComparison({ properties, onClose }: PropertyComp
                             </tr>
 
                             {/* Price per sqft */}
-                            <tr className="border-t border-gray-200 bg-gray-50/50">
-                                <td className="p-4 font-semibold text-gray-700 sticky left-0 bg-gray-50/50">Price/sqft</td>
+                            <tr className="border-t border-gray-200 bg-gray-50">
+                                <td className="p-4 font-semibold text-gray-700 sticky left-0 bg-gray-50">Price/sqft</td>
                                 {properties.map((property) => {
                                     const pricePerSqft = property.price && property.area_sqft
                                         ? (property.price / property.area_sqft).toFixed(0)

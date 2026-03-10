@@ -110,6 +110,29 @@ class CRMLeadsResponse(BaseModel):
     leads: List[dict]
 
 
+class CRMLeadCreateRequest(BaseModel):
+    name: str
+    email: str
+    phone: Optional[str] = None
+    type: str = "BUYER"
+    stage: str = "NEW"
+    temperature: str = "WARM"
+    notes: Optional[str] = None
+    expected_value: Optional[float] = None
+
+
+class CRMLeadUpdateRequest(BaseModel):
+    stage: Optional[str] = None
+    temperature: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class CRMLeadActionResponse(BaseModel):
+    success: bool
+    lead_id: Optional[str] = None
+    error: Optional[str] = None
+
+
 class InsightsResponse(BaseModel):
     success: bool
     insights: List[dict]
@@ -124,6 +147,18 @@ class MarketingAssetResponse(BaseModel):
     success: bool
     asset_url: str
     type: str
+
+
+class MarketingProfileResponse(BaseModel):
+    success: bool
+    profile: dict
+
+
+class MarketingProfileUpdateRequest(BaseModel):
+    bio: Optional[str] = None
+    social_links: Optional[dict] = None
+    service_areas: Optional[List[str]] = None
+    photo_url: Optional[str] = None
 
 
 class MarketingTemplatesResponse(BaseModel):
@@ -338,6 +373,7 @@ async def complete_verification(
         gps_lng=body.gps_lng,
         notes=body.notes,
         rejection_reason=body.rejection_reason,
+        checklist=body.checklist,
         ip_address=ip_address
     )
     
@@ -444,6 +480,65 @@ async def get_crm_leads(
     return CRMLeadsResponse(**result)
 
 
+@router.post("/agent/crm/leads", response_model=CRMLeadActionResponse)
+async def create_crm_lead(
+    body: CRMLeadCreateRequest,
+    current_user: AuthenticatedUser = Depends(require_role("AGENT")),
+    db_pool = Depends(get_db_pool)
+):
+    """
+    Create a new manual CRM lead.
+    """
+    service = AgentAssignmentService(db_pool)
+    result = await service.create_crm_lead(
+        agent_id=current_user.user_id,
+        lead_data=body.dict(exclude_unset=True)
+    )
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result.get("error"))
+    return CRMLeadActionResponse(**result)
+
+
+@router.put("/agent/crm/leads/{lead_id}", response_model=CRMLeadActionResponse)
+async def update_crm_lead(
+    lead_id: UUID,
+    body: CRMLeadUpdateRequest,
+    current_user: AuthenticatedUser = Depends(require_role("AGENT")),
+    db_pool = Depends(get_db_pool)
+):
+    """
+    Update a manual CRM lead (e.g., change stage).
+    """
+    service = AgentAssignmentService(db_pool)
+    result = await service.update_crm_lead(
+        agent_id=current_user.user_id,
+        lead_id=lead_id,
+        update_data=body.dict(exclude_unset=True)
+    )
+    if not result["success"]:
+        raise HTTPException(status_code=404, detail=result.get("error"))
+    return CRMLeadActionResponse(success=True, lead_id=str(lead_id))
+
+
+@router.delete("/agent/crm/leads/{lead_id}", response_model=CRMLeadActionResponse)
+async def delete_crm_lead(
+    lead_id: UUID,
+    current_user: AuthenticatedUser = Depends(require_role("AGENT")),
+    db_pool = Depends(get_db_pool)
+):
+    """
+    Delete a manual CRM lead.
+    """
+    service = AgentAssignmentService(db_pool)
+    result = await service.delete_crm_lead(
+        agent_id=current_user.user_id,
+        lead_id=lead_id
+    )
+    if not result["success"]:
+        raise HTTPException(status_code=404, detail=result.get("error"))
+    return CRMLeadActionResponse(success=True, lead_id=str(lead_id))
+
+
 @router.get("/agent/insights", response_model=InsightsResponse)
 async def get_agent_insights(
     current_user: AuthenticatedUser = Depends(require_role("AGENT")),
@@ -489,6 +584,38 @@ async def get_marketing_templates(
     service = AgentAssignmentService(db_pool)
     result = await service.get_marketing_templates()
     return MarketingTemplatesResponse(**result)
+
+
+@router.get("/agent/marketing/profile", response_model=MarketingProfileResponse)
+async def get_marketing_profile(
+    current_user: AuthenticatedUser = Depends(require_role("AGENT")),
+    db_pool = Depends(get_db_pool)
+):
+    """
+    Get the agent's public marketing profile.
+    """
+    service = AgentAssignmentService(db_pool)
+    result = await service.get_marketing_profile(agent_id=current_user.user_id)
+    if not result["success"]:
+        raise HTTPException(status_code=404, detail=result.get("error"))
+    return MarketingProfileResponse(**result)
+
+
+@router.put("/agent/marketing/profile", response_model=ActionResponse)
+async def update_marketing_profile(
+    body: MarketingProfileUpdateRequest,
+    current_user: AuthenticatedUser = Depends(require_role("AGENT")),
+    db_pool = Depends(get_db_pool)
+):
+    """
+    Update or create the agent's marketing profile.
+    """
+    service = AgentAssignmentService(db_pool)
+    result = await service.update_marketing_profile(
+        agent_id=current_user.user_id,
+        profile_data=body.dict(exclude_unset=True)
+    )
+    return ActionResponse(success=True)
 
 
 @router.get("/agent/marketing/history", response_model=MarketingHistoryResponse)

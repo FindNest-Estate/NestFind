@@ -13,7 +13,7 @@ from typing import Optional
 from uuid import UUID
 
 from ..core.database import get_db_pool
-from ..middleware.auth_middleware import get_current_user, AuthenticatedUser
+from ..middleware.auth_middleware import get_current_user, AuthenticatedUser, require_role
 from ..services.reservation_service import ReservationService
 from ..services.payment_gateway import get_payment_provider
 
@@ -44,7 +44,7 @@ def get_client_ip(request: Request) -> str:
 async def create_reservation(
     data: ReservationCreate,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("BUYER"))
 ):
     """
     Create a reservation for an accepted offer.
@@ -142,12 +142,46 @@ async def get_reservation(
     return result
 
 
+class ReservationProof(BaseModel):
+    proof_url: str = Field(..., description="URL to the uploaded payment proof")
+
+
+@router.post("/{reservation_id}/proof")
+async def submit_payment_proof(
+    reservation_id: UUID,
+    data: ReservationProof,
+    request: Request,
+    current_user: AuthenticatedUser = Depends(require_role("BUYER"))
+):
+    """
+    Submit payment proof for a reservation.
+    """
+    pool = get_db_pool()
+    service = ReservationService(pool)
+    
+    result = await service.submit_payment_proof(
+        reservation_id=reservation_id,
+        proof_url=data.proof_url,
+        user_id=current_user.user_id,
+        ip_address=get_client_ip(request)
+    )
+    
+    if not result["success"]:
+        if "not found" in result["error"].lower():
+            raise HTTPException(status_code=404, detail=result["error"])
+        elif "only" in result["error"].lower():
+            raise HTTPException(status_code=403, detail=result["error"])
+        raise HTTPException(status_code=400, detail=result["error"])
+    
+    return result
+
+
 @router.post("/{reservation_id}/cancel")
 async def cancel_reservation(
     reservation_id: UUID,
     data: ReservationCancel,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("BUYER"))
 ):
     """
     Cancel a reservation.

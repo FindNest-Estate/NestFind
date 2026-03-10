@@ -75,6 +75,7 @@ class ViewerContext(BaseModel):
     is_owner: bool
     is_agent: bool  # The assigned agent for this property
     visit_id: Optional[str] = None  # Existing visit request ID if any
+    visit_status: Optional[str] = None
 
 
 class PropertyHighlightsResponse(BaseModel):
@@ -211,7 +212,8 @@ async def get_property_detail(
         viewer_context = ViewerContext(
             is_owner=prop["viewer"]["is_owner"],
             is_agent=prop["viewer"]["is_agent"],
-            visit_id=prop["viewer"].get("visit_id")
+            visit_id=prop["viewer"].get("visit_id"),
+            visit_status=prop["viewer"].get("visit_status")
         )
     
     return PropertyDetailResponse(

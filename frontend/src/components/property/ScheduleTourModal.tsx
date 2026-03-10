@@ -8,11 +8,12 @@ import { toast } from 'sonner';
 interface ScheduleTourModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onSuccess?: (visitId: string) => void;
     propertyId: string;
     propertyTitle: string;
 }
 
-export default function ScheduleTourModal({ isOpen, onClose, propertyId, propertyTitle }: ScheduleTourModalProps) {
+export default function ScheduleTourModal({ isOpen, onClose, onSuccess, propertyId, propertyTitle }: ScheduleTourModalProps) {
     const [date, setDate] = useState('');
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
@@ -49,6 +50,7 @@ export default function ScheduleTourModal({ isOpen, onClose, propertyId, propert
 
             if (result.success) {
                 toast.success('Visit request sent successfully!');
+                onSuccess?.(result.visit_id || '');
                 onClose();
                 // Reset form
                 setDate('');

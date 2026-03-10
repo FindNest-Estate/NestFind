@@ -8,12 +8,13 @@ import os
 load_dotenv()
 
 
-from app.routers import otp, login, session, refresh, register_user, register_agent, admin_agent_approval, user, seller_properties, property_media, public_properties, public_agents, saved_properties, agent_assignments, messaging, notifications, admin_analytics, admin_transactions, admin_users, admin_properties, admin_audit_logs, buyer, collections
+from app.routers import otp, login, session, refresh, register_user, register_agent, admin_agent_approval, user, seller_properties, property_media, public_properties, public_agents, saved_properties, agent_assignments, messaging, notifications, admin_analytics, admin_transactions, admin_users, admin_properties, admin_audit_logs, buyer, collections, admin_operations
 
 
-from app.routers import visits, offers, reservations, transactions, disputes, property_stats
+from app.routers import visits, offers, reservations, transactions, disputes, property_stats, deals, agreements, finance, settlement
 from app.routers import seller_analytics, seller_offers, seller_visits, seller_transactions, seller_settings
-from app.core.database import init_db_pool, close_db_pool
+from app.routers import activate_seller
+from app.core.database import init_db_pool, close_db_pool, get_db_pool
 from app.jobs.scheduler import init_scheduler, start_scheduler, shutdown_scheduler
 from pathlib import Path
 
@@ -37,10 +38,10 @@ app.add_middleware(
 async def startup():
     await init_db_pool()
     # Initialize and start scheduled jobs
-    db_pool = app.state.db_pool if hasattr(app.state, 'db_pool') else None
-    if db_pool:
-        init_scheduler(db_pool)
-        start_scheduler()
+    db_pool = get_db_pool()
+    app.state.db_pool = db_pool
+    init_scheduler(db_pool)
+    start_scheduler()
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -56,11 +57,13 @@ app.include_router(register_user.router)
 app.include_router(register_agent.router)
 app.include_router(admin_agent_approval.router)
 app.include_router(admin_analytics.router)
+app.include_router(admin_operations.router)
 app.include_router(admin_transactions.router)
 app.include_router(admin_users.router)
 app.include_router(admin_properties.router)
 app.include_router(admin_audit_logs.router)
 app.include_router(user.router)
+app.include_router(activate_seller.router)
 
 # PUBLIC routes MUST come before authenticated routes with /properties prefix
 # to avoid route conflicts (e.g. /properties/browse vs /properties/{id}/media)
@@ -85,6 +88,10 @@ app.include_router(offers.router)
 app.include_router(reservations.router)
 app.include_router(transactions.router)
 app.include_router(disputes.router)
+app.include_router(deals.router)
+app.include_router(agreements.router)
+app.include_router(finance.router)
+app.include_router(settlement.router)  # Phase 5A: Commission lifecycle & settlement
 
 # Seller dashboard routers
 app.include_router(seller_analytics.router)
@@ -108,3 +115,4 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+

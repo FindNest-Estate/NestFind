@@ -1,73 +1,33 @@
 import { get, post } from '@/lib/api';
-import {
-    Dispute,
-    CreateDisputeRequest,
-    DisputeListResponse,
-    DisputeDecision
-} from '@/lib/types/dispute';
+import { Dispute, RaiseDisputeRequest } from '@/lib/types/disputes';
 
-/**
- * Raise a new dispute
- */
-export async function raiseDispute(
-    data: CreateDisputeRequest
-): Promise<{ success: boolean; dispute_id: string }> {
-    return post<{ success: boolean; dispute_id: string }>('/disputes', data);
+export async function raiseDispute(dealId: string, data: RaiseDisputeRequest) {
+    return post(`/deals/${dealId}/disputes`, data);
 }
 
-/**
- * Get disputes list
- */
-export async function getDisputes(
-    status?: string,
-    page = 1,
-    perPage = 20
-): Promise<DisputeListResponse> {
-    const params = new URLSearchParams();
-    if (status) params.append('status', status);
-    params.append('page', page.toString());
-    params.append('per_page', perPage.toString());
-
-    return get<DisputeListResponse>(`/disputes?${params.toString()}`);
+export async function getDealDisputes(dealId: string) {
+    return get<{ success: boolean; disputes: Dispute[] }>(`/deals/${dealId}/disputes`);
 }
 
-/**
- * Get dispute details by ID
- */
-export async function getDisputeById(
-    disputeId: string
-): Promise<{ success: boolean; dispute: Dispute }> {
-    return get<{ success: boolean; dispute: Dispute }>(`/disputes/${disputeId}`);
+// Admin: Get All
+export async function getAllDisputes() {
+    return get<{ success: boolean; disputes: Dispute[] }>(`/disputes`);
 }
 
-/**
- * Close a dispute (Reporter)
- */
-export async function closeDispute(
-    disputeId: string
-): Promise<{ success: boolean }> {
-    return post<{ success: boolean }>(`/disputes/${disputeId}/close`);
+// Admin: Get One
+export async function getDisputeById(disputeId: string) {
+    return get<{ success: boolean; dispute: Dispute & { deal_info?: { is_frozen: boolean; freeze_reason: string } } }>(`/disputes/${disputeId}`);
 }
 
-/**
- * Assign dispute to self (Admin)
- */
-export async function assignDispute(
-    disputeId: string
-): Promise<{ success: boolean }> {
-    return post<{ success: boolean }>(`/admin/disputes/${disputeId}/assign`);
+// Admin Operations
+export async function resolveDispute(disputeId: string, status: 'RESOLVED' | 'REJECTED', adminNotes: string) {
+    return post(`/disputes/${disputeId}/resolve`, { status, admin_notes: adminNotes });
 }
 
-/**
- * Resolve dispute (Admin)
- */
-export async function resolveDispute(
-    disputeId: string,
-    decision: DisputeDecision,
-    resolutionNotes: string
-): Promise<{ success: boolean }> {
-    return post<{ success: boolean }>(`/admin/disputes/${disputeId}/resolve`, {
-        decision,
-        resolution_notes: resolutionNotes
-    });
+export async function updateDisputeStatus(disputeId: string, status: string, adminNotes?: string) {
+    return post(`/disputes/${disputeId}/status`, { status, admin_notes: adminNotes });
+}
+
+export async function toggleDealFreeze(dealId: string, freeze: boolean, reason?: string) {
+    return post(`/deals/${dealId}/freeze`, { freeze, reason });
 }

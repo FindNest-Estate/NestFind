@@ -80,9 +80,9 @@ class RegisterUserService:
                     full_name, email, mobile_number, password_hash
                 )
                 
-                # Assign USER role
+                # Assign BUYER role (hybrid role default)
                 user_role_id = await conn.fetchval(
-                    "SELECT id FROM roles WHERE name = 'USER'"
+                    "SELECT id FROM roles WHERE name = 'BUYER'"
                 )
                 
                 await conn.execute(

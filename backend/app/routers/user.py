@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 import bcrypt
 
@@ -24,6 +24,7 @@ class UserResponse(BaseModel):
     mobile_number: Optional[str]
     status: str
     role: str
+    roles: List[str]
     created_at: Optional[datetime] = None
     avatar_url: Optional[str] = None
 
@@ -72,12 +73,19 @@ async def get_me(
         async with db_pool.acquire() as conn:
             user_data = await conn.fetchrow(
                 """
-                SELECT u.id, u.email, u.full_name, u.mobile_number, u.status::text, 
-                       u.created_at, r.name::text as role
+                SELECT 
+                    u.id, 
+                    u.email, 
+                    u.full_name, 
+                    u.mobile_number, 
+                    u.status::text, 
+                    u.created_at, 
+                    array_agg(r.name::text) as roles
                 FROM users u
                 JOIN user_roles ur ON u.id = ur.user_id
                 JOIN roles r ON ur.role_id = r.id
                 WHERE u.id = $1
+                GROUP BY u.id
                 """,
                 current_user["user_id"]
             )
@@ -85,17 +93,35 @@ async def get_me(
             if not user_data:
                 raise HTTPException(status_code=404, detail="User not found")
             
+            roles_list = user_data["roles"]
+            # Determine primary role for backward compatibility
+            # Priority: ADMIN > AGENT > SELLER > BUYER
+            primary_role = "BUYER"
+            if "ADMIN" in roles_list:
+                primary_role = "ADMIN"
+            elif "AGENT" in roles_list:
+                primary_role = "AGENT"
+            elif "SELLER" in roles_list:
+                primary_role = "SELLER"
+            elif "BUYER" in roles_list:
+                primary_role = "BUYER"
+            elif roles_list:
+                primary_role = roles_list[0]
+
             return UserResponse(
                 id=user_data["id"],
                 email=user_data["email"],
                 full_name=user_data["full_name"],
                 mobile_number=user_data["mobile_number"],
                 status=user_data["status"],
-                role=user_data["role"],
+                role=primary_role,
+                roles=roles_list,
                 created_at=user_data["created_at"],
                 avatar_url=None
             )
     
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -235,4 +261,6 @@ async def change_password(
             success=True,
             message="Password updated successfully"
         )
+
+
 

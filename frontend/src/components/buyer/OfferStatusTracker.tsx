@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { CheckCircle2, Circle, Clock, AlertCircle } from 'lucide-react';
+import { OfferStatus } from '@/lib/types/offer';
 
 interface StatusStep {
     label: string;
@@ -11,7 +12,7 @@ interface StatusStep {
 }
 
 interface OfferStatusTrackerProps {
-    currentStatus: 'PENDING' | 'COUNTERED' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN';
+    currentStatus: OfferStatus;
     submittedAt: string;
     respondedAt?: string;
 }
@@ -121,8 +122,8 @@ export default function OfferStatusTracker({ currentStatus, submittedAt, respond
                             {/* Connector Line */}
                             {!isLast && (
                                 <div className={`absolute left-5 top-12 bottom-0 w-0.5 ${isComplete ? 'bg-emerald-500' :
-                                        isCurrent ? 'bg-gradient-to-b from-blue-500 to-transparent' :
-                                            'bg-gray-200'
+                                    isCurrent ? 'bg-gradient-to-b from-blue-500 to-transparent' :
+                                        'bg-gray-200'
                                     }`} />
                             )}
 
@@ -134,8 +135,8 @@ export default function OfferStatusTracker({ currentStatus, submittedAt, respond
                             >
                                 {/* Icon */}
                                 <div className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isComplete ? 'bg-emerald-500 ring-4 ring-emerald-100' :
-                                        isCurrent ? 'bg-blue-500 ring-4 ring-blue-100 animate-pulse' :
-                                            'bg-gray-200 ring-4 ring-gray-50'
+                                    isCurrent ? 'bg-blue-500 ring-4 ring-blue-100 animate-pulse' :
+                                        'bg-gray-200 ring-4 ring-gray-50'
                                     }`}>
                                     {isComplete ? (
                                         <CheckCircle2 className="w-6 h-6 text-white" />
@@ -150,8 +151,8 @@ export default function OfferStatusTracker({ currentStatus, submittedAt, respond
                                 <div className="flex-1 pb-6">
                                     <div className="flex items-start justify-between mb-1">
                                         <h4 className={`font-bold text-lg ${isComplete ? 'text-emerald-700' :
-                                                isCurrent ? 'text-blue-700' :
-                                                    'text-gray-500'
+                                            isCurrent ? 'text-blue-700' :
+                                                'text-gray-500'
                                             }`}>
                                             {step.label}
                                         </h4>
@@ -183,9 +184,9 @@ export default function OfferStatusTracker({ currentStatus, submittedAt, respond
 
             {/* Summary Card */}
             <div className={`mt-6 p-4 rounded-xl border-2 ${currentStatus === 'ACCEPTED' ? 'bg-emerald-50 border-emerald-200' :
-                    currentStatus === 'REJECTED' || currentStatus === 'WITHDRAWN' ? 'bg-red-50 border-red-200' :
-                        currentStatus === 'COUNTERED' ? 'bg-amber-50 border-amber-200' :
-                            'bg-blue-50 border-blue-200'
+                currentStatus === 'REJECTED' || currentStatus === 'WITHDRAWN' ? 'bg-red-50 border-red-200' :
+                    currentStatus === 'COUNTERED' ? 'bg-amber-50 border-amber-200' :
+                        'bg-blue-50 border-blue-200'
                 }`}>
                 <div className="flex items-start gap-3">
                     {currentStatus === 'ACCEPTED' ? (
@@ -197,9 +198,9 @@ export default function OfferStatusTracker({ currentStatus, submittedAt, respond
                     )}
                     <div>
                         <p className={`font-semibold mb-1 ${currentStatus === 'ACCEPTED' ? 'text-emerald-900' :
-                                currentStatus === 'REJECTED' || currentStatus === 'WITHDRAWN' ? 'text-red-900' :
-                                    currentStatus === 'COUNTERED' ? 'text-amber-900' :
-                                        'text-blue-900'
+                            currentStatus === 'REJECTED' || currentStatus === 'WITHDRAWN' ? 'text-red-900' :
+                                currentStatus === 'COUNTERED' ? 'text-amber-900' :
+                                    'text-blue-900'
                             }`}>
                             {currentStatus === 'ACCEPTED' && 'Offer Accepted! 🎉'}
                             {currentStatus === 'REJECTED' && 'Offer Not Accepted'}
@@ -208,9 +209,9 @@ export default function OfferStatusTracker({ currentStatus, submittedAt, respond
                             {currentStatus === 'PENDING' && 'In Progress'}
                         </p>
                         <p className={`text-sm ${currentStatus === 'ACCEPTED' ? 'text-emerald-700' :
-                                currentStatus === 'REJECTED' || currentStatus === 'WITHDRAWN' ? 'text-red-700' :
-                                    currentStatus === 'COUNTERED' ? 'text-amber-700' :
-                                        'text-blue-700'
+                            currentStatus === 'REJECTED' || currentStatus === 'WITHDRAWN' ? 'text-red-700' :
+                                currentStatus === 'COUNTERED' ? 'text-amber-700' :
+                                    'text-blue-700'
                             }`}>
                             {currentStatus === 'ACCEPTED' && 'The seller has accepted your offer. Proceed to escrow.'}
                             {currentStatus === 'REJECTED' && 'Consider submitting a new offer or browsing other properties.'}

@@ -69,7 +69,7 @@ export default function NotificationBell() {
                         transition={{ duration: 0.2 }}
                         className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-lg border border-gray-100 ring-1 ring-black ring-opacity-5 z-50 overflow-hidden"
                     >
-                        <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                        <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
                             <h3 className="font-semibold text-gray-900">Notifications</h3>
                             {unreadCount > 0 && (
                                 <button

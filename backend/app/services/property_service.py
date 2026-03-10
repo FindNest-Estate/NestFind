@@ -405,8 +405,7 @@ class PropertyService:
                 "visibility": self._compute_visibility(status),
                 "agent": agent,
                 "media": [dict(m) for m in media],
-                "highlights": [dict(h) for h in highlights],
-                "price_history": [dict(ph) for ph in price_history],
+
                 "created_at": row["created_at"].isoformat(),
                 "updated_at": row["updated_at"].isoformat(),
                 "has_media": len(media) > 0
@@ -479,7 +478,7 @@ class PropertyService:
                         print(f"[PropertyService] Updating field: {field} = {updates[field]}")
                 
                 if not update_fields:
-                    return {"success": False, "error": "No valid fields to update", "code": 400}
+                    return {"success": True, "message": "No changes to save"}
                 
                 values.append(property_id)
                 
@@ -636,7 +635,7 @@ class PropertyService:
         
         async with self.db.acquire() as conn:
             # Build WHERE clause dynamically
-            conditions = ["p.status = 'ACTIVE'", "p.deleted_at IS NULL"]
+            conditions = ["p.status IN ('ACTIVE', 'UNDER_DEAL', 'SOLD')", "p.deleted_at IS NULL"]
             params = []
             param_idx = 1
             
@@ -812,8 +811,8 @@ class PropertyService:
             if not row:
                 return {"success": False, "error": "Property not found", "code": 404}
             
-            if row["status"] != "ACTIVE":
-                return {"success": False, "error": "Property not available", "code": 404}
+            if row["status"] not in ("ACTIVE", "UNDER_DEAL", "SOLD"):
+                return {"success": False, "error": f"Property is {row['status']} and cannot be viewed", "code": 404}
             
             # Get all media
             media = await conn.fetch(
@@ -839,19 +838,21 @@ class PropertyService:
             viewer_context = None
             if viewer_id:
                 # Check for existing active visit
-                visit_id = await conn.fetchval("""
-                    SELECT id 
+                visit_record = await conn.fetchrow("""
+                    SELECT id, status 
                     FROM visit_requests 
                     WHERE property_id = $1 
                       AND buyer_id = $2
-                      AND status IN ('REQUESTED', 'APPROVED', 'COUNTERED', 'CHECKED_IN')
+                      AND status NOT IN ('CANCELLED', 'REJECTED', 'COMPLETED', 'NO_SHOW')
+                    ORDER BY created_at DESC
                     LIMIT 1
                 """, property_id, viewer_id)
 
                 viewer_context = {
                     "is_owner": row["seller_id"] == viewer_id,
                     "is_agent": row["agent_id"] == viewer_id if row["agent_id"] else False,
-                    "visit_id": str(visit_id) if visit_id else None
+                    "visit_id": str(visit_record['id']) if visit_record else None,
+                    "visit_status": visit_record['status'] if visit_record else None
                 }
                 print(f"[DEBUG] viewer_context for property {property_id}: {viewer_context}")
                 

@@ -72,7 +72,7 @@ function LeadCard({ lead, onClick, onDragStart }: {
     onDragStart: (e: React.DragEvent, lead: PipelineLead) => void;
 }) {
     const daysSinceContact = Math.floor(
-        (Date.now() - new Date(lead.last_contact).getTime()) / (1000 * 60 * 60 * 24)
+        (new Date().getTime() - new Date(lead.last_contact).getTime()) / (1000 * 60 * 60 * 24)
     );
 
     return (

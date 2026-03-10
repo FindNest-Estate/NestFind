@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { PropertyCard as IPropertyCard } from '@/lib/api/public';
 import { saveProperty, unsaveProperty, checkIfSaved } from '@/lib/propertiesApi';
 import { Heart, MapPin, Bed, Bath, Square, Home, Building2, Warehouse, TreePine, Loader2 } from 'lucide-react';
-import { getCurrentUser } from '@/lib/authApi';
+import { useAuth } from '@/lib/auth';
+import { getImageUrl } from '@/lib/api';
+import { StatusBadge } from '@/components/ui/Badge';
 
 const PROPERTY_TYPES = [
     { value: 'HOUSE', icon: Home },
@@ -18,60 +20,38 @@ interface PropertyCardProps {
     property: IPropertyCard;
     initialIsSaved?: boolean;
     onToggleSave?: (newState: boolean) => void;
+    showOverlay?: boolean;
 }
 
 function formatPrice(price: number | null): string {
     if (!price) return 'Price on Request';
-    if (price >= 10000000) {
-        return `₹${(price / 10000000).toFixed(2)} Cr`;
-    }
-    if (price >= 100000) {
-        return `₹${(price / 100000).toFixed(2)} L`;
-    }
-    return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        maximumFractionDigits: 0
-    }).format(price);
+    if (price >= 10000000) return `₹${(price / 10000000).toFixed(2)} Cr`;
+    if (price >= 100000) return `₹${(price / 100000).toFixed(2)} L`;
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(price);
 }
 
-export default function PropertyCard({ property, initialIsSaved = false, onToggleSave }: PropertyCardProps) {
+export default function PropertyCard({ property, initialIsSaved = false, onToggleSave, showOverlay = true }: PropertyCardProps) {
     const [isSaved, setIsSaved] = useState(initialIsSaved);
     const [isLoading, setIsLoading] = useState(false);
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-
+    const { user } = useAuth();
     const TypeIcon = PROPERTY_TYPES.find(t => t.value === property.type)?.icon || Home;
 
-    // Check auth status and saved status on mount
     useEffect(() => {
         const init = async () => {
-            try {
-                // Simple check if we have a token/user
-                const user = await getCurrentUser();
-                if (user) {
-                    setIsAuthenticated(true);
-                    if (initialIsSaved === undefined) {
-                        const saved = await checkIfSaved(property.id);
-                        setIsSaved(saved);
-                    }
-                }
-            } catch {
-                // Not logged in
-                setIsAuthenticated(false);
+            if (user && initialIsSaved === undefined) {
+                try {
+                    const saved = await checkIfSaved(property.id);
+                    setIsSaved(saved);
+                } catch { /* ignore */ }
             }
         };
         init();
-    }, [property.id, initialIsSaved]);
+    }, [property.id, initialIsSaved, user]);
 
     const handleToggleSave = async (e: React.MouseEvent) => {
-        e.preventDefault(); // Prevent link navigation
+        e.preventDefault();
         e.stopPropagation();
-
-        if (!isAuthenticated) {
-            window.location.href = '/login'; // Or open login modal
-            return;
-        }
-
+        if (!user) { window.location.href = '/login'; return; }
         setIsLoading(true);
         try {
             if (isSaved) {
@@ -83,8 +63,7 @@ export default function PropertyCard({ property, initialIsSaved = false, onToggl
                 setIsSaved(true);
                 onToggleSave?.(true);
             }
-        } catch (error) {
-            console.error('Failed to toggle save:', error);
+        } catch {
             alert('Something went wrong. Please try again.');
         } finally {
             setIsLoading(false);
@@ -94,107 +73,89 @@ export default function PropertyCard({ property, initialIsSaved = false, onToggl
     return (
         <Link
             href={`/properties/${property.id}`}
-            className="group bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 block relative"
+            className="group flex flex-col bg-white rounded-xl overflow-hidden border border-gray-200 hover:shadow-lg transition-all duration-200 relative block"
         >
             {/* Thumbnail */}
-            <div className="relative aspect-[4/3] bg-gray-100 overflow-hidden">
+            <div className="relative aspect-[4/3] w-full bg-gray-100 overflow-hidden shrink-0">
                 {property.thumbnail_url ? (
                     <img
-                        src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${property.thumbnail_url}`}
+                        src={getImageUrl(property.thumbnail_url) || ''}
                         alt={property.title || 'Property'}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
-                        <TypeIcon className="w-16 h-16 text-gray-300" />
+                    <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                        <TypeIcon className="w-12 h-12 text-gray-300" />
                     </div>
                 )}
 
-                {/* Type Badge */}
-                <div className="absolute top-3 left-3 px-3 py-1 bg-white/90 backdrop-blur-sm rounded-full text-sm font-medium text-gray-700 shadow-sm z-10">
-                    {property.type || 'Property'}
-                </div>
-
-                {/* Status Badge - RESERVED */}
-                {property.status === 'RESERVED' && (
-                    <div className="absolute bottom-3 left-3 right-3 z-10">
-                        <div className="px-3 py-2 bg-amber-500 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2 shadow-lg">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Reserved
-                        </div>
+                {/* Status overlay */}
+                {showOverlay && (
+                    <div className="absolute top-2 left-2 z-10">
+                        <StatusBadge status={property.status || ''} />
                     </div>
                 )}
 
-                {/* Status Badge - SOLD */}
-                {property.status === 'SOLD' && (
-                    <div className="absolute bottom-3 left-3 right-3 z-10">
-                        <div className="px-3 py-2 bg-slate-800 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2 shadow-lg">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Sold
-                        </div>
-                    </div>
-                )}
-
-                {/* Save Button */}
+                {/* Save button - Top Right */}
                 <button
                     onClick={handleToggleSave}
                     disabled={isLoading}
-                    className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur-sm rounded-full text-gray-500 hover:text-[#FF385C] hover:bg-white transition-all shadow-sm z-20"
+                    className="absolute top-2 right-2 p-2 bg-white/50 hover:bg-white/90 backdrop-blur-md rounded-full text-gray-600 hover:text-[#FF385C] transition-all z-20"
                 >
                     {isLoading ? (
                         <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
-                        <Heart
-                            className={`w-5 h-5 transition-colors ${isSaved ? 'fill-[#FF385C] text-[#FF385C]' : ''}`}
-                        />
+                        <Heart className={`w-5 h-5 transition-colors ${isSaved ? 'fill-[#FF385C] text-[#FF385C]' : ''}`} />
                     )}
                 </button>
             </div>
 
-            {/* Content */}
-            <div className="p-4">
+            {/* Content Area - High Density Platform Style */}
+            <div className="p-4 flex flex-col flex-1">
                 {/* Price */}
-                <div className="text-xl font-bold text-gray-900 mb-1">
+                <div className="text-[22px] font-bold text-gray-900 leading-none mb-2">
                     {formatPrice(property.price)}
                 </div>
 
-                {/* Title */}
-                <h3 className="text-gray-800 font-medium mb-2 line-clamp-1 group-hover:text-[#FF385C] transition-colors">
-                    {property.title || 'Untitled Property'}
-                </h3>
-
-                {/* Location */}
-                <div className="flex items-center gap-1.5 text-gray-500 text-sm mb-3">
-                    <MapPin className="w-4 h-4 flex-shrink-0" />
-                    <span className="line-clamp-1">
-                        {[property.city, property.state].filter(Boolean).join(', ') || 'Location not specified'}
+                {/* Key Stats (Beds, Baths, Sqft) */}
+                <div className="flex items-center flex-wrap text-base text-gray-900 mb-1">
+                    {property.bedrooms !== null && (
+                        <span className="mr-2 border-r border-gray-300 pr-2">
+                            <span className="font-bold">{property.bedrooms}</span> bds
+                        </span>
+                    )}
+                    {property.bathrooms !== null && (
+                        <span className="mr-2 border-r border-gray-300 pr-2">
+                            <span className="font-bold">{property.bathrooms}</span> ba
+                        </span>
+                    )}
+                    {property.area_sqft !== null && (
+                        <span className="mr-2">
+                            <span className="font-bold">{property.area_sqft.toLocaleString()}</span> sqft
+                        </span>
+                    )}
+                    {/* Add property type if it fits, e.g "- House for sale" */}
+                    <span className="text-gray-500 font-normal text-[13px] ml-1">
+                        - {property.type === 'APARTMENT' ? 'Apt' : property.type ? property.type.charAt(0) + property.type.slice(1).toLowerCase() : 'Property'} for sale
                     </span>
                 </div>
 
-                {/* Features */}
-                <div className="flex items-center gap-4 text-gray-600 text-sm border-t border-gray-100 pt-3">
-                    {property.bedrooms !== null && (
-                        <div className="flex items-center gap-1.5">
-                            <Bed className="w-4 h-4" />
-                            <span>{property.bedrooms}</span>
-                        </div>
-                    )}
-                    {property.bathrooms !== null && (
-                        <div className="flex items-center gap-1.5">
-                            <Bath className="w-4 h-4" />
-                            <span>{property.bathrooms}</span>
-                        </div>
-                    )}
-                    {property.area_sqft !== null && (
-                        <div className="flex items-center gap-1.5">
-                            <Square className="w-4 h-4" />
-                            <span>{property.area_sqft.toLocaleString()} sqft</span>
-                        </div>
-                    )}
+                {/* Address & Title */}
+                <h3 className="text-sm font-semibold text-gray-800 truncate leading-tight mt-1">
+                    {property.title || 'Untitled Property'}
+                </h3>
+                <div className="text-sm text-gray-600 truncate mt-0.5">
+                    {[property.city, property.state].filter(Boolean).join(', ') || 'Location not specified'}
+                </div>
+
+                {/* Optional Brokerage/Agent Tag line for authenticity */}
+                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center gap-2">
+                    <div className="w-5 h-5 rounded bg-gray-200 flex items-center justify-center shrink-0">
+                        <Building2 className="w-3 h-3 text-gray-500" />
+                    </div>
+                    <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider truncate">
+                        NestFind Brokerage
+                    </span>
                 </div>
             </div>
         </Link>

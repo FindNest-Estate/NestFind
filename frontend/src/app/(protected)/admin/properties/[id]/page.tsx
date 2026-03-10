@@ -3,62 +3,29 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-    ArrowLeft,
-    Building2,
-    MapPin,
-    User,
-    Calendar,
-    Eye,
-    MessageSquare,
-    DollarSign,
-    CheckCircle,
-    AlertCircle,
-    Loader2,
-    Settings
+    ArrowLeft, MapPin, Calendar, Eye, MessageSquare, DollarSign,
+    CheckCircle, AlertCircle, Loader2, Settings
 } from 'lucide-react';
-import { get, post } from '@/lib/api';
+import { getAdminPropertyDetail, overridePropertyStatus, AdminPropertyDetail } from '@/lib/api/admin';
+import StatusBadge from '@/components/ui/StatusBadge';
 import { format } from 'date-fns';
 
-interface PageParams {
-    id: string;
-}
-
-interface PropertyDetail {
-    id: string;
-    title: string;
-    description: string;
-    address: string;
-    city: string;
-    state: string;
-    pincode: string;
-    price: number;
-    property_type: string;
-    bedrooms: number;
-    bathrooms: number;
-    area_sqft: number;
-    status: string;
-    created_at: string;
-    verified_at: string | null;
-    seller: { id: string; name: string; email: string };
-    agent: { id: string; name: string; email: string } | null;
-    stats: { visits: number; offers: number; transactions: number };
-    media: Array<{ id: string; url: string; type: string; is_primary: boolean }>;
-}
+interface PageParams { id: string; }
 
 const STATUS_OPTIONS = [
-    { value: 'DRAFT', label: 'Draft', color: 'bg-slate-100 text-slate-700' },
-    { value: 'PENDING_VERIFICATION', label: 'Pending Verification', color: 'bg-amber-100 text-amber-700' },
-    { value: 'VERIFIED', label: 'Verified', color: 'bg-emerald-100 text-emerald-700' },
-    { value: 'RESERVED', label: 'Reserved', color: 'bg-blue-100 text-blue-700' },
-    { value: 'SOLD', label: 'Sold', color: 'bg-purple-100 text-purple-700' },
-    { value: 'REJECTED', label: 'Rejected', color: 'bg-red-100 text-red-700' },
-    { value: 'ARCHIVED', label: 'Archived', color: 'bg-slate-200 text-slate-600' }
+    'DRAFT', 'PENDING_VERIFICATION', 'VERIFIED', 'RESERVED', 'SOLD', 'REJECTED', 'ARCHIVED'
 ];
+
+const fmt = (price: number) => {
+    if (price >= 10000000) return `₹${(price / 10000000).toFixed(2)} Cr`;
+    if (price >= 100000) return `₹${(price / 100000).toFixed(2)} L`;
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(price);
+};
 
 export default function AdminPropertyDetailPage({ params }: { params: Promise<PageParams> }) {
     const resolvedParams = use(params);
     const router = useRouter();
-    const [property, setProperty] = useState<PropertyDetail | null>(null);
+    const [property, setProperty] = useState<AdminPropertyDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
     const [showStatusModal, setShowStatusModal] = useState(false);
@@ -66,41 +33,28 @@ export default function AdminPropertyDetailPage({ params }: { params: Promise<Pa
     const [statusReason, setStatusReason] = useState('');
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-    useEffect(() => {
-        loadProperty();
-    }, [resolvedParams.id]);
-
     const loadProperty = async () => {
         try {
-            const response = await get<{ success: boolean; property: PropertyDetail }>(`/admin/properties/${resolvedParams.id}`);
+            const response = await getAdminPropertyDetail(resolvedParams.id);
             if (response.success) {
                 setProperty(response.property);
                 setSelectedStatus(response.property.status);
             }
         } catch (err: any) {
             setMessage({ type: 'error', text: err.message || 'Failed to load property' });
-        } finally {
-            setLoading(false);
-        }
+        } finally { setLoading(false); }
     };
+
+    useEffect(() => { loadProperty(); }, [resolvedParams.id]);
 
     const handleStatusUpdate = async () => {
         if (!property || selectedStatus === property.status) return;
-
         setUpdating(true);
         try {
-            const response = await post(`/admin/properties/${property.id}/status`, {
-                status: selectedStatus,
-                reason: statusReason || undefined
-            });
-
-            if (response.success) {
-                setMessage({ type: 'success', text: response.message });
-                setShowStatusModal(false);
-                loadProperty();
-            } else {
-                throw new Error(response.error);
-            }
+            await overridePropertyStatus(property.id, selectedStatus, statusReason || undefined);
+            setMessage({ type: 'success', text: 'Status updated successfully' });
+            setShowStatusModal(false);
+            loadProperty();
         } catch (err: any) {
             setMessage({ type: 'error', text: err.message || 'Failed to update status' });
         } finally {
@@ -109,269 +63,186 @@ export default function AdminPropertyDetailPage({ params }: { params: Promise<Pa
         }
     };
 
-    const formatPrice = (price: number) => {
-        if (price >= 10000000) return `₹${(price / 10000000).toFixed(2)} Cr`;
-        if (price >= 100000) return `₹${(price / 100000).toFixed(2)} L`;
-        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(price);
-    };
+    if (loading) return (
+        <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-7 h-7 animate-spin text-[var(--color-brand)]" />
+        </div>
+    );
 
-    const getStatusColor = (status: string) => {
-        return STATUS_OPTIONS.find(s => s.value === status)?.color || 'bg-slate-100 text-slate-600';
-    };
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
-            </div>
-        );
-    }
-
-    if (!property) {
-        return (
-            <div className="text-center py-20">
-                <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-                <p className="text-slate-500">Property not found</p>
-            </div>
-        );
-    }
+    if (!property) return (
+        <div className="text-center py-20">
+            <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+            <p className="text-sm text-[var(--color-text-muted)]">Property not found</p>
+        </div>
+    );
 
     return (
-        <div className="space-y-6">
-            {/* Back Button */}
-            <button
-                onClick={() => router.back()}
-                className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
-            >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Properties
+        <div className="space-y-5">
+            {/* Back */}
+            <button onClick={() => router.back()}
+                className="flex items-center gap-1.5 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors">
+                <ArrowLeft className="w-4 h-4" /> Back to Properties
             </button>
 
-            {/* Message */}
             {message && (
-                <div className={`flex items-center gap-3 p-4 rounded-lg border ${message.type === 'success'
+                <div className={`flex items-center gap-2 p-3 rounded-lg border text-sm ${message.type === 'success'
                     ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                    : 'bg-red-50 border-red-200 text-red-700'
-                    }`}>
-                    {message.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+                    : 'bg-red-50 border-red-200 text-red-700'}`}>
+                    {message.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
                     {message.text}
                 </div>
             )}
 
             {/* Header */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <div className="bg-white rounded-[var(--card-radius)] border border-[var(--gray-200)] p-5">
                 <div className="flex items-start justify-between">
                     <div>
-                        <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(property.status)} mb-3`}>
-                            {STATUS_OPTIONS.find(s => s.value === property.status)?.label || property.status}
-                        </span>
-                        <h1 className="text-2xl font-bold text-slate-900">{property.title}</h1>
-                        <div className="flex items-center gap-2 text-slate-500 mt-2">
-                            <MapPin className="w-4 h-4" />
-                            <span>{property.address}, {property.city}, {property.state} {property.pincode}</span>
+                        <div className="mb-2"><StatusBadge status={property.status} /></div>
+                        <h1 className="text-xl font-bold text-[var(--gray-900)]">{property.title}</h1>
+                        <div className="flex items-center gap-1.5 text-sm text-[var(--gray-500)] mt-1">
+                            <MapPin className="w-3.5 h-3.5" />
+                            {property.address}, {property.city}, {property.state} {property.pincode}
                         </div>
                     </div>
                     <div className="text-right">
-                        <p className="text-3xl font-bold text-emerald-600">{formatPrice(property.price)}</p>
-                        <p className="text-sm text-slate-500 mt-1">{property.property_type}</p>
+                        <p className="text-2xl font-bold text-[var(--color-brand)]">{fmt(property.price)}</p>
+                        <p className="text-xs text-[var(--gray-500)] font-medium">{property.property_type}</p>
                     </div>
                 </div>
-
-                {/* Quick Actions */}
-                <div className="mt-6 pt-6 border-t border-slate-100 flex gap-3">
-                    <button
-                        onClick={() => setShowStatusModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800"
-                    >
-                        <Settings className="w-4 h-4" />
-                        Change Status
+                <div className="mt-4 pt-4 border-t border-[var(--gray-100)] flex gap-2">
+                    <button onClick={() => setShowStatusModal(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--gray-900)] text-white text-sm font-medium rounded-[var(--radius-sm)] hover:bg-black transition-colors">
+                        <Settings className="w-3.5 h-3.5" /> Change Status
                     </button>
                 </div>
             </div>
 
-            {/* Media Gallery */}
+            {/* Media */}
             {property.media.length > 0 && (
-                <div className="bg-white rounded-xl border border-slate-200 p-6">
-                    <h2 className="text-lg font-bold text-slate-900 mb-4">Property Images</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white rounded-[var(--card-radius)] border border-[var(--gray-200)] p-5">
+                    <h2 className="text-sm font-bold text-[var(--gray-900)] mb-3">Property Images</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {property.media.map((m) => (
-                            <div key={m.id} className="aspect-video rounded-lg overflow-hidden bg-slate-100">
-                                <img
-                                    src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${m.url}`}
-                                    alt="Property"
-                                    className="w-full h-full object-cover"
-                                />
+                            <div key={m.id} className="aspect-video rounded-[var(--radius-sm)] overflow-hidden bg-[var(--gray-50)] border border-[var(--gray-100)]">
+                                <img src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${m.url}`}
+                                    alt="Property" className="w-full h-full object-cover" />
                             </div>
                         ))}
                     </div>
                 </div>
             )}
 
-            {/* Details Grid */}
-            <div className="grid md:grid-cols-2 gap-6">
+            {/* Two columns */}
+            <div className="grid md:grid-cols-2 gap-4">
                 {/* Stats */}
-                <div className="bg-white rounded-xl border border-slate-200 p-6">
-                    <h2 className="text-lg font-bold text-slate-900 mb-4">Activity Stats</h2>
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="text-center p-4 bg-slate-50 rounded-lg">
-                            <Eye className="w-6 h-6 text-slate-400 mx-auto mb-2" />
-                            <p className="text-2xl font-bold text-slate-900">{property.stats.visits}</p>
-                            <p className="text-xs text-slate-500">Visits</p>
-                        </div>
-                        <div className="text-center p-4 bg-slate-50 rounded-lg">
-                            <MessageSquare className="w-6 h-6 text-slate-400 mx-auto mb-2" />
-                            <p className="text-2xl font-bold text-slate-900">{property.stats.offers}</p>
-                            <p className="text-xs text-slate-500">Offers</p>
-                        </div>
-                        <div className="text-center p-4 bg-slate-50 rounded-lg">
-                            <DollarSign className="w-6 h-6 text-slate-400 mx-auto mb-2" />
-                            <p className="text-2xl font-bold text-slate-900">{property.stats.transactions}</p>
-                            <p className="text-xs text-slate-500">Transactions</p>
-                        </div>
+                <div className="bg-white rounded-[var(--card-radius)] border border-[var(--gray-200)] p-5">
+                    <h2 className="text-sm font-bold text-[var(--gray-900)] mb-3">Activity Metrics</h2>
+                    <div className="grid grid-cols-3 gap-3">
+                        {[
+                            { icon: Eye, label: 'Visits', value: property.visits },
+                            { icon: MessageSquare, label: 'Offers', value: property.offers },
+                            { icon: DollarSign, label: 'Transactions', value: property.transactions },
+                        ].map((s) => (
+                            <div key={s.label} className="text-center p-3 bg-[var(--gray-50)] rounded-[var(--radius-sm)] border border-[var(--gray-100)]">
+                                <s.icon className="w-4 h-4 text-[var(--gray-400)] mx-auto mb-1" />
+                                <p className="text-xl font-bold text-[var(--gray-900)]">{s.value}</p>
+                                <p className="text-[10px] uppercase font-bold text-[var(--gray-500)] tracking-tight">{s.label}</p>
+                            </div>
+                        ))}
                     </div>
                 </div>
 
-                {/* Seller & Agent */}
-                <div className="bg-white rounded-xl border border-slate-200 p-6">
-                    <h2 className="text-lg font-bold text-slate-900 mb-4">Parties</h2>
-                    <div className="space-y-4">
-                        <div className="p-4 bg-slate-50 rounded-lg">
-                            <p className="text-xs text-slate-500 mb-1">Seller</p>
-                            <p className="font-medium text-slate-900">{property.seller.name}</p>
-                            <p className="text-sm text-slate-500">{property.seller.email}</p>
+                {/* Parties */}
+                <div className="bg-white rounded-[var(--card-radius)] border border-[var(--gray-200)] p-5">
+                    <h2 className="text-sm font-bold text-[var(--gray-900)] mb-3">Associated Parties</h2>
+                    <div className="space-y-3">
+                        <div className="p-3 bg-[var(--gray-50)] rounded-[var(--radius-sm)] border border-[var(--gray-100)]">
+                            <p className="text-[10px] text-[var(--gray-500)] font-bold uppercase tracking-wider mb-0.5">Seller</p>
+                            <p className="text-sm font-semibold text-[var(--gray-900)]">{property.seller.name}</p>
+                            <p className="text-xs text-[var(--gray-500)]">{property.seller.email}</p>
                         </div>
                         {property.agent ? (
-                            <div className="p-4 bg-emerald-50 rounded-lg">
-                                <p className="text-xs text-emerald-600 mb-1">Assigned Agent</p>
-                                <p className="font-medium text-slate-900">{property.agent.name}</p>
-                                <p className="text-sm text-slate-500">{property.agent.email}</p>
+                            <div className="p-3 bg-[var(--color-brand-subtle)] rounded-[var(--radius-sm)] border border-[var(--color-brand-subtle)]">
+                                <p className="text-[10px] text-[var(--color-brand)] font-bold uppercase tracking-wider mb-0.5">Agent</p>
+                                <p className="text-sm font-semibold text-[var(--gray-900)]">{property.agent.name}</p>
+                                <p className="text-xs text-[var(--gray-500)]">{property.agent.email}</p>
                             </div>
                         ) : (
-                            <div className="p-4 bg-amber-50 rounded-lg">
-                                <p className="text-amber-700 text-sm">No agent assigned</p>
+                            <div className="p-3 bg-amber-50 rounded-[var(--radius-sm)] border border-amber-100">
+                                <p className="text-sm font-semibold text-amber-700">No agent assigned</p>
                             </div>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* Property Details */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <h2 className="text-lg font-bold text-slate-900 mb-4">Property Details</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                        <p className="text-xs text-slate-500">Bedrooms</p>
-                        <p className="text-lg font-bold text-slate-900">{property.bedrooms || '-'}</p>
-                    </div>
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                        <p className="text-xs text-slate-500">Bathrooms</p>
-                        <p className="text-lg font-bold text-slate-900">{property.bathrooms || '-'}</p>
-                    </div>
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                        <p className="text-xs text-slate-500">Area</p>
-                        <p className="text-lg font-bold text-slate-900">{property.area_sqft ? `${property.area_sqft} sqft` : '-'}</p>
-                    </div>
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                        <p className="text-xs text-slate-500">Type</p>
-                        <p className="text-lg font-bold text-slate-900">{property.property_type}</p>
-                    </div>
+            {/* Details */}
+            <div className="bg-white rounded-[var(--card-radius)] border border-[var(--gray-200)] p-5">
+                <h2 className="text-sm font-bold text-[var(--gray-900)] mb-3">Property Specifications</h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                        { label: 'Bedrooms', value: property.bedrooms || '-' },
+                        { label: 'Bathrooms', value: property.bathrooms || '-' },
+                        { label: 'Area', value: property.area_sqft ? `${property.area_sqft} sqft` : '-' },
+                        { label: 'Type', value: property.property_type },
+                    ].map((d) => (
+                        <div key={d.label} className="p-3 bg-[var(--gray-50)] rounded-[var(--radius-sm)] border border-[var(--gray-100)]">
+                            <p className="text-[10px] text-[var(--gray-500)] font-bold uppercase tracking-wider">{d.label}</p>
+                            <p className="text-base font-bold text-[var(--gray-900)] mt-0.5">{d.value}</p>
+                        </div>
+                    ))}
                 </div>
-
                 {property.description && (
-                    <div className="mt-4 pt-4 border-t border-slate-100">
-                        <p className="text-sm text-slate-600">{property.description}</p>
+                    <div className="mt-4 pt-4 border-t border-[var(--gray-100)] text-sm text-[var(--gray-600)] leading-relaxed">
+                        {property.description}
                     </div>
                 )}
             </div>
 
             {/* Timestamps */}
-            <div className="bg-slate-50 rounded-xl p-4 flex gap-6 text-sm text-slate-500">
-                <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    <span>Created: {property.created_at ? format(new Date(property.created_at), 'MMM d, yyyy') : '-'}</span>
+            <div className="bg-[var(--gray-50)] border border-[var(--gray-200)] rounded-[var(--radius-sm)] p-3 flex gap-6 text-[11px] font-medium text-[var(--gray-500)]">
+                <div className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5" />
+                    Created: {property.created_at ? format(new Date(property.created_at), 'MMM d, yyyy') : '-'}
                 </div>
                 {property.verified_at && (
-                    <div className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-500" />
-                        <span>Verified: {format(new Date(property.verified_at), 'MMM d, yyyy')}</span>
+                    <div className="flex items-center gap-1.5">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                        Verified: {format(new Date(property.verified_at), 'MMM d, yyyy')}
                     </div>
                 )}
             </div>
 
             {/* Status Override Modal */}
             {showStatusModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    <div className="absolute inset-0 bg-black/50" onClick={() => setShowStatusModal(false)} />
-                    <div className="relative bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl">
-                        <h3 className="text-xl font-bold text-slate-900 mb-4">Change Property Status</h3>
-
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowStatusModal(false)} />
+                    <div className="relative bg-white p-6 max-w-md w-full shadow-2xl" style={{ borderRadius: 'var(--card-radius)' }}>
+                        <h3 className="text-lg font-bold text-[var(--color-text)] mb-4">Change Property Status</h3>
                         <div className="mb-4">
-                            <label className="block text-sm font-medium text-slate-700 mb-2">New Status</label>
-                            <select
-                                value={selectedStatus}
-                                onChange={(e) => setSelectedStatus(e.target.value)}
-                                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                            >
-                                {STATUS_OPTIONS.map((option) => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                ))}
+                            <label className="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider mb-1">New Status</label>
+                            <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}
+                                className="w-full px-3 py-2 border text-sm outline-none"
+                                style={{ borderRadius: 'var(--input-radius, 8px)', borderColor: 'var(--color-border)' }}>
+                                {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
                             </select>
                         </div>
-
-                        {selectedStatus === 'VERIFIED' && (
-                            <div className="mb-4 p-4 bg-emerald-50 rounded-lg border border-emerald-100">
-                                <h4 className="text-sm font-bold text-emerald-800 mb-2">Verification Checklist</h4>
-                                <div className="space-y-2">
-                                    {[
-                                        'Seller Identity Verified (KYC)',
-                                        'Property Ownership Documents Checked',
-                                        'Location & Address Confirmed',
-                                        'Images Meet Quality Standards'
-                                    ].map((label, idx) => (
-                                        <label key={idx} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer hover:text-emerald-700">
-                                            <input
-                                                type="checkbox"
-                                                className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
-                                                id={`check-${idx}`}
-                                                onChange={(e) => {
-                                                    const checks = document.querySelectorAll('input[type="checkbox"]:checked');
-                                                    const btn = document.getElementById('update-status-btn') as HTMLButtonElement;
-                                                    if (btn) btn.disabled = checks.length < 4;
-                                                }}
-                                            />
-                                            {label}
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
                         <div className="mb-4">
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Reason (optional)</label>
-                            <textarea
-                                value={statusReason}
-                                onChange={(e) => setStatusReason(e.target.value)}
-                                placeholder="Add a reason for this change..."
-                                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
-                                rows={3}
-                            />
+                            <label className="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider mb-1">Reason (optional)</label>
+                            <textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)}
+                                placeholder="Add a reason..." rows={3}
+                                className="w-full px-3 py-2 border text-sm outline-none resize-none"
+                                style={{ borderRadius: 'var(--input-radius, 8px)', borderColor: 'var(--color-border)' }} />
                         </div>
-
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowStatusModal(false)}
-                                className="flex-1 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                id="update-status-btn"
-                                onClick={handleStatusUpdate}
-                                disabled={updating || selectedStatus === property.status || (selectedStatus === 'VERIFIED' && document.querySelectorAll('input[type="checkbox"]:checked').length < 4)}
-                                className="flex-1 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-all disabled:cursor-not-allowed"
-                            >
+                        <div className="flex gap-2">
+                            <button onClick={() => setShowStatusModal(false)}
+                                className="flex-1 py-2 border text-sm font-medium text-[var(--color-text-secondary)] hover:bg-slate-50"
+                                style={{ borderRadius: 'var(--input-radius, 8px)', borderColor: 'var(--color-border)' }}>Cancel</button>
+                            <button onClick={handleStatusUpdate} disabled={updating || selectedStatus === property.status}
+                                className="flex-1 py-2 bg-[var(--color-brand)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                style={{ borderRadius: 'var(--input-radius, 8px)' }}>
                                 {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                                Update Status
+                                Update
                             </button>
                         </div>
                     </div>

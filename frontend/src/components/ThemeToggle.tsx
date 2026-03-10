@@ -3,16 +3,12 @@
 import { useTheme } from '@/components/ThemeProvider';
 import { Moon, Sun } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
 
 export default function ThemeToggle() {
     const { theme, setTheme } = useTheme();
-    const [mounted, setMounted] = useState(false);
 
-    // Provide initial state to avoid hydration mismatch
-    useEffect(() => setMounted(true), []);
-
-    if (!mounted) return null;
+    // Avoid hydration mismatch while staying side-effect free in render rules.
+    if (typeof window === 'undefined') return null;
 
     const toggleTheme = () => {
         setTheme(theme === 'dark' ? 'light' : 'dark');
@@ -30,7 +26,7 @@ export default function ThemeToggle() {
                     animate={{
                         scale: theme === 'dark' ? 0 : 1,
                         opacity: theme === 'dark' ? 0 : 1,
-                        rotate: theme === 'dark' ? -90 : 0
+                        rotate: theme === 'dark' ? -90 : 0,
                     }}
                     transition={{ duration: 0.2 }}
                     className="absolute inset-0 flex items-center justify-center text-amber-500"
@@ -43,7 +39,7 @@ export default function ThemeToggle() {
                     animate={{
                         scale: theme === 'dark' ? 1 : 0,
                         opacity: theme === 'dark' ? 1 : 0,
-                        rotate: theme === 'dark' ? 0 : 90
+                        rotate: theme === 'dark' ? 0 : 90,
                     }}
                     transition={{ duration: 0.2 }}
                     className="absolute inset-0 flex items-center justify-center text-blue-400"

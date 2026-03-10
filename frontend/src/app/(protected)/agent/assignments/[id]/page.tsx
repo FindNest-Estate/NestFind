@@ -1,27 +1,24 @@
 'use client';
 
-import React, { useState, useEffect, use } from 'react';
-import Link from 'next/link';
+import React, { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import {
-    ArrowLeft,
     MapPin,
-    Bed,
-    Bath,
-    Square,
-    Home,
-    User,
-    Mail,
-    Phone,
-    Clock,
+    Calendar,
+    DollarSign,
     CheckCircle,
     XCircle,
-    PlayCircle,
-    Loader2,
-    AlertCircle,
+    Clock,
+    User,
+    ArrowLeft,
+    Phone,
+    Mail,
+    Shield,
+    FileText,
     Navigation,
-    IndianRupee,
-    Building2,
-    Calendar
+    MessageSquare,
+    ChevronRight,
+    Loader2
 } from 'lucide-react';
 import {
     getAssignmentDetail,
@@ -29,416 +26,610 @@ import {
     declineAssignment,
     startVerification,
     completeVerification,
-    AssignmentDetail
+    generateOtp,
+    verifyOtp,
+    AssignmentDetail,
 } from '@/lib/api/agent';
-import { format } from 'date-fns';
+import { getImageUrl } from '@/lib/api';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { Card } from '@/components/ui/Card';
+import { Modal } from '@/components/ui/Modal';
+import { Alert } from '@/components/ui/Alert';
+import { OTPInput } from '@/components/OTPInput';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Verification Modal with OTP Flow
+function VerificationModal({
+    isOpen,
+    onClose,
+    onComplete,
+    assignmentId,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onComplete: (data: any) => Promise<void>;
+    assignmentId: string;
+}) {
+    const [step, setStep] = useState<'otp_request' | 'otp_verify' | 'gps_check'>('otp_request');
+    const [otp, setOtp] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
 
-function formatPrice(price: number | null): string {
-    if (!price) return 'Price TBD';
-    if (price >= 10000000) return `₹${(price / 10000000).toFixed(2)} Cr`;
-    if (price >= 100000) return `₹${(price / 100000).toFixed(2)} Lakh`;
-    return `₹${price.toLocaleString()}`;
-}
+    // GPS State
+    const [gpsLocation, setGpsLocation] = useState<{ lat: number, lng: number } | null>(null);
+    const [isGettingLocation, setIsGettingLocation] = useState(false);
 
-interface PageParams {
-    id: string;
-}
-
-export default function AssignmentDetailPage({ params }: { params: Promise<PageParams> }) {
-    const resolvedParams = use(params);
-    const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [actionLoading, setActionLoading] = useState(false);
-    const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-    // Verification modal
-    const [showVerifyModal, setShowVerifyModal] = useState(false);
+    // Decision State
     const [verifyApproved, setVerifyApproved] = useState(true);
-    const [verifyNotes, setVerifyNotes] = useState('');
     const [verifyReason, setVerifyReason] = useState('');
-    const [gpsLocation, setGpsLocation] = useState<{ lat: number; lng: number } | null>(null);
+    const [verifyNotes, setVerifyNotes] = useState('');
 
-    useEffect(() => {
-        async function load() {
-            setIsLoading(true);
-            setError(null);
-            try {
-                const data = await getAssignmentDetail(resolvedParams.id);
-                setAssignment(data);
-            } catch (err: any) {
-                console.error('Failed to load assignment:', err);
-                setError(err?.message || 'Failed to load assignment');
-            } finally {
-                setIsLoading(false);
+    const handleSendOtp = async () => {
+        setIsLoading(true);
+        setError('');
+        try {
+            const res = await generateOtp(assignmentId);
+            if (res.success) {
+                setStep('otp_verify');
+            } else {
+                setError('Failed to send OTP');
             }
-        }
-        load();
-    }, [resolvedParams.id]);
-
-    const handleAccept = async () => {
-        if (!assignment) return;
-        setActionLoading(true);
-        try {
-            await acceptAssignment(assignment.id);
-            setSuccessMessage('Assignment accepted! You can now start verification.');
-            const updated = await getAssignmentDetail(assignment.id);
-            setAssignment(updated);
-        } catch (err: any) {
-            setError(err?.message || 'Failed to accept');
+        } catch (err) {
+            setError('Error generating OTP');
         } finally {
-            setActionLoading(false);
+            setIsLoading(false);
         }
     };
 
-    const handleDecline = async () => {
-        if (!assignment) return;
-        const reason = prompt('Reason for declining (optional):');
-        setActionLoading(true);
+    const handleVerifyOtp = async (code?: string) => {
+        const codeToVerify = code || otp;
+        if (!codeToVerify || codeToVerify.length !== 6) return;
+
+        setIsLoading(true);
+        setError('');
         try {
-            await declineAssignment(assignment.id, reason || undefined);
-            setSuccessMessage('Assignment declined.');
-            const updated = await getAssignmentDetail(assignment.id);
-            setAssignment(updated);
-        } catch (err: any) {
-            setError(err?.message || 'Failed to decline');
+            const res = await verifyOtp(assignmentId, codeToVerify);
+            if (res.success) {
+                setStep('gps_check');
+            } else {
+                setError('Invalid OTP. Please try again.');
+            }
+        } catch (err) {
+            setError('Verification failed');
         } finally {
-            setActionLoading(false);
+            setIsLoading(false);
         }
     };
 
-    const handleStartVerification = async () => {
-        if (!assignment) return;
-        setActionLoading(true);
-        try {
-            await startVerification(assignment.id);
-            setSuccessMessage('Verification started! Visit the property and complete verification.');
-            const updated = await getAssignmentDetail(assignment.id);
-            setAssignment(updated);
-        } catch (err: any) {
-            setError(err?.message || 'Failed to start verification');
-        } finally {
-            setActionLoading(false);
-        }
-    };
-
-    const handleGetLocation = () => {
+    const getGPS = () => {
+        setIsGettingLocation(true);
+        setError('');
         if (!navigator.geolocation) {
-            setError('Geolocation not supported');
+            setError('Geolocation is not supported by your browser');
+            setIsGettingLocation(false);
             return;
         }
+
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 setGpsLocation({
                     lat: position.coords.latitude,
                     lng: position.coords.longitude
                 });
-                setSuccessMessage('Location captured successfully!');
+                setIsGettingLocation(false);
             },
-            (err) => {
-                setError('Failed to get location: ' + err.message);
+            () => {
+                setError('Unable to retrieve your location');
+                setIsGettingLocation(false);
             }
         );
     };
 
-    const handleCompleteVerification = async () => {
-        if (!assignment) return;
-        setActionLoading(true);
+    const handleSubmit = async () => {
+        if (!gpsLocation) {
+            setError('GPS location is required');
+            return;
+        }
+
+        setIsLoading(true);
         try {
-            await completeVerification(assignment.id, {
+            await onComplete({
                 approved: verifyApproved,
-                gps_lat: gpsLocation?.lat,
-                gps_lng: gpsLocation?.lng,
+                gps_lat: gpsLocation.lat,
+                gps_lng: gpsLocation.lng,
                 notes: verifyNotes || undefined,
                 rejection_reason: !verifyApproved ? verifyReason : undefined
             });
-            setSuccessMessage(verifyApproved
-                ? 'Property verified and now ACTIVE!'
-                : 'Property returned for seller review.');
-            setShowVerifyModal(false);
-            const updated = await getAssignmentDetail(assignment.id);
-            setAssignment(updated);
-        } catch (err: any) {
-            setError(err?.message || 'Failed to complete verification');
+        } catch (err) {
+            setError('Failed to complete verification');
         } finally {
-            setActionLoading(false);
+            setIsLoading(false);
         }
     };
 
-    if (isLoading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-emerald-600" /></div>;
-    if (error && !assignment) return <div className="text-center py-20 text-red-500">{error}</div>;
-    if (!assignment) return null;
-
-    const isPending = assignment.status === 'REQUESTED';
-    const isAccepted = assignment.status === 'ACCEPTED';
-    const isVerifying = assignment.property.status === 'VERIFICATION_IN_PROGRESS';
-    const isCompleted = assignment.status === 'COMPLETED';
+    if (!isOpen) return null;
 
     return (
-        <div className="space-y-6 animate-fade-in">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                        Assignment Details
-                        <span className="text-slate-400 font-normal text-lg">#{assignment.id.slice(0, 8)}</span>
-                    </h1>
-                    <div className="flex items-center gap-2 text-slate-500 mt-1">
-                        <MapPin className="w-4 h-4" />
-                        {[assignment.property.address, assignment.property.city].filter(Boolean).join(', ')}
+        <Modal
+            open={isOpen}
+            onClose={onClose}
+            title="Property Verification"
+            description="Follow the steps to verify this property."
+        >
+            <div className="space-y-6">
+                {/* Steps Indicator */}
+                <div className="flex items-center justify-between text-sm border-b border-[var(--gray-200)] pb-4">
+                    <div className={`flex items-center gap-2 ${step === 'otp_request' ? 'text-[var(--color-brand)] font-bold' : 'text-[var(--gray-400)]'}`}>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${step === 'otp_request' ? 'border-[var(--color-brand)] bg-[var(--color-brand-subtle)]' : 'border-[var(--gray-200)]'}`}>1</div>
+                        <span>Request OTP</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-[var(--gray-300)]" />
+                    <div className={`flex items-center gap-2 ${step === 'otp_verify' ? 'text-[var(--color-brand)] font-bold' : step === 'gps_check' ? 'text-[var(--color-brand)]' : 'text-[var(--gray-400)]'}`}>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${step === 'otp_verify' ? 'border-[var(--color-brand)] bg-[var(--color-brand-subtle)]' : step === 'gps_check' ? 'border-[var(--color-brand)] text-[var(--color-brand)]' : 'border-[var(--gray-200)]'}`}>2</div>
+                        <span>Verify OTP</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-[var(--gray-300)]" />
+                    <div className={`flex items-center gap-2 ${step === 'gps_check' ? 'text-[var(--color-brand)] font-bold' : 'text-[var(--gray-400)]'}`}>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${step === 'gps_check' ? 'border-[var(--color-brand)] bg-[var(--color-brand-subtle)]' : 'border-[var(--gray-200)]'}`}>3</div>
+                        <span>Inspect</span>
                     </div>
                 </div>
 
-                {/* Status Badge */}
-                <div className={`px-4 py-1.5 rounded-full text-sm font-semibold flex items-center gap-2 border ${isPending ? 'bg-amber-50 border-amber-200 text-amber-700' :
-                        isVerifying ? 'bg-purple-50 border-purple-200 text-purple-700' :
-                            isCompleted ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
-                                'bg-blue-50 border-blue-200 text-blue-700'
-                    }`}>
-                    {isVerifying ? <Navigation className="w-4 h-4" /> : isCompleted ? <CheckCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
-                    {assignment.status === 'ACCEPTED' && isVerifying ? 'Verifying' : assignment.status}
+                {error && (
+                    <Alert variant="error" title="Error" description={error} />
+                )}
+
+                {/* Step 1: Request OTP */}
+                {step === 'otp_request' && (
+                    <div className="space-y-4 py-4 text-center">
+                        <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <MessageSquare className="w-8 h-8 text-blue-500" />
+                        </div>
+                        <h3 className="font-semibold text-[var(--gray-900)]">Ask Seller for OTP</h3>
+                        <p className="text-[var(--gray-500)] text-sm">
+                            Click below to send a 6-digit verification code to the seller's registered mobile number/email.
+                        </p>
+                        <Button onClick={handleSendOtp} disabled={isLoading} className="w-full">
+                            {isLoading ? 'Sending...' : 'Send OTP to Seller'}
+                        </Button>
+                    </div>
+                )}
+
+                {/* Step 2: Verify OTP */}
+                {step === 'otp_verify' && (
+                    <div className="space-y-4 py-4 text-center">
+                        <h3 className="font-bold text-[var(--gray-900)]">Enter Verification Code</h3>
+                        <p className="text-[var(--gray-500)] text-sm mb-4">Enter the 6-digit code received by the seller.</p>
+
+                        <div className="flex justify-center">
+                            <OTPInput
+                                length={6}
+                                onComplete={(code) => {
+                                    setOtp(code);
+                                    handleVerifyOtp(code);
+                                }}
+                            />
+                        </div>
+
+                        <div className="flex gap-3 mt-6">
+                            <Button variant="ghost" onClick={() => setStep('otp_request')} className="flex-1">Back</Button>
+                            <Button onClick={() => handleVerifyOtp()} disabled={isLoading || otp.length !== 6} className="flex-1">
+                                {isLoading ? 'Verifying...' : 'Verify Code'}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Step 3: GPS + Inspection */}
+                {step === 'gps_check' && (
+                    <div className="space-y-4">
+
+                        {/* GPS Section */}
+                        <div className="bg-[var(--gray-50)] p-4 rounded-lg border border-[var(--gray-200)]">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="font-semibold text-sm">Location Check</span>
+                                {gpsLocation && <CheckCircle className="w-4 h-4 text-emerald-500" />}
+                            </div>
+
+                            {!gpsLocation ? (
+                                <button
+                                    onClick={getGPS}
+                                    disabled={isGettingLocation}
+                                    className="flex items-center gap-2 text-sm text-[var(--color-brand)] font-medium hover:underline"
+                                >
+                                    <MapPin className="w-4 h-4" />
+                                    {isGettingLocation ? 'Getting location...' : 'Capture GPS Location'}
+                                </button>
+                            ) : (
+                                <div className="text-xs text-[var(--gray-600)] font-mono">
+                                    {gpsLocation.lat.toFixed(6)}, {gpsLocation.lng.toFixed(6)}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Approval Section */}
+                        <div className="space-y-3">
+                            <label className="block text-sm font-medium">Verification Result</label>
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={() => setVerifyApproved(true)}
+                                    className={`p-3 rounded-lg border text-sm font-semibold flex items-center justify-center gap-2 transition-all ${verifyApproved
+                                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500'
+                                        : 'border-[var(--gray-200)] text-[var(--gray-500)] hover:bg-[var(--gray-50)]'
+                                        }`}
+                                >
+                                    <CheckCircle className="w-4 h-4" /> Approved
+                                </button>
+                                <button
+                                    onClick={() => setVerifyApproved(false)}
+                                    className={`p-3 rounded-lg border text-sm font-semibold flex items-center justify-center gap-2 transition-all ${!verifyApproved
+                                        ? 'border-[var(--color-error)] bg-[var(--color-error-bg)] text-[var(--color-error)] ring-1 ring-[var(--color-error)]'
+                                        : 'border-[var(--gray-200)] text-[var(--gray-500)] hover:bg-[var(--gray-50)]'
+                                        }`}
+                                >
+                                    <XCircle className="w-4 h-4" /> Rejected
+                                </button>
+                            </div>
+                        </div>
+
+                        {!verifyApproved && (
+                            <div>
+                                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--gray-500)] mb-1">Rejection Reason</label>
+                                <select
+                                    value={verifyReason}
+                                    onChange={(e) => setVerifyReason(e.target.value)}
+                                    className="w-full px-3 py-2 rounded-md border border-[var(--gray-300)] text-sm"
+                                >
+                                    <option value="">Select reason...</option>
+                                    <option value="property_mismatch">Property details do not match</option>
+                                    <option value="seller_unavailable">Seller unavailable</option>
+                                    <option value="access_issue">Cannot access property</option>
+                                    <option value="condition_issue">Poor condition</option>
+                                </select>
+                            </div>
+                        )}
+
+                        <div>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--gray-500)] mb-1">Notes</label>
+                            <textarea
+                                value={verifyNotes}
+                                onChange={(e) => setVerifyNotes(e.target.value)}
+                                className="w-full px-3 py-2 rounded-md border border-[var(--gray-300)] text-sm focus:ring-1 focus:ring-[var(--color-brand)] outline-none"
+                                rows={3}
+                                placeholder="Any additional observations..."
+                            />
+                        </div>
+
+                        <Button
+                            onClick={handleSubmit}
+                            disabled={isLoading || !gpsLocation || (!verifyApproved && !verifyReason)}
+                            className="w-full"
+                        >
+                            {isLoading ? 'Processing...' : verifyApproved ? 'Complete & Approve' : 'Reject Verification'}
+                        </Button>
+                    </div>
+                )}
+            </div>
+        </Modal>
+    );
+}
+
+// Decline Modal
+function DeclineModal({ isOpen, onClose, onConfirm }: { isOpen: boolean; onClose: () => void; onConfirm: (reason: string) => void }) {
+    const [reason, setReason] = useState('');
+
+    if (!isOpen) return null;
+
+    return (
+        <Modal
+            open={isOpen}
+            onClose={onClose}
+            title="Decline Assignment"
+            description="Are you sure you want to decline this assignment? This action cannot be undone."
+        >
+            <div className="space-y-4">
+                <textarea
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Please provide a reason..."
+                    className="w-full p-3 border border-[var(--gray-200)] rounded-md text-sm outline-none focus:border-[var(--color-brand)] min-h-[100px]"
+                />
+                <div className="flex justify-end gap-3">
+                    <Button variant="ghost" onClick={onClose}>Cancel</Button>
+                    <Button variant="danger" onClick={() => onConfirm(reason)} disabled={!reason.trim()}>
+                        Decline Assignment
+                    </Button>
+                </div>
+            </div>
+        </Modal>
+    );
+}
+
+export default function AssignmentDetailPage() {
+    const params = useParams();
+    const router = useRouter();
+    const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [isActionLoading, setIsActionLoading] = useState(false);
+    const [showDeclineModal, setShowDeclineModal] = useState(false);
+    const [showVerifyModal, setShowVerifyModal] = useState(false);
+
+    useEffect(() => {
+        if (params.id) {
+            loadAssignment(params.id as string);
+        }
+    }, [params.id]);
+
+    const loadAssignment = async (id: string) => {
+        setIsLoading(true);
+        try {
+            const data = await getAssignmentDetail(id);
+            setAssignment(data);
+        } catch (err) {
+            setError('Failed to load assignment details');
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleAccept = async () => {
+        if (!assignment) return;
+        setIsActionLoading(true);
+        try {
+            const res = await acceptAssignment(assignment.id);
+            if (res.success) {
+                loadAssignment(assignment.id);
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsActionLoading(false);
+        }
+    };
+
+    const handleDecline = async (reason: string) => {
+        if (!assignment) return;
+        setIsActionLoading(true);
+        try {
+            const res = await declineAssignment(assignment.id, reason);
+            if (res.success) {
+                router.push('/agent/assignments');
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsActionLoading(false);
+            setShowDeclineModal(false);
+        }
+    };
+
+    const handleStartVerification = async () => {
+        if (!assignment) return;
+        setIsActionLoading(true);
+        try {
+            const res = await startVerification(assignment.id);
+            if (res.success) {
+                loadAssignment(assignment.id);
+                // Automatically open modal if needed, or wait for user to click "Complete"
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsActionLoading(false);
+        }
+    };
+
+    const handleCompleteVerification = async (data: any) => {
+        if (!assignment) return;
+        try {
+            const res = await completeVerification(
+                assignment.id,
+                data
+            );
+
+            if (res.success) {
+                setShowVerifyModal(false);
+                loadAssignment(assignment.id);
+            }
+        } catch (err) {
+            // Error handled in modal
+            throw err;
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <Loader2 className="w-8 h-8 animate-spin text-[var(--color-brand)]" />
+            </div>
+        );
+    }
+
+    if (error || !assignment) {
+        return <Alert variant="error" title="Error" description={error || "Assignment not found"} />;
+    }
+
+    const { property, seller } = assignment;
+
+    // Derived state or fallbacks for missing API fields
+    const propertyImage = property.media && property.media.length > 0 ? getImageUrl(property.media[0].file_url) : null;
+    const formattedPrice = property.price ? `$${property.price.toLocaleString()}` : 'Price TBD';
+
+    return (
+        <div className="space-y-6 pb-20">
+            {/* Header */}
+            <div className="flex items-center gap-4">
+                <Button variant="ghost" size="icon" onClick={() => router.back()}>
+                    <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                    <h1 className="text-2xl font-bold text-[var(--gray-900)]">Assignment #{assignment.id.substring(0, 8)}</h1>
+                    <div className="flex items-center gap-2 text-[var(--gray-500)] text-sm">
+                        <span>Requested {new Date(assignment.requested_at).toLocaleDateString()}</span>
+                        <span>•</span>
+                        <Badge variant={
+                            assignment.status === 'ACCEPTED' ? 'success' :
+                                assignment.status === 'COMPLETED' ? 'neutral' :
+                                    assignment.status === 'DECLINED' ? 'error' : 'warning'
+                        }>
+                            {assignment.status}
+                        </Badge>
+                    </div>
                 </div>
             </div>
 
-            {/* Messages */}
-            {successMessage && (
-                <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 animate-fade-in-up">
-                    <CheckCircle className="w-5 h-5" />
-                    <span>{successMessage}</span>
-                </div>
-            )}
-            {error && (
-                <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-                    <AlertCircle className="w-5 h-5" />
-                    <span>{error}</span>
-                </div>
-            )}
-
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Column: Property Info */}
+                {/* Main Content */}
                 <div className="lg:col-span-2 space-y-6">
-                    {/* Images */}
-                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                        {assignment.property.media.length > 0 ? (
-                            <div className="grid grid-cols-2 gap-1 h-[300px]">
-                                {assignment.property.media.slice(0, 3).map((m, idx) => (
-                                    <div key={m.id} className={`relative overflow-hidden ${idx === 0 ? 'col-span-2 row-span-2 h-full' : 'h-full'}`}>
-                                        <img
-                                            src={m.file_url.startsWith('/') ? `${API_BASE_URL}${m.file_url}` : m.file_url}
-                                            alt="Property"
-                                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                                        />
-                                    </div>
-                                ))}
+                    {/* Property Card */}
+                    <Card>
+                        <div className="relative h-48 bg-[var(--gray-200)] w-full">
+                            {propertyImage ? (
+                                <img src={propertyImage} alt={property.title} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-[var(--gray-400)]">
+                                    <span className="flex items-center gap-2"><FileText className="w-5 h-5" /> No Image</span>
+                                </div>
+                            )}
+                            <div className="absolute top-4 right-4">
+                                <Badge className="bg-white/90 backdrop-blur text-[var(--gray-900)] shadow-sm">
+                                    {property.type}
+                                </Badge>
                             </div>
-                        ) : (
-                            <div className="aspect-video bg-gray-100 flex items-center justify-center">
-                                <Home className="w-16 h-16 text-gray-300" />
+                        </div>
+                        <div className="p-6">
+                            <h2 className="text-xl font-bold text-[var(--gray-900)] mb-2">{property.title}</h2>
+                            <div className="flex items-center gap-2 text-[var(--gray-500)] mb-4">
+                                <MapPin className="w-4 h-4" />
+                                {property.address}, {property.city}
                             </div>
-                        )}
-                        <div className="p-4 border-t border-gray-100">
-                            <div className="flex justify-between items-start">
+
+                            <div className="grid grid-cols-3 gap-4 py-4 border-t border-[var(--gray-100)]">
                                 <div>
-                                    <h2 className="text-xl font-bold text-gray-900">{assignment.property.title || 'Untitled Property'}</h2>
-                                    <p className="text-gray-500 mt-1 flex items-center gap-1"><IndianRupee className="w-3.5 h-3.5" /> {formatPrice(assignment.property.price)}</p>
+                                    <p className="text-xs text-[var(--gray-500)] uppercase tracking-wide">Price</p>
+                                    <p className="font-semibold text-lg text-[var(--gray-900)]">
+                                        {formattedPrice}
+                                    </p>
                                 </div>
-                                <div className="text-xs font-semibold px-2 py-1 bg-gray-100 rounded text-gray-600">
-                                    {assignment.property.type}
+                                <div>
+                                    <p className="text-xs text-[var(--gray-500)] uppercase tracking-wide">Size</p>
+                                    <p className="font-semibold text-lg text-[var(--gray-900)]">
+                                        {property.area_sqft ? `${property.area_sqft} sqft` : 'N/A'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-[var(--gray-500)] uppercase tracking-wide">Configuration</p>
+                                    <p className="font-semibold text-lg text-[var(--gray-900)]">
+                                        {property.bedrooms} Bed / {property.bathrooms} Bath
+                                    </p>
                                 </div>
                             </div>
-                        </div>
-                    </div>
 
-                    {/* Features & Description */}
-                    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                        <h3 className="font-bold text-gray-900 mb-4">Property Overview</h3>
-                        <div className="grid grid-cols-4 gap-4 mb-6">
-                            <div className="p-3 bg-gray-50 rounded-lg text-center">
-                                <Bed className="w-5 h-5 mx-auto text-gray-400 mb-1" />
-                                <div className="font-semibold">{assignment.property.bedrooms || '-'}</div>
-                                <div className="text-xs text-gray-500">Beds</div>
-                            </div>
-                            <div className="p-3 bg-gray-50 rounded-lg text-center">
-                                <Bath className="w-5 h-5 mx-auto text-gray-400 mb-1" />
-                                <div className="font-semibold">{assignment.property.bathrooms || '-'}</div>
-                                <div className="text-xs text-gray-500">Baths</div>
-                            </div>
-                            <div className="p-3 bg-gray-50 rounded-lg text-center">
-                                <Square className="w-5 h-5 mx-auto text-gray-400 mb-1" />
-                                <div className="font-semibold">{assignment.property.area_sqft || '-'}</div>
-                                <div className="text-xs text-gray-500">Sqft</div>
-                            </div>
-                            <div className="p-3 bg-gray-50 rounded-lg text-center">
-                                <Building2 className="w-5 h-5 mx-auto text-gray-400 mb-1" />
-                                <div className="font-semibold">{assignment.property.status}</div>
-                                <div className="text-xs text-gray-500">Status</div>
-                            </div>
-                        </div>
-
-                        {assignment.property.description && (
-                            <div>
-                                <h4 className="font-semibold text-gray-900 mb-2 text-sm">Description</h4>
-                                <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-line">
-                                    {assignment.property.description}
+                            <div className="mt-4 pt-4 border-t border-[var(--gray-100)]">
+                                <h3 className="font-semibold text-[var(--gray-900)] mb-2">Description</h3>
+                                <p className="text-[var(--gray-600)] text-sm leading-relaxed">
+                                    {property.description || "No description provided."}
                                 </p>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    </Card>
                 </div>
 
-                {/* Right Column: Actions & Seller */}
+                {/* Sidebar Actions */}
                 <div className="space-y-6">
-                    {/* Actions Card */}
-                    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                        <h3 className="font-bold text-gray-900 mb-4">Actions</h3>
-                        {isPending && (
+                    {/* Action Card */}
+                    <Card className="p-5">
+                        <h3 className="font-semibold text-[var(--gray-900)] mb-4">Actions</h3>
+
+                        {assignment.status === 'REQUESTED' && (
                             <div className="space-y-3">
-                                <button
-                                    onClick={handleAccept}
-                                    disabled={actionLoading}
-                                    className="w-full py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                                >
-                                    {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                                    Accept Assignment
-                                </button>
-                                <button
-                                    onClick={handleDecline}
-                                    disabled={actionLoading}
-                                    className="w-full py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 disabled:opacity-50 flex items-center justify-center gap-2"
-                                >
-                                    <XCircle className="w-4 h-4" />
+                                <Button className="w-full" onClick={handleAccept} disabled={isActionLoading}>
+                                    {isActionLoading ? 'Processing...' : 'Accept Assignment'}
+                                </Button>
+                                <Button variant="outline" className="w-full" onClick={() => setShowDeclineModal(true)} disabled={isActionLoading}>
                                     Decline
-                                </button>
+                                </Button>
                             </div>
                         )}
 
-                        {isAccepted && !isVerifying && assignment.property.status !== 'ACTIVE' && (
-                            <button
-                                onClick={handleStartVerification}
-                                disabled={actionLoading}
-                                className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-95"
-                            >
-                                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
-                                Start Verification
-                            </button>
-                        )}
-
-                        {isVerifying && (
-                            <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 text-purple-900">
-                                <h4 className="font-bold mb-1 flex items-center gap-2"><Navigation className="w-4 h-4" /> Verification in Progress</h4>
-                                <p className="text-sm text-purple-700 mb-3">You are verifying this property.</p>
-                                <button
-                                    onClick={() => setShowVerifyModal(true)}
-                                    className="w-full py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 flex items-center justify-center gap-2"
-                                >
-                                    Complete Report
-                                </button>
+                        {assignment.status === 'ACCEPTED' && (
+                            <div className="space-y-3">
+                                {property.status === 'PENDING_ASSIGNMENT' || property.status === 'ASSIGNED' ? (
+                                    <Button className="w-full" onClick={handleStartVerification} disabled={isActionLoading}>
+                                        <Shield className="w-4 h-4 mr-2" />
+                                        Start Verification
+                                    </Button>
+                                ) : property.status === 'VERIFICATION_IN_PROGRESS' ? (
+                                    <Button className="w-full" onClick={() => setShowVerifyModal(true)}>
+                                        <CheckCircle className="w-4 h-4 mr-2" />
+                                        Complete Verification
+                                    </Button>
+                                ) : (
+                                    <div className="text-center p-3 bg-emerald-50 text-emerald-700 rounded-md text-sm font-medium">
+                                        <CheckCircle className="w-4 h-4 mx-auto mb-1" />
+                                        Property Verified
+                                    </div>
+                                )}
                             </div>
                         )}
 
-                        {isCompleted && (
-                            <div className="text-center p-3 bg-emerald-50 rounded-lg border border-emerald-100 text-emerald-600 font-medium text-sm flex items-center justify-center gap-2">
-                                <CheckCircle className="w-4 h-4" /> Property Verified
+                        {assignment.status === 'COMPLETED' && (
+                            <div className="text-center p-3 bg-[var(--gray-50)] text-[var(--gray-600)] rounded-md text-sm">
+                                This assignment is completed.
                             </div>
                         )}
-                    </div>
+                    </Card>
 
-                    {/* Seller Card */}
-                    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                        <h3 className="font-bold text-gray-900 mb-4">Seller Details</h3>
+                    {/* Seller Info */}
+                    <Card className="p-5">
+                        <h3 className="font-semibold text-[var(--gray-900)] mb-4">Seller Information</h3>
                         <div className="flex items-center gap-3 mb-4">
-                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                                <User className="w-6 h-6 text-blue-600" />
+                            <div className="w-10 h-10 rounded-full bg-[var(--color-brand-subtle)] flex items-center justify-center text-[var(--color-brand)] font-bold">
+                                {seller.name.charAt(0)}
                             </div>
                             <div>
-                                <div className="font-medium text-gray-900">{assignment.seller.name}</div>
-                                <div className="text-xs text-gray-500">Property Owner</div>
+                                <p className="font-medium text-[var(--gray-900)]">{seller.name}</p>
+                                <p className="text-xs text-[var(--gray-500)]">Property Owner</p>
                             </div>
                         </div>
-                        <div className="space-y-3 pt-3 border-t border-gray-100">
-                            <a href={`mailto:${assignment.seller.email}`} className="flex items-center gap-3 text-gray-600 hover:text-emerald-600 p-2 hover:bg-gray-50 rounded-lg transition-colors">
-                                <Mail className="w-4 h-4" />
-                                <span className="text-sm">{assignment.seller.email}</span>
-                            </a>
-                            {assignment.seller.phone && (
-                                <a href={`tel:${assignment.seller.phone}`} className="flex items-center gap-3 text-gray-600 hover:text-emerald-600 p-2 hover:bg-gray-50 rounded-lg transition-colors">
-                                    <Phone className="w-4 h-4" />
-                                    <span className="text-sm">{assignment.seller.phone}</span>
-                                </a>
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm text-[var(--gray-600)]">
+                                <Mail className="w-4 h-4 text-[var(--gray-400)]" />
+                                <a href={`mailto:${seller.email}`} className="hover:text-[var(--color-brand)]">{seller.email}</a>
+                            </div>
+                            {seller.phone && (
+                                <div className="flex items-center gap-2 text-sm text-[var(--gray-600)]">
+                                    <Phone className="w-4 h-4 text-[var(--gray-400)]" />
+                                    <a href={`tel:${seller.phone}`} className="hover:text-[var(--color-brand)]">{seller.phone}</a>
+                                </div>
                             )}
                         </div>
-                    </div>
+                        <div className="mt-4 pt-4 border-t border-[var(--gray-100)]">
+                            <Button variant="outline" className="w-full" onClick={() => router.push('/agent/messages')}>
+                                <MessageSquare className="w-4 h-4 mr-2" />
+                                Send Message
+                            </Button>
+                        </div>
+                    </Card>
                 </div>
             </div>
 
             {/* Verification Modal */}
-            {showVerifyModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowVerifyModal(false)} />
-                    <div className="relative bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-gray-900">Final Verification</h3>
-                            <button onClick={() => setShowVerifyModal(false)} className="text-gray-400 hover:text-gray-600"><XCircle className="w-5 h-5" /></button>
-                        </div>
+            <VerificationModal
+                isOpen={showVerifyModal}
+                onClose={() => setShowVerifyModal(false)}
+                onComplete={handleCompleteVerification}
+                assignmentId={assignment.id}
+            />
 
-                        {/* GPS Capture */}
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">GPS Coordinates</label>
-                            <button
-                                onClick={handleGetLocation}
-                                className={`w-full py-3 px-4 border rounded-xl flex items-center justify-center gap-2 transition-colors ${gpsLocation ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'border-gray-200 hover:bg-gray-50 text-gray-600'}`}
-                            >
-                                <Navigation className="w-5 h-5" />
-                                {gpsLocation ? `Lat: ${gpsLocation.lat.toFixed(4)}, Lng: ${gpsLocation.lng.toFixed(4)}` : 'Capture Location'}
-                            </button>
-                            {gpsLocation && <p className="text-xs text-emerald-600 mt-1 text-center">Location captured</p>}
-                        </div>
-
-                        {/* Approval Toggle */}
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Verification Status</label>
-                            <div className="grid grid-cols-2 gap-3">
-                                <button
-                                    onClick={() => setVerifyApproved(true)}
-                                    className={`py-3 rounded-xl font-medium border-2 transition-all ${verifyApproved ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-transparent bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                                >
-                                    Approve
-                                </button>
-                                <button
-                                    onClick={() => setVerifyApproved(false)}
-                                    className={`py-3 rounded-xl font-medium border-2 transition-all ${!verifyApproved ? 'border-red-500 bg-red-50 text-red-700' : 'border-transparent bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                                >
-                                    Reject
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Notes/Reason */}
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                {verifyApproved ? 'Verification Notes (Optional)' : 'Rejection Reason (Required)'}
-                            </label>
-                            <textarea
-                                value={verifyApproved ? verifyNotes : verifyReason}
-                                onChange={(e) => verifyApproved ? setVerifyNotes(e.target.value) : setVerifyReason(e.target.value)}
-                                placeholder={verifyApproved ? 'Property condition, anomalies...' : 'Missing documents, property mismatch...'}
-                                className="w-full p-4 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
-                                rows={3}
-                            />
-                        </div>
-
-                        <button
-                            onClick={handleCompleteVerification}
-                            disabled={actionLoading || (!verifyApproved && !verifyReason)}
-                            className="w-full py-3.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-200"
-                        >
-                            {actionLoading ? 'Submitting Report...' : 'Submit Verification Report'}
-                        </button>
-                    </div>
-                </div>
-            )}
+            {/* Decline Modal */}
+            <DeclineModal
+                isOpen={showDeclineModal}
+                onClose={() => setShowDeclineModal(false)}
+                onConfirm={handleDecline}
+            />
         </div>
     );
 }

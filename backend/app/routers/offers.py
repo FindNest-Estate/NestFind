@@ -16,7 +16,7 @@ from typing import Optional
 from uuid import UUID
 
 from ..core.database import get_db_pool
-from ..middleware.auth_middleware import get_current_user, AuthenticatedUser
+from ..middleware.auth_middleware import get_current_user, AuthenticatedUser, require_role
 from ..services.offer_service import OfferService
 
 
@@ -53,7 +53,7 @@ def get_client_ip(request: Request) -> str:
 async def create_offer(
     data: OfferCreate,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("BUYER"))
 ):
     """
     Buyer creates an offer for a property.
@@ -235,7 +235,7 @@ async def counter_offer(
 async def withdraw_offer(
     offer_id: UUID,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("BUYER"))
 ):
     """Buyer withdraws their offer."""
     pool = get_db_pool()

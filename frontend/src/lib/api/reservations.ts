@@ -48,3 +48,13 @@ export async function cancelReservation(
 ): Promise<{ success: boolean }> {
     return post<{ success: boolean }>(`/reservations/${reservationId}/cancel`, { reason });
 }
+
+/**
+ * Submit payment proof for a reservation
+ */
+export async function submitPaymentProof(
+    reservationId: string,
+    proofUrl: string
+): Promise<{ success: boolean; proof_url: string }> {
+    return post<{ success: boolean; proof_url: string }>(`/reservations/${reservationId}/proof`, { proof_url: proofUrl });
+}

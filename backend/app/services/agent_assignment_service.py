@@ -957,16 +957,34 @@ class AgentAssignmentService:
     async def get_agent_crm_leads(self, agent_id: UUID) -> Dict[str, Any]:
         """
         Get CRM leads (Sellers and potential Buyers) from DB.
+        Includes EXPLICIT leads from the new CRM feature and IMPLICIT leads
+        derived from active assignments and visits.
         """
         async with self.db.acquire() as conn:
-            # 1. Sellers (from assignments)
-            # agent_assignments has no updated_at, using COALESCE(completed_at, responded_at, requested_at)
+            # 1. Explicit CRM Leads (from new table)
+            explicit_leads = await conn.fetch(
+                """
+                SELECT id, name as full_name, email, phone as mobile_number,
+                       type, pipeline_stage as deal_stage,
+                       temperature, notes, expected_value, 
+                       '' as property_interest, 
+                       last_contacted_at as last_interaction,
+                       true as is_explicit
+                FROM agent_crm_leads
+                WHERE agent_id = $1
+                """,
+                agent_id
+            )
+            
+            # 2. Implicit Sellers (from assignments)
             sellers = await conn.fetch(
                 """
                 SELECT DISTINCT u.id, u.full_name, u.email, u.mobile_number, 
                        'SELLER' as type, aa.status as deal_stage,
+                       'WARM' as temperature, '' as notes, NULL as expected_value,
                        p.title as property_interest, 
-                       COALESCE(aa.completed_at, aa.responded_at, aa.requested_at) as last_interaction
+                       COALESCE(aa.completed_at, aa.responded_at, aa.requested_at) as last_interaction,
+                       false as is_explicit
                 FROM agent_assignments aa
                 JOIN properties p ON aa.property_id = p.id
                 JOIN users u ON p.seller_id = u.id
@@ -975,13 +993,14 @@ class AgentAssignmentService:
                 agent_id
             )
             
-            # 2. Buyers (from visit requests)
-            # visit_requests HAS updated_at
+            # 3. Implicit Buyers (from visit requests)
             buyers = await conn.fetch(
                 """
                 SELECT DISTINCT u.id, u.full_name, u.email, u.mobile_number,
                        'BUYER' as type, vr.status as deal_stage,
-                       p.title as property_interest, vr.updated_at as last_interaction
+                       'COLD' as temperature, '' as notes, NULL as expected_value,
+                       p.title as property_interest, vr.updated_at as last_interaction,
+                       false as is_explicit
                 FROM visit_requests vr
                 JOIN properties p ON vr.property_id = p.id
                 JOIN users u ON vr.buyer_id = u.id
@@ -990,23 +1009,126 @@ class AgentAssignmentService:
                 agent_id
             )
             
-            leads = []
+            # Deduplicate by email (prefer explicit leads over implicit ones)
+            leads_map = {}
             for row in sellers + buyers:
-                leads.append({
-                    "id": str(row["id"]),
-                    "name": row["full_name"],
-                    "email": row["email"],
-                    "phone": row["mobile_number"],
-                    "type": row["type"],
-                    "stage": row["deal_stage"],
-                    "interest": row["property_interest"],
-                    "last_contact": row["last_interaction"].strftime("%Y-%m-%d") if row["last_interaction"] else "N/A"
+                email = row["email"]
+                if email not in leads_map:
+                    leads_map[email] = dict(row)
+                    # Normalize stages for implicit leads to match Kanban
+                    if row["deal_stage"] in ('ACCEPTED', 'APPROVED', 'CHECKED_IN'):
+                        leads_map[email]["deal_stage"] = "SHOWING"
+                    elif row["deal_stage"] == 'COMPLETED':
+                        leads_map[email]["deal_stage"] = "CLOSED"
+                    else:
+                        leads_map[email]["deal_stage"] = "CONTACTED"
+                        
+            # Override with explicit leads explicitly managed by the agent
+            for row in explicit_leads:
+                email = row["email"]
+                # fix alias collision from sql query (temperature in english)
+                leads_map[email] = dict(row)
+                leads_map[email]["temperature"] = row["temperature"] if "temperature" in dict(row) else row["温度"]
+            
+            leads_list = []
+            for item in leads_map.values():
+                leads_list.append({
+                    "id": str(item["id"]),
+                    "name": item["full_name"],
+                    "email": item["email"],
+                    "phone": item["mobile_number"],
+                    "type": item["type"],
+                    "stage": item["deal_stage"].upper() if item["deal_stage"] else "NEW",
+                    "temperature": item.get("temperature", "WARM"),
+                    "notes": item.get("notes", ""),
+                    "expected_value": float(item["expected_value"]) if item.get("expected_value") else None,
+                    "interest": item["property_interest"],
+                    "last_contact": item["last_interaction"].strftime("%Y-%m-%d") if item["last_interaction"] else "N/A",
+                    "is_explicit": item["is_explicit"]
                 })
                 
             return {
                 "success": True,
-                "leads": leads
+                "leads": leads_list
             }
+
+    async def create_crm_lead(self, agent_id: UUID, lead_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new explicit CRM lead."""
+        async with self.db.acquire() as conn:
+            # Generate UUID early to return it
+            import uuid
+            new_id = uuid.uuid4()
+            
+            await conn.execute(
+                """
+                INSERT INTO agent_crm_leads 
+                (id, agent_id, name, email, phone, type, pipeline_stage, temperature, notes, expected_value)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                """,
+                new_id,
+                agent_id,
+                lead_data.get("name"),
+                lead_data.get("email"),
+                lead_data.get("phone"),
+                lead_data.get("type", "BUYER"),
+                lead_data.get("stage", "NEW"),
+                lead_data.get("temperature", "WARM"),
+                lead_data.get("notes"),
+                lead_data.get("expected_value")
+            )
+            
+            return {
+                "success": True,
+                "lead_id": str(new_id)
+            }
+
+    async def update_crm_lead(self, agent_id: UUID, lead_id: UUID, update_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update an explicit CRM lead (e.g. move stage)."""
+        async with self.db.acquire() as conn:
+            # Build dynamic UPDAte query
+            fields = []
+            values = [lead_id, agent_id]
+            idx = 3
+            
+            if "stage" in update_data:
+                fields.append(f"pipeline_stage = ${idx}")
+                values.append(update_data["stage"])
+                idx += 1
+            if "temperature" in update_data:
+                fields.append(f"temperature = ${idx}")
+                values.append(update_data["temperature"])
+                idx += 1
+            if "notes" in update_data:
+                fields.append(f"notes = ${idx}")
+                values.append(update_data["notes"])
+                idx += 1
+                
+            if not fields:
+                return {"success": True}
+                
+            query = f"""
+                UPDATE agent_crm_leads
+                SET {", ".join(fields)}
+                WHERE id = $1 AND agent_id = $2
+            """
+            
+            result = await conn.execute(query, *values)
+            
+            if "0" in result:
+                return {"success": False, "error": "Lead not found or access denied"}
+                
+            return {"success": True}
+
+    async def delete_crm_lead(self, agent_id: UUID, lead_id: UUID) -> Dict[str, Any]:
+        """Delete an explicit CRM lead."""
+        async with self.db.acquire() as conn:
+            result = await conn.execute(
+                "DELETE FROM agent_crm_leads WHERE id = $1 AND agent_id = $2",
+                lead_id, agent_id
+            )
+            if "0" in result:
+                return {"success": False, "error": "Lead not found or access denied"}
+            return {"success": True}
 
     async def get_agent_insights(self, agent_id: UUID) -> Dict[str, Any]:
         """
@@ -1416,6 +1538,58 @@ class AgentAssignmentService:
                 "amount": amount
             }
 
+    async def get_marketing_profile(self, agent_id: UUID) -> Dict[str, Any]:
+        """Get the agent's public marketing profile."""
+        async with self.db.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT p.bio, p.social_links, p.service_areas, p.photo_url, u.full_name, u.email, u.mobile_number
+                FROM users u
+                LEFT JOIN agent_marketing_profiles p ON u.id = p.agent_id
+                WHERE u.id = $1
+                """,
+                agent_id
+            )
+            
+            if not row:
+                return {"success": False, "error": "Agent not found"}
+                
+            return {
+                "success": True,
+                "profile": {
+                    "name": row["full_name"],
+                    "email": row["email"],
+                    "phone": row["mobile_number"],
+                    "bio": row["bio"] or "",
+                    "social_links": json.loads(row["social_links"]) if row["social_links"] and isinstance(row["social_links"], str) else (row["social_links"] or {}),
+                    "service_areas": row["service_areas"] or [],
+                    "photo_url": row["photo_url"] or ""
+                }
+            }
+
+    async def update_marketing_profile(self, agent_id: UUID, profile_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update or create the agent's marketing profile."""
+        async with self.db.acquire() as conn:
+            # Upsert into agent_marketing_profiles
+            await conn.execute(
+                """
+                INSERT INTO agent_marketing_profiles (agent_id, bio, social_links, service_areas, photo_url)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (agent_id) DO UPDATE SET
+                    bio = EXCLUDED.bio,
+                    social_links = EXCLUDED.social_links,
+                    service_areas = EXCLUDED.service_areas,
+                    photo_url = EXCLUDED.photo_url
+                """,
+                agent_id,
+                profile_data.get("bio", ""),
+                json.dumps(profile_data.get("social_links", {})),
+                profile_data.get("service_areas", []),
+                profile_data.get("photo_url", "")
+            )
+            
+            return {"success": True}
+
     # ========================================================================
     # MESSAGES
     # ========================================================================
@@ -1532,7 +1706,7 @@ class AgentAssignmentService:
                     pm.is_primary,
                     p.id as property_id,
                     p.title as property_title,
-                    pm.created_at,
+                    p.created_at,
                     'property_media' as category
                 FROM property_media pm
                 JOIN properties p ON pm.property_id = p.id
@@ -1540,7 +1714,7 @@ class AgentAssignmentService:
                 WHERE aa.agent_id = $1 
                   AND aa.status IN ('ACCEPTED', 'COMPLETED')
                   AND pm.deleted_at IS NULL
-                ORDER BY pm.created_at DESC
+                ORDER BY p.created_at DESC
                 LIMIT 100
             """
             

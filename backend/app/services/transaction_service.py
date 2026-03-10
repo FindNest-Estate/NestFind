@@ -514,6 +514,13 @@ class TransactionService:
                     "error": f"Cannot complete transaction in {transaction['status']} status. Both parties must verify first."
                 }
             
+            # Rule 3: Cannot submit final payment without reservation
+            if not transaction['reservation_id']:
+                return {
+                    "success": False,
+                    "error": "Cannot submit final payment without an active reservation."
+                }
+            
             async with conn.transaction():
                 # Update transaction
                 await conn.execute("""
@@ -553,6 +560,61 @@ class TransactionService:
                     )
             except Exception:
                 pass
+            
+            # ===================================================================
+            # DEAL INTEGRATION (Phase 1.5) - Silent orchestration
+            # ===================================================================
+            try:
+                from .deal_service import DealService
+                from decimal import Decimal
+                deal_service = DealService(self.db)
+                
+                # Get active deal
+                deal = await deal_service.get_active_deal_by_property(
+                    property_id=transaction['property_id'],
+                    conn=conn
+                )
+                
+                if deal:
+                    # PRE-CONDITION FIX #4: Atomic REGISTRATION → COMPLETED → COMMISSION_RELEASED
+                    # Use deal_id for atomic operations (no property lookups)
+                    if deal['status'] == 'REGISTRATION':
+                        # Step 1: REGISTRATION → COMPLETED
+                        await deal_service.transition_deal(
+                            deal_id=deal['id'],
+                            new_status='COMPLETED',
+                            actor_id=agent_id,
+                            actor_role='AGENT',
+                            notes=f'Transaction completed for {transaction["property_title"]}',
+                            metadata={'transaction_id': str(transaction_id)},
+                            ip_address=ip_address
+                        )
+                        
+                        # Step 2: COMPLETED → COMMISSION_RELEASED (atomic, immediately after)
+                        await deal_service.transition_deal(
+                            deal_id=deal['id'],
+                            new_status='COMMISSION_RELEASED',
+                            actor_id=agent_id,
+                            actor_role='ADMIN',  # System auto-release
+                            notes=f'Commission auto-released for {transaction["property_title"]}',
+                            metadata={'transaction_id': str(transaction_id)},
+                            ip_address=ip_address
+                        )
+                    
+                    # Link transaction with commission details
+                    await deal_service.link_transaction(
+                        deal_id=deal['id'],
+                        transaction_id=transaction_id,
+                        commission_amount=Decimal(str(transaction['commission_amount'])),
+                        platform_fee=Decimal(str(transaction['platform_fee'])),
+                        agent_commission=Decimal(str(transaction['agent_commission'])),
+                        actor_id=agent_id,
+                        actor_role='AGENT',
+                        conn=conn
+                    )
+            except Exception as e:
+                # Silent failure - don't block legacy flow
+                print(f"[WARN] DEAL integration failed in complete_transaction: {str(e)}")
             
             return {
                 "success": True,
@@ -723,15 +785,46 @@ class TransactionService:
             except Exception:
                 pass
             
+            # ===================================================================
+            # DEAL INTEGRATION (Phase 1.5) - Silent orchestration
+            # ===================================================================
+            try:
+                from .deal_service import DealService
+                deal_service = DealService(self.db)
+                
+                # Get active deal
+                deal = await deal_service.get_active_deal_by_property(
+                    property_id=reservation['property_id'],
+                    conn=conn
+                )
+                
+                if deal:
+                    # Transition to REGISTRATION (from TOKEN_PAID or AGREEMENT_SIGNED)
+                    if deal['status'] in ('TOKEN_PAID', 'AGREEMENT_SIGNED'):
+                        await deal_service.transition_deal(
+                            deal_id=deal['id'],
+                            new_status='REGISTRATION',
+                            actor_id=agent_id,
+                            actor_role='AGENT',
+                            notes=f'Registration scheduled for {reservation["property_title"]}',
+                            metadata={
+                                'transaction_id': str(transaction['id']),
+                                'registration_date': registration_date.isoformat()
+                            },
+                            ip_address=ip_address
+                        )
+            except Exception as e:
+                # Silent failure - don't block legacy flow
+                print(f"[WARN] DEAL integration failed in schedule_registration: {str(e)}")
+            
             return {
                 "success": True,
-                "message": "Transaction approved and completed!",
+                "message": "Registration scheduled successfully",
                 "transaction": {
                     "id": str(transaction_id),
                     "property_id": str(transaction['property_id']),
                     "property_title": transaction['property_title'],
                     "status": "COMPLETED",
-                    "agent_commission": float(transaction['agent_commission']),
                     "completed_at": datetime.now(timezone.utc).isoformat()
                 }
             }

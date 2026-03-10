@@ -4,12 +4,14 @@ import { useState, useEffect, FormEvent, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Shield, Lock, Mail, Eye, EyeOff, Loader2, AlertTriangle } from 'lucide-react';
-import { login } from '@/lib/authApi';
+import { login as loginApi } from '@/lib/authApi';
+import { useAuth } from '@/lib/auth';
 import { RateLimitError } from '@/lib/api';
 
 function AdminLoginContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { login: authLogin } = useAuth();
     const returnUrl = searchParams.get('returnUrl') || '/admin';
     const sessionExpired = searchParams.get('session_expired') === 'true';
 
@@ -37,7 +39,7 @@ function AdminLoginContent() {
         setIsSubmitting(true);
 
         try {
-            const response = await login({ email, password, portal: 'admin' });
+            const response = await loginApi({ email, password, portal: 'admin' });
 
             // Check for login error - backend returns success: false with message
             if ('success' in response && !response.success) {
@@ -61,8 +63,8 @@ function AdminLoginContent() {
 
             // Success - has access_token
             if ('access_token' in response) {
-                if (response.access_token) localStorage.setItem('access_token', response.access_token);
-                if (response.refresh_token) localStorage.setItem('refresh_token', response.refresh_token);
+                // Use centralized auth context to persist token and update state
+                authLogin(response.access_token, response.user, response.refresh_token);
 
                 if (response.user.status === 'ACTIVE') {
                     router.push(returnUrl);

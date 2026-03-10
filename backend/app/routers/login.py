@@ -1,7 +1,8 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr
 from uuid import UUID
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from datetime import datetime
 
 from ..services.login_service import LoginService
@@ -26,6 +27,7 @@ class UserInfo(BaseModel):
     full_name: str
     status: str
     role: str
+    roles: List[str]
 
 
 class LoginResponse(BaseModel):
@@ -43,11 +45,11 @@ async def login(
     request: LoginRequest,
     http_request: Request,
     response: Response,
-    db_pool = Depends(get_db_pool)
+    db_pool=Depends(get_db_pool),
 ):
     """
     Authenticate user with password and issue JWT + refresh token.
-    
+
     Enforces:
     - Bcrypt password verification
     - 5-attempt lockout
@@ -57,111 +59,125 @@ async def login(
     - Sets HTTP-only cookies for tokens
     - Portal-based role restrictions (admin portal only for ADMIN)
     """
-    ip_address = http_request.client.host
+    ip_address = http_request.client.host if http_request.client else "unknown"
     user_agent = http_request.headers.get("user-agent", "unknown")
-    
+
     login_service = LoginService(db_pool)
     session_service = SessionService(db_pool)
     refresh_service = RefreshTokenService(db_pool)
-    
+
     try:
-        # Authenticate user
         auth_result = await login_service.authenticate(
             email=request.email,
             password=request.password,
-            ip_address=ip_address
+            ip_address=ip_address,
         )
-        
+
         if not auth_result["success"]:
             return LoginResponse(
                 success=False,
                 message=auth_result["error"],
-                locked_until=auth_result.get("locked_until")
+                locked_until=auth_result.get("locked_until"),
             )
-        
-        # Fetch user details for response
+
         async with db_pool.acquire() as conn:
             user_data = await conn.fetchrow(
                 """
-                SELECT u.id, u.email, u.full_name, u.status::text, r.name::text as role
+                SELECT
+                    u.id,
+                    u.email,
+                    u.full_name,
+                    u.status::text,
+                    array_agg(r.name::text) as roles
                 FROM users u
                 JOIN user_roles ur ON u.id = ur.user_id
                 JOIN roles r ON ur.role_id = r.id
                 WHERE u.id = $1
+                GROUP BY u.id
                 """,
-                auth_result["user_id"]
+                auth_result["user_id"],
             )
-        
+
         if not user_data:
             raise HTTPException(status_code=500, detail="User data not found after authentication")
-        
-        user_role = user_data["role"]
-        
-        # Portal-based access restriction
+
+        roles_list = user_data["roles"]
+        primary_role = "BUYER"
+        if "ADMIN" in roles_list:
+            primary_role = "ADMIN"
+        elif "AGENT" in roles_list:
+            primary_role = "AGENT"
+        elif "SELLER" in roles_list:
+            primary_role = "SELLER"
+        elif "BUYER" in roles_list:
+            primary_role = "BUYER"
+        elif roles_list:
+            primary_role = roles_list[0]
+
+        user_role = primary_role
+
         if request.portal == "admin":
-            # Admin portal: Only ADMIN role allowed
             if user_role != "ADMIN":
                 return LoginResponse(
                     success=False,
-                    message="Access denied. Admin portal is for administrators only."
+                    message="Access denied. Admin portal is for administrators only.",
                 )
         else:
-            # User portal: ADMIN should use admin portal
             if user_role == "ADMIN":
                 return LoginResponse(
                     success=False,
-                    message="Please use the admin portal to login."
+                    message="Please use the admin portal to login.",
                 )
-        
-        # Create session
+
+        refresh_duration = get_refresh_token_duration(user_role)
+
         session = await session_service.create_session(
             user_id=auth_result["user_id"],
             ip_address=ip_address,
-            user_agent=user_agent
+            user_agent=user_agent,
+            expires_in_minutes=refresh_duration,
         )
-        
-        # Generate JWT with role-based expiration
+
         access_token = create_access_token(
             user_id=auth_result["user_id"],
             session_id=session["session_id"],
-            role=user_role
+            role=user_role,
         )
-        
-        # Issue refresh token with role-based duration
-        refresh_duration = get_refresh_token_duration(user_role)
+
         refresh_token = await refresh_service.issue_refresh_token(
             session_id=session["session_id"],
-            ip_address=ip_address
+            ip_address=ip_address,
+            expiry_minutes=refresh_duration,
         )
-        
-        # Cookie max_age based on role (in seconds)
+
         if user_role == "ADMIN":
-            access_max_age = 15 * 60  # 15 minutes
-            refresh_max_age = 60 * 60  # 1 hour
+            access_max_age = 15 * 60
+            refresh_max_age = 60 * 60
         else:
-            access_max_age = 30 * 24 * 60 * 60  # 30 days
-            refresh_max_age = 30 * 24 * 60 * 60  # 30 days
-        
-        # Set HTTP-only cookies for tokens
+            access_max_age = 30 * 24 * 60 * 60
+            refresh_max_age = 30 * 24 * 60 * 60
+
+        secure_cookie = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+
         response.set_cookie(
             key="access_token",
             value=access_token,
             httponly=True,
-            secure=False,  # Set to True in production with HTTPS
+            secure=secure_cookie,
             samesite="lax",
             max_age=access_max_age,
-            path="/"
+            path="/",
         )
         response.set_cookie(
             key="refresh_token",
             value=refresh_token,
             httponly=True,
-            secure=False,  # Set to True in production with HTTPS
+            secure=secure_cookie,
             samesite="lax",
             max_age=refresh_max_age,
-            path="/"
+            path="/",
         )
-        
+
         return LoginResponse(
             success=True,
             message="Login successful",
@@ -173,14 +189,12 @@ async def login(
                 email=user_data["email"],
                 full_name=user_data["full_name"],
                 status=user_data["status"],
-                role=user_data["role"]
-            )
+                role=user_role,
+                roles=roles_list,
+            ),
         )
-    
+
     except HTTPException:
         raise
     except Exception as e:
-        import traceback
-        print(f"[LOGIN ERROR] {type(e).__name__}: {str(e)}")
-        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")

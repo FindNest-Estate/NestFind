@@ -11,6 +11,8 @@ import logging
 from .offer_expiry_job import expire_stale_offers
 from .otp_cleanup_job import cleanup_expired_otps
 from .reservation_expiry_job import release_expired_reservations
+from .sla_checker_job import check_deal_slas
+from .visit_followup_job import send_post_visit_followups
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +32,8 @@ def init_scheduler(db_pool):
     
     # Job 1: Expire stale offers (every hour)
     scheduler.add_job(
-        func=lambda: expire_stale_offers(db_pool),
+        func=expire_stale_offers,
+        args=[db_pool],
         trigger=IntervalTrigger(hours=1),
         id='expire_offers',
         name='Expire Stale Offers',
@@ -40,7 +43,8 @@ def init_scheduler(db_pool):
     
     # Job 2: Cleanup expired OTPs (every 5 minutes)
     scheduler.add_job(
-        func=lambda: cleanup_expired_otps(db_pool),
+        func=cleanup_expired_otps,
+        args=[db_pool],
         trigger=IntervalTrigger(minutes=5),
         id='cleanup_otps',
         name='Cleanup Expired OTPs',
@@ -50,13 +54,36 @@ def init_scheduler(db_pool):
     
     # Job 3: Release expired reservations (every hour)
     scheduler.add_job(
-        func=lambda: release_expired_reservations(db_pool),
+        func=release_expired_reservations,
+        args=[db_pool],
         trigger=IntervalTrigger(hours=1),
         id='release_reservations',
         name='Release Expired Reservations',
         replace_existing=True
     )
     logger.info("Scheduled job: release_reservations (every 1 hour)")
+    
+    # Job 4: SLA breach detection (every 2 hours)
+    scheduler.add_job(
+        func=check_deal_slas,
+        args=[db_pool],
+        trigger=IntervalTrigger(hours=2),
+        id='check_sla_breaches',
+        name='Check Deal SLA Breaches',
+        replace_existing=True
+    )
+    logger.info("Scheduled job: check_sla_breaches (every 2 hours)")
+    
+    # Job 5: Post-visit follow-up notifications (every hour)
+    scheduler.add_job(
+        func=send_post_visit_followups,
+        args=[db_pool],
+        trigger=IntervalTrigger(hours=1),
+        id='visit_followups',
+        name='Post-Visit Follow-Up Notifications',
+        replace_existing=True
+    )
+    logger.info("Scheduled job: visit_followups (every 1 hour)")
     
     logger.info("All scheduled jobs configured successfully")
 
@@ -73,3 +100,4 @@ def shutdown_scheduler():
     if scheduler.running:
         scheduler.shutdown()
         logger.info("APScheduler shut down")
+

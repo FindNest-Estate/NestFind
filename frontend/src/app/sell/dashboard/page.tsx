@@ -80,17 +80,15 @@ export default function SellDashboardPage() {
             title: 'Total Views',
             value: stats.total_views,
             icon: Eye,
-            trend: 12,
-            color: 'text-slate-700',
-            bgColor: 'bg-slate-50'
+            color: 'text-slate-800',
+            bgColor: 'bg-slate-100/50'
         },
         {
             title: 'Property Visits',
             value: stats.total_visits,
             icon: Users,
-            trend: 5,
-            color: 'text-slate-700',
-            bgColor: 'bg-slate-50'
+            color: 'text-slate-800',
+            bgColor: 'bg-slate-100/50'
         },
         {
             title: 'Deals Closed',
@@ -104,15 +102,15 @@ export default function SellDashboardPage() {
             value: stats.conversion_rate,
             suffix: '%',
             icon: TrendingUp,
-            color: 'text-slate-700',
-            bgColor: 'bg-slate-50'
+            color: 'text-slate-800',
+            bgColor: 'bg-slate-100/50'
         },
         {
             title: 'Total Properties',
             value: stats.total_properties,
             icon: ShoppingBag,
-            color: 'text-slate-700',
-            bgColor: 'bg-slate-50'
+            color: 'text-slate-800',
+            bgColor: 'bg-slate-100/50'
         }
     ] : [];
 
@@ -144,7 +142,7 @@ export default function SellDashboardPage() {
             {/* Welcome Section */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">
+                    <h1 className="text-2xl font-bold text-slate-800">
                         Welcome back! 👋
                     </h1>
                     <p className="text-slate-500 mt-1">
@@ -166,8 +164,8 @@ export default function SellDashboardPage() {
                             key={stat.title}
                             className={`
                                 relative overflow-hidden bg-white
-                                rounded-xl p-5 border border-slate-100 shadow-sm
-                                hover:border-slate-300 hover:shadow-md transition-all duration-200
+                                rounded-xl p-5 border border-slate-200/60 shadow-sm
+                                hover:border-slate-300 hover:shadow-lg hover:-translate-y-1 transition-all duration-300
                             `}
                         >
                             <div className="flex items-start justify-between">
@@ -196,22 +194,23 @@ export default function SellDashboardPage() {
                 {/* Main Action Area */}
                 <div className="lg:col-span-2 space-y-8">
                     {/* CTA Banner */}
-                    <section className="relative bg-[#ff385c] rounded-2xl p-8 text-white shadow-lg overflow-hidden group">
+                    <section className="relative bg-gradient-to-br from-[#ff385c] to-rose-600 rounded-2xl p-8 text-white shadow-lg overflow-hidden group">
                         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
                             <div>
-                                <h2 className="text-2xl font-bold mb-2">
+                                <h2 className="text-xl font-bold text-white mb-2">
                                     List another property
                                 </h2>
-                                <p className="text-white/90 max-w-md">
+                                <p className="text-sm text-white/90 max-w-md">
                                     Ready to expand your portfolio? Create a new listing and connect with more buyers.
                                 </p>
                             </div>
                             <Link
                                 href="/sell/create"
-                                className="whitespace-nowrap inline-flex items-center px-6 py-3 bg-white text-[#ff385c] rounded-xl font-bold hover:bg-slate-50 transition-colors shadow-sm"
+                                className="whitespace-nowrap inline-flex items-center px-6 py-3 bg-white text-rose-600 rounded-xl font-bold hover:bg-slate-50 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                                style={{ color: '#ff385c' }}
                             >
                                 <Plus className="w-5 h-5 mr-2" />
-                                New Listing
+                                <span className="text-[#ff385c]">New Listing</span>
                             </Link>
                         </div>
                     </section>
@@ -219,7 +218,7 @@ export default function SellDashboardPage() {
                     {/* Quick Stats / Pending Actions */}
                     <section>
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                                 Properties Requiring Attention
                             </h2>
                             <Link href="/sell/dashboard/listings" className="text-sm text-[#ff385c] hover:text-[#d9324e] font-medium flex items-center gap-1">
@@ -297,7 +296,7 @@ export default function SellDashboardPage() {
                                             className="px-6 py-4 hover:bg-slate-50/50 transition-colors group"
                                         >
                                             <div className="flex items-start gap-3">
-                                                <div className={`p-2 rounded-lg ${bgColors[activity.type] || 'bg-slate-100 text-slate-600'}`}>
+                                                <div className={`p-2.5 rounded-xl ${bgColors[activity.type] || 'bg-slate-100 text-slate-600'}`}>
                                                     <Icon className="w-4 h-4" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">

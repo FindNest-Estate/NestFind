@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from ..services.saved_properties_service import SavedPropertiesService
 from ..core.database import get_db_pool
-from ..middleware.auth_middleware import get_current_user
+from ..middleware.auth_middleware import get_current_user, AuthenticatedUser, require_role, require_any_role
 
 
 router = APIRouter(prefix="/properties", tags=["Saved Properties"])
@@ -66,7 +66,7 @@ class SavedPropertiesListResponse(BaseModel):
 async def save_property(
     property_id: UUID,
     request: SavePropertyRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(require_any_role("BUYER", "USER")),
     db_pool = Depends(get_db_pool)
 ):
     """
@@ -77,7 +77,7 @@ async def save_property(
     """
     service = SavedPropertiesService(db_pool)
     result = await service.save_property(
-        user_id=UUID(current_user["id"]),
+        user_id=current_user.user_id,
         property_id=property_id,
         notes=request.notes
     )
@@ -108,7 +108,7 @@ async def unsave_property(
     """
     service = SavedPropertiesService(db_pool)
     result = await service.unsave_property(
-        user_id=UUID(current_user["id"]),
+        user_id=current_user.user_id,
         property_id=property_id
     )
     
@@ -119,7 +119,7 @@ async def unsave_property(
 async def list_saved_properties(
     page: int = 1,
     per_page: int = 12,
-    current_user: dict = Depends(get_current_user),
+    current_user: AuthenticatedUser = Depends(require_any_role("BUYER", "USER")),
     db_pool = Depends(get_db_pool)
 ):
     """
@@ -130,7 +130,7 @@ async def list_saved_properties(
     """
     service = SavedPropertiesService(db_pool)
     result = await service.get_saved_properties(
-        user_id=UUID(current_user["id"]),
+        user_id=current_user.user_id,
         page=page,
         per_page=per_page
     )
@@ -154,7 +154,7 @@ async def check_if_saved(
     """
     service = SavedPropertiesService(db_pool)
     is_saved = await service.is_property_saved(
-        user_id=UUID(current_user["id"]),
+        user_id=current_user.user_id,
         property_id=property_id
     )
     

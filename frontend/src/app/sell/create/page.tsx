@@ -2,8 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createProperty, getSellerProperties } from '@/lib/api/seller';
-import { PropertyStatus } from '@/lib/types/property';
+import { createProperty, getSellerProperties, PropertyStatus } from '@/lib/api/seller';
 import { Loader2 } from 'lucide-react';
 
 /**

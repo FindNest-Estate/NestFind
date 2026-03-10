@@ -17,7 +17,7 @@ from datetime import datetime
 from uuid import UUID
 
 from ..core.database import get_db_pool
-from ..middleware.auth_middleware import get_current_user, AuthenticatedUser
+from ..middleware.auth_middleware import get_current_user, AuthenticatedUser, require_role
 from ..services.transaction_service import TransactionService
 from ..services.payment_gateway import get_payment_provider
 
@@ -91,7 +91,7 @@ async def list_transactions(
 async def schedule_registration(
     data: RegistrationSchedule,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("AGENT"))
 ):
     """
     Agent schedules registration for a reserved property.
@@ -101,8 +101,6 @@ async def schedule_registration(
     - Reservation must be ACTIVE
     - Agent must be assigned to the property
     """
-    if "AGENT" not in (current_user.roles or []):
-        raise HTTPException(status_code=403, detail="Only agents can schedule registrations")
     
     pool = get_db_pool()
     service = TransactionService(pool)
@@ -150,11 +148,9 @@ async def get_transaction(
 async def send_buyer_otp(
     transaction_id: UUID,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("AGENT"))
 ):
     """Agent triggers sending OTP to buyer."""
-    if "AGENT" not in (current_user.roles or []):
-        raise HTTPException(status_code=403, detail="Only agents can send OTPs")
     
     pool = get_db_pool()
     service = TransactionService(pool)
@@ -180,7 +176,7 @@ async def verify_buyer_otp(
     transaction_id: UUID,
     data: OTPVerify,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("BUYER"))
 ):
     """Buyer verifies their OTP."""
     pool = get_db_pool()
@@ -207,11 +203,9 @@ async def verify_buyer_otp(
 async def send_seller_otp(
     transaction_id: UUID,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("AGENT"))
 ):
     """Agent triggers sending OTP to seller."""
-    if "AGENT" not in (current_user.roles or []):
-        raise HTTPException(status_code=403, detail="Only agents can send OTPs")
     
     pool = get_db_pool()
     service = TransactionService(pool)
@@ -237,7 +231,7 @@ async def verify_seller_otp(
     transaction_id: UUID,
     data: OTPVerify,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("SELLER"))
 ):
     """Seller verifies their OTP."""
     pool = get_db_pool()
@@ -265,7 +259,7 @@ async def complete_transaction(
     transaction_id: UUID,
     data: TransactionComplete,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("AGENT"))
 ):
     """
     Agent completes the transaction.
@@ -274,8 +268,6 @@ async def complete_transaction(
     - Both buyer and seller must have verified their OTP
     - Marks property as SOLD
     """
-    if "AGENT" not in (current_user.roles or []):
-        raise HTTPException(status_code=403, detail="Only agents can complete transactions")
     
     pool = get_db_pool()
     payment_provider = get_payment_provider()
@@ -327,7 +319,7 @@ async def process_seller_payment(
     transaction_id: UUID,
     data: SellerPayment,
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(require_role("SELLER"))
 ):
     """Seller pays the 0.9% commission."""
     pool = get_db_pool()

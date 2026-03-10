@@ -53,14 +53,10 @@ export default function PropertyCategories({ onCategoryChange, selectedCategory 
     };
 
     return (
-        <div className="relative mb-8">
-            {/* Gradient fade on edges */}
-            <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
-
+        <div className="relative mb-8 bg-white border-b border-gray-100 pb-2">
             {/* Scrollable container */}
-            <div className="overflow-x-auto custom-scrollbar pb-3 -mx-4 px-4">
-                <div className="flex gap-3 min-w-max">
+            <div className="overflow-x-auto custom-scrollbar pb-2 -mx-4 px-4">
+                <div className="flex gap-6 min-w-max items-center">
                     {categories.map((category, index) => {
                         const Icon = category.icon;
                         const isActive = activeCategory === category.id;
@@ -68,44 +64,38 @@ export default function PropertyCategories({ onCategoryChange, selectedCategory 
                         return (
                             <motion.button
                                 key={category.id}
-                                initial={{ opacity: 0, y: 20 }}
+                                initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.05 }}
+                                transition={{ delay: index * 0.03 }}
                                 onClick={() => handleCategoryClick(category.id)}
-                                className={`group relative flex flex-col items-center gap-2 px-5 py-3 rounded-xl transition-all duration-300 ${isActive
-                                        ? 'bg-white shadow-lg scale-105'
-                                        : 'hover:bg-white/50 hover:shadow-md'
-                                    }`}
+                                className="group relative flex flex-col items-center gap-2 py-2 transition-all duration-200"
                             >
-                                {/* Active indicator */}
-                                {isActive && (
-                                    <motion.div
-                                        layoutId="activeCategory"
-                                        className="absolute inset-0 bg-gradient-to-r from-rose-50 to-pink-50 rounded-xl border-2 border-rose-500"
-                                        transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
-                                    />
-                                )}
-
-                                <div className="relative z-10 flex flex-col items-center gap-2">
-                                    {/* Icon with gradient background */}
+                                <div className="relative flex flex-col items-center gap-2">
+                                    {/* Icon - Minimalist style */}
                                     <div
-                                        className={`w-12 h-12 rounded-xl bg-gradient-to-br ${category.gradient} flex items-center justify-center transition-transform ${isActive ? 'scale-110 shadow-lg' : 'group-hover:scale-105'
+                                        className={`transition-colors duration-200 ${isActive ? 'text-[#FF385C]' : 'text-gray-500 group-hover:text-gray-900'
                                             }`}
                                     >
-                                        <Icon className="w-6 h-6 text-white" />
+                                        <Icon className="w-6 h-6 stroke-[1.5]" />
                                     </div>
 
                                     {/* Label */}
                                     <span
-                                        className={`text-sm font-semibold whitespace-nowrap transition-colors ${isActive ? 'text-rose-600' : 'text-gray-700 group-hover:text-gray-900'
+                                        className={`text-xs font-medium whitespace-nowrap transition-colors duration-200 ${isActive ? 'text-gray-900 font-semibold' : 'text-gray-500 group-hover:text-gray-900'
                                             }`}
                                     >
                                         {category.name}
                                     </span>
                                 </div>
 
-                                {/* Subtle glow effect on hover */}
-                                <div className={`absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br ${category.gradient} blur-xl -z-10`} style={{ filter: 'blur(20px)' }} />
+                                {/* Minimal Active Underline */}
+                                {isActive && (
+                                    <motion.div
+                                        layoutId="activeCategoryIndicator"
+                                        className="absolute -bottom-2.5 left-0 right-0 h-[2px] bg-gray-900 rounded-full"
+                                        transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
+                                    />
+                                )}
                             </motion.button>
                         );
                     })}
@@ -118,20 +108,20 @@ export default function PropertyCategories({ onCategoryChange, selectedCategory 
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="mt-4 px-4 py-3 bg-gradient-to-r from-rose-50 to-pink-50 rounded-xl border border-rose-100"
+                    className="mt-4 flex items-center justify-between bg-gray-50 px-4 py-3 rounded-lg border border-gray-100"
                 >
                     <p className="text-sm text-gray-700">
-                        <span className="font-semibold text-rose-600">
+                        <span className="font-semibold text-gray-900">
                             {categories.find(c => c.id === activeCategory)?.name}
                         </span>
-                        {' '}- Showing properties matching this category
-                        <button
-                            onClick={() => handleCategoryClick('all')}
-                            className="ml-3 text-rose-600 hover:text-rose-700 underline font-medium"
-                        >
-                            Clear filter
-                        </button>
+                        {' '}— Selected Category
                     </p>
+                    <button
+                        onClick={() => handleCategoryClick('all')}
+                        className="text-sm text-[#FF385C] hover:text-[#E31C5F] font-medium transition-colors"
+                    >
+                        Clear Filter
+                    </button>
                 </motion.div>
             )}
         </div>

@@ -1,22 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { get } from '@/lib/api';
+import React, { useState, useEffect } from 'react';
 import {
     BarChart3,
-    Users,
-    Eye,
-    Home,
     TrendingUp,
-    Award,
-    Calendar,
+    DollarSign,
     Target,
+    Award,
     ArrowUpRight,
     ArrowDownRight,
     Loader2,
-    Download
+    RefreshCw,
+    Briefcase,
+    AlertTriangle,
 } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
 import {
     AreaChart,
     Area,
@@ -26,275 +23,312 @@ import {
     Tooltip,
     ResponsiveContainer,
     BarChart,
-    Bar
+    Bar,
+    Cell
 } from 'recharts';
-import AchievementsWidget from '@/components/agent/AchievementsWidget';
-import Leaderboard from '@/components/agent/Leaderboard';
+import { getAgentAnalytics, AnalyticsResponse } from '@/lib/api/agent';
 
-interface AgentPortfolioStats {
-    active_listings: number;
-    total_properties: number;
-    total_views: number;
-    total_visits: number;
-    deals_closed: number;
-    conversion_rate: number;
-}
+/* ──────────────────────────────────────────────────────── */
+/*  HELPERS                                                 */
+/* ──────────────────────────────────────────────────────── */
 
-// Mock trend data
-const weeklyData = [
-    { day: 'Mon', views: 45, visits: 12, deals: 2 },
-    { day: 'Tue', views: 52, visits: 15, deals: 0 },
-    { day: 'Wed', views: 38, visits: 8, deals: 1 },
-    { day: 'Thu', views: 65, visits: 22, deals: 3 },
-    { day: 'Fri', views: 48, visits: 18, deals: 1 },
-    { day: 'Sat', views: 78, visits: 25, deals: 2 },
-    { day: 'Sun', views: 35, visits: 10, deals: 0 },
-];
+const generateChartData = (value: number) => {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return days.map(name => ({
+        name,
+        value: Math.max(0, Math.floor(value / 7 + (Math.random() * 20 - 10)))
+    }));
+};
 
-const monthlyGoals = [
-    { name: 'Deals Closed', current: 8, target: 10, color: '#10B981' },
-    { name: 'Property Visits', current: 45, target: 50, color: '#6366F1' },
-    { name: 'New Leads', current: 22, target: 30, color: '#F59E0B' },
-    { name: 'Client Calls', current: 38, target: 40, color: '#EC4899' },
-];
+/* ──────────────────────────────────────────────────────── */
+/*  STAT CARD WITH TREND                                    */
+/* ──────────────────────────────────────────────────────── */
 
-function StatCard({ title, value, change, changeType, icon: Icon, color }: {
-    title: string;
+function MetricCard({ label, value, icon: Icon, color, trend, trendLabel, extra }: {
+    label: string;
     value: string | number;
-    change?: string;
-    changeType?: 'up' | 'down';
-    icon: React.ElementType;
+    icon: typeof BarChart3;
     color: string;
+    trend?: number;
+    trendLabel?: string;
+    extra?: React.ReactNode;
 }) {
     return (
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all">
-            <div className="flex items-center justify-between mb-3">
-                <div className={`p-3 rounded-xl ${color}`}>
-                    <Icon className="w-6 h-6" />
-                </div>
-                {change && (
-                    <span className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${changeType === 'up' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
-                        }`}>
-                        {changeType === 'up' ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                        {change}
-                    </span>
-                )}
-            </div>
-            <p className="text-sm font-medium text-gray-500">{title}</p>
-            <h3 className="text-2xl font-bold text-gray-900 mt-1">{value}</h3>
-        </div>
-    );
-}
-
-function GoalProgress({ goal }: { goal: typeof monthlyGoals[0] }) {
-    const progress = Math.min((goal.current / goal.target) * 100, 100);
-    return (
-        <div className="flex items-center gap-4">
-            <div className="flex-1">
-                <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm font-medium text-gray-700">{goal.name}</span>
-                    <span className="text-sm font-bold text-gray-900">{goal.current}/{goal.target}</span>
-                </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${progress}%`, backgroundColor: goal.color }}
-                    />
-                </div>
-            </div>
-            <span className="text-xs font-bold text-gray-500 w-12 text-right">{Math.round(progress)}%</span>
-        </div>
-    );
-}
-
-export default function AgentAnalyticsPage() {
-    const { user } = useAuth();
-    const [stats, setStats] = useState<AgentPortfolioStats | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [period, setPeriod] = useState<'week' | 'month' | 'quarter'>('week');
-
-    useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const res = await get<AgentPortfolioStats>('/agent/portfolio-stats');
-                setStats(res);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchStats();
-    }, []);
-
-    if (loading) {
-        return (
-            <div className="flex h-[60vh] items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
-            </div>
-        );
-    }
-
-    if (!stats) return <div className="p-8 text-center text-red-500">Failed to load analytics</div>;
-
-    const funnel = [
-        { label: "Total Views", value: stats.total_views, icon: Eye, color: "bg-blue-100 text-blue-700" },
-        { label: "Visits Scheduled", value: stats.total_visits, icon: Users, color: "bg-indigo-100 text-indigo-700" },
-        { label: "Deals Closed", value: stats.deals_closed, icon: Award, color: "bg-emerald-100 text-emerald-700" },
-    ];
-
-    return (
-        <div className="space-y-8 pb-20 animate-fade-in">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="bg-white rounded-xl border border-[var(--gray-200)] p-5 hover:shadow-sm transition-shadow">
+            <div className="flex items-start justify-between mb-3">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Performance Analytics</h1>
-                    <p className="text-gray-500 mt-1">Track your progress and achievements, {user?.full_name}</p>
+                    <p className="text-[11px] font-semibold text-[var(--gray-500)] uppercase tracking-wider">{label}</p>
+                    <h3 className="text-2xl font-bold text-[var(--gray-900)] mt-1">{value}</h3>
                 </div>
-                <div className="flex items-center gap-3">
-                    <div className="flex bg-gray-100 rounded-lg p-1">
-                        {(['week', 'month', 'quarter'] as const).map((p) => (
+                <div className={`w-9 h-9 rounded-lg ${color} flex items-center justify-center`}>
+                    <Icon className="w-4.5 h-4.5 text-white" />
+                </div>
+            </div>
+            {trend !== undefined && (
+                <div className="flex items-center gap-1.5 text-[11px]">
+                    {trend >= 0 ? (
+                        <span className="text-emerald-600 flex items-center font-medium">
+                            <ArrowUpRight className="w-3 h-3 mr-0.5" />{trend}%
+                        </span>
+                    ) : (
+                        <span className="text-red-500 flex items-center font-medium">
+                            <ArrowDownRight className="w-3 h-3 mr-0.5" />{Math.abs(trend)}%
+                        </span>
+                    )}
+                    <span className="text-[var(--gray-400)]">{trendLabel || 'vs last period'}</span>
+                </div>
+            )}
+            {extra}
+        </div>
+    );
+}
+
+/* ──────────────────────────────────────────────────────── */
+/*  MAIN PAGE                                               */
+/* ──────────────────────────────────────────────────────── */
+
+export default function AnalyticsPage() {
+    const [stats, setStats] = useState<AnalyticsResponse | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [timeRange, setTimeRange] = useState('week');
+
+    const fetchStats = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await getAgentAnalytics(timeRange);
+            setStats(res);
+        } catch (err: any) {
+            setError(err?.message || 'Failed to load analytics');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchStats(); }, [timeRange]);
+
+    const chartData = stats?.portfolio_data || generateChartData(stats?.overview.active_deals || 0);
+    const earningsTrend = (stats?.overview.total_earnings || 0) > 0 ? 12.5 : 0;
+
+    const barData = stats ? [
+        { name: 'Active', value: stats.overview.active_deals, color: '#3b82f6' },
+        { name: 'Pending', value: stats.overview.pending_requests, color: '#f59e0b' },
+        { name: 'Closed', value: stats.overview.completed_deals, color: '#10b981' },
+    ] : [];
+
+    return (
+        <div className="space-y-5">
+            {/* ── Header ── */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <h1 className="text-xl font-bold text-[var(--gray-900)] flex items-center gap-2">
+                        <BarChart3 className="w-5 h-5 text-[var(--gray-400)]" />
+                        Performance Analytics
+                    </h1>
+                    <p className="text-xs text-[var(--gray-500)] mt-0.5">
+                        Track your earnings, deals, and conversion metrics
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    {/* Time Range Selector */}
+                    <div className="flex items-center gap-0.5 bg-[var(--gray-100)] rounded-lg p-0.5">
+                        {['week', 'month', 'year'].map((range) => (
                             <button
-                                key={p}
-                                onClick={() => setPeriod(p)}
-                                className={`px-3 py-1.5 rounded-md text-sm font-medium capitalize transition-colors ${period === p ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                                key={range}
+                                onClick={() => setTimeRange(range)}
+                                className={`px-3 py-1.5 text-[11px] font-medium rounded-md transition-all ${timeRange === range
+                                        ? 'bg-white text-[var(--gray-900)] shadow-sm'
+                                        : 'text-[var(--gray-500)] hover:text-[var(--gray-700)]'
                                     }`}
                             >
-                                {p}
+                                {range.charAt(0).toUpperCase() + range.slice(1)}
                             </button>
                         ))}
                     </div>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50">
-                        <Download className="w-4 h-4" />
-                        Export
+                    <button
+                        onClick={fetchStats}
+                        disabled={loading}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--gray-600)] bg-white border border-[var(--gray-200)] rounded-lg hover:bg-[var(--gray-50)] transition-all disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                     </button>
                 </div>
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                    title="Active Listings"
-                    value={stats.active_listings}
-                    change="+2"
-                    changeType="up"
-                    icon={Home}
-                    color="bg-orange-100 text-orange-700"
-                />
-                <StatCard
-                    title="Total Views"
-                    value={stats.total_views}
-                    change="+15%"
-                    changeType="up"
-                    icon={Eye}
-                    color="bg-blue-100 text-blue-700"
-                />
-                <StatCard
-                    title="Property Visits"
-                    value={stats.total_visits}
-                    change="+8%"
-                    changeType="up"
-                    icon={Calendar}
-                    color="bg-purple-100 text-purple-700"
-                />
-                <StatCard
-                    title="Conversion Rate"
-                    value={`${stats.conversion_rate}%`}
-                    change="-2%"
-                    changeType="down"
-                    icon={TrendingUp}
-                    color="bg-emerald-100 text-emerald-700"
-                />
-            </div>
-
-            {/* Charts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Activity Trend */}
-                <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6">Weekly Activity</h3>
-                    <div className="h-[250px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={weeklyData}>
-                                <defs>
-                                    <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#6366F1" stopOpacity={0.1} />
-                                        <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 12 }} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 12 }} />
-                                <Tooltip />
-                                <Area type="monotone" dataKey="views" stroke="#6366F1" strokeWidth={2} fill="url(#colorViews)" />
-                                <Area type="monotone" dataKey="visits" stroke="#10B981" strokeWidth={2} fill="transparent" />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                    <div className="flex justify-center gap-6 mt-4">
-                        <span className="flex items-center gap-2 text-sm text-gray-600">
-                            <span className="w-3 h-3 rounded-full bg-indigo-500" /> Views
-                        </span>
-                        <span className="flex items-center gap-2 text-sm text-gray-600">
-                            <span className="w-3 h-3 rounded-full bg-emerald-500" /> Visits
-                        </span>
-                    </div>
+            {/* ── Loading ── */}
+            {loading && (
+                <div className="flex items-center justify-center py-20">
+                    <Loader2 className="w-6 h-6 animate-spin text-[var(--gray-400)]" />
                 </div>
+            )}
 
-                {/* Monthly Goals */}
-                <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-lg font-bold text-gray-900">Monthly Goals</h3>
-                        <Target className="w-5 h-5 text-gray-400" />
-                    </div>
-                    <div className="space-y-5">
-                        {monthlyGoals.map((goal, i) => (
-                            <GoalProgress key={i} goal={goal} />
-                        ))}
-                    </div>
+            {/* ── Error ── */}
+            {error && !loading && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+                    <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                    <p className="text-sm text-red-600 font-medium">{error}</p>
+                    <button onClick={fetchStats} className="mt-3 text-xs text-red-500 hover:underline">Try again</button>
                 </div>
-            </div>
+            )}
 
-            {/* Funnel & Gamification */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Conversion Funnel */}
-                <div className="lg:col-span-1 bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6">Conversion Funnel</h3>
-                    <div className="space-y-6">
-                        {funnel.map((step, i) => (
-                            <div key={i} className="flex items-center gap-4">
-                                <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${step.color}`}>
-                                    <step.icon className="w-6 h-6" />
+            {/* ── Empty ── */}
+            {!loading && !error && !stats?.success && (
+                <div className="bg-white rounded-xl border border-[var(--gray-200)] p-12 text-center">
+                    <BarChart3 className="w-10 h-10 text-[var(--gray-300)] mx-auto mb-3" />
+                    <h3 className="text-sm font-semibold text-[var(--gray-700)]">No analytics data available</h3>
+                    <p className="text-xs text-[var(--gray-500)] mt-1">Check back later once you have activity.</p>
+                </div>
+            )}
+
+            {!loading && stats?.success && (
+                <>
+                    {/* ── KPI Cards ── */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <MetricCard
+                            label="Total Earnings"
+                            value={`₹${(stats.overview.total_earnings || 0).toLocaleString('en-IN')}`}
+                            icon={DollarSign}
+                            color="bg-emerald-500"
+                            trend={earningsTrend}
+                        />
+                        <MetricCard
+                            label="Active Deals"
+                            value={stats.overview.active_deals}
+                            icon={TrendingUp}
+                            color="bg-blue-500"
+                            extra={
+                                <p className="text-[11px] text-[var(--gray-500)] mt-2">
+                                    {stats.overview.pending_requests} pending requests
+                                </p>
+                            }
+                        />
+                        <MetricCard
+                            label="Completed Deals"
+                            value={stats.overview.completed_deals}
+                            icon={Award}
+                            color="bg-violet-500"
+                            extra={
+                                <p className="text-[11px] text-[var(--gray-500)] mt-2">
+                                    Avg deal: ₹{(stats.overview.avg_deal_size || 0).toLocaleString('en-IN')}
+                                </p>
+                            }
+                        />
+                        <MetricCard
+                            label="Conversion Rate"
+                            value={`${stats.overview.conversion_rate}%`}
+                            icon={Target}
+                            color="bg-amber-500"
+                            extra={
+                                <div className="mt-2.5 w-full bg-[var(--gray-100)] rounded-full h-1.5 overflow-hidden">
+                                    <div
+                                        className="bg-amber-500 h-full rounded-full transition-all duration-700"
+                                        style={{ width: `${Math.min(stats.overview.conversion_rate, 100)}%` }}
+                                    />
                                 </div>
-                                <div className="flex-1">
-                                    <p className="text-sm text-gray-500">{step.label}</p>
-                                    <p className="text-xl font-bold text-gray-900">{step.value}</p>
-                                </div>
-                                {i < funnel.length - 1 && (
-                                    <span className="text-xs text-gray-400">
-                                        →
-                                    </span>
-                                )}
+                            }
+                        />
+                    </div>
+
+                    {/* ── Charts ── */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                        {/* Activity Chart */}
+                        <div className="lg:col-span-2 bg-white rounded-xl border border-[var(--gray-200)] overflow-hidden">
+                            <div className="px-5 py-4 border-b border-[var(--gray-100)] flex items-center gap-2">
+                                <TrendingUp className="w-4 h-4 text-[var(--gray-400)]" />
+                                <h3 className="text-sm font-bold text-[var(--gray-900)]">Activity Overview</h3>
                             </div>
-                        ))}
-                    </div>
-                    <div className="mt-6 pt-6 border-t border-gray-100">
-                        <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-500">Overall Conversion</span>
-                            <span className="text-lg font-bold text-emerald-600">{stats.conversion_rate}%</span>
+                            <div className="p-4 h-[300px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={chartData}>
+                                        <defs>
+                                            <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.08} />
+                                                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis
+                                            dataKey="name"
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#94a3b8', fontSize: 11 }}
+                                            dy={8}
+                                        />
+                                        <YAxis
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#94a3b8', fontSize: 11 }}
+                                            width={40}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{
+                                                borderRadius: '8px',
+                                                border: '1px solid #e2e8f0',
+                                                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                                                fontSize: '12px',
+                                            }}
+                                        />
+                                        <Area
+                                            type="monotone"
+                                            dataKey="value"
+                                            stroke="#6366f1"
+                                            strokeWidth={2}
+                                            fillOpacity={1}
+                                            fill="url(#colorValue)"
+                                        />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        {/* Distribution Chart */}
+                        <div className="bg-white rounded-xl border border-[var(--gray-200)] overflow-hidden">
+                            <div className="px-5 py-4 border-b border-[var(--gray-100)] flex items-center gap-2">
+                                <Briefcase className="w-4 h-4 text-[var(--gray-400)]" />
+                                <h3 className="text-sm font-bold text-[var(--gray-900)]">Deal Distribution</h3>
+                            </div>
+                            <div className="p-4 h-[300px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={barData}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis
+                                            dataKey="name"
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#94a3b8', fontSize: 11 }}
+                                        />
+                                        <YAxis hide />
+                                        <Tooltip
+                                            cursor={{ fill: 'transparent' }}
+                                            contentStyle={{
+                                                borderRadius: '8px',
+                                                border: '1px solid #e2e8f0',
+                                                fontSize: '12px',
+                                            }}
+                                        />
+                                        <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                                            {barData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                            {/* Legend */}
+                            <div className="px-5 pb-4 flex items-center justify-center gap-5">
+                                {barData.map((item) => (
+                                    <div key={item.name} className="flex items-center gap-1.5">
+                                        <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: item.color }} />
+                                        <span className="text-[11px] text-[var(--gray-500)]">{item.name}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                {/* Achievements */}
-                <div className="lg:col-span-1">
-                    <AchievementsWidget />
-                </div>
-
-                {/* Leaderboard */}
-                <div className="lg:col-span-1">
-                    <Leaderboard />
-                </div>
-            </div>
+                </>
+            )}
         </div>
     );
 }

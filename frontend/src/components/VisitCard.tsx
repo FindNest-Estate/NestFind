@@ -3,6 +3,7 @@
 import { Visit, VisitStatus } from "@/lib/types/visit";
 import Link from "next/link";
 import { format } from "date-fns";
+import { getImageUrl } from "@/lib/api";
 
 interface VisitCardProps {
     visit: Visit;
@@ -39,7 +40,7 @@ export function VisitCard({ visit, role = 'buyer' }: VisitCardProps) {
             <div className="flex gap-4">
                 {visit.property?.thumbnail_url && (
                     <img
-                        src={visit.property.thumbnail_url}
+                        src={getImageUrl(visit.property.thumbnail_url) || ''}
                         alt={visit.property.title}
                         className="w-20 h-20 object-cover rounded bg-gray-200"
                     />

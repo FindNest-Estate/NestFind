@@ -59,6 +59,7 @@ export interface ViewerContext {
     is_owner: boolean;
     is_agent: boolean;
     visit_id?: string | null;
+    visit_status?: string | null;
 }
 
 export interface PropertyHighlights {

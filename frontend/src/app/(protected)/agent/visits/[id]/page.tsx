@@ -1,10 +1,22 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { getVisitById, approveVisit, rejectVisit, startVisitSession, completeVisit, markNoShow, respondToCounter, submitAgentFeedback } from "@/lib/api/visits";
-import { Visit, VisitStatus, AgentFeedbackData } from "@/lib/types/visit";
-import { Loader2, MapPin, Calendar, Clock, Navigation, CheckCircle, XCircle, Key, MessageSquare, Star, ArrowLeft, User, Mail, Phone, CalendarDays, AlertCircle } from "lucide-react";
+import {
+    getVisitById, approveVisit, rejectVisit,
+    startVisitSession, verifyVisitOTP, completeVisit,
+    markNoShow, respondToCounter, submitAgentFeedback,
+    getVisitImages, uploadVisitImage, deleteVisitImage,
+    getFollowupContext
+} from "@/lib/api/visits";
+import { Visit, VisitStatus, AgentFeedbackData, VisitImage, FollowupContext } from "@/lib/types/visit";
+import {
+    Loader2, MapPin, Calendar, Clock, Navigation,
+    CheckCircle, XCircle, Key, MessageSquare, Star,
+    ArrowLeft, User, Mail, Phone, CalendarDays,
+    AlertCircle, ShieldCheck, Camera, Trash2, Image as ImageIcon
+} from "lucide-react";
 import { format } from "date-fns";
+import { getImageUrl } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import Link from 'next/link';
 import CounterVisitModal from "@/components/property/CounterVisitModal";
@@ -25,6 +37,13 @@ export default function AgentVisitDetailPage({ params }: { params: Promise<PageP
     // Session state
     const [sessionStarted, setSessionStarted] = useState(false);
     const [otpExpiry, setOtpExpiry] = useState<string | null>(null);
+    const [otpCode, setOtpCode] = useState("");
+    const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+    const [isVerified, setIsVerified] = useState(false);
+
+    // Media state
+    const [images, setImages] = useState<VisitImage[]>([]);
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
 
     // Feedback state
     const [showFeedbackForm, setShowFeedbackForm] = useState(false);
@@ -40,6 +59,9 @@ export default function AgentVisitDetailPage({ params }: { params: Promise<PageP
         additional_notes: ''
     });
 
+    // Follow-up state
+    const [followupContext, setFollowupContext] = useState<FollowupContext | null>(null);
+
     useEffect(() => {
         loadData();
     }, [resolvedParams.id]);
@@ -51,6 +73,21 @@ export default function AgentVisitDetailPage({ params }: { params: Promise<PageP
             if (data.visit?.status === 'CHECKED_IN') {
                 setSessionStarted(true);
             }
+            // Check if already verified
+            if (data.visit?.verification?.otp_verified_at) {
+                setIsVerified(true);
+            }
+
+            // Fetch followup context if visit is completed
+            if (data.visit?.status === 'COMPLETED') {
+                const ctxRes = await getFollowupContext(resolvedParams.id);
+                if (ctxRes.success && ctxRes.context) {
+                    setFollowupContext(ctxRes.context);
+                }
+            }
+
+            // Load images
+            loadImages();
         } catch (err) {
             console.error(err);
         } finally {
@@ -58,11 +95,26 @@ export default function AgentVisitDetailPage({ params }: { params: Promise<PageP
         }
     }
 
+    async function loadImages() {
+        try {
+            const data = await getVisitImages(resolvedParams.id);
+            if (data.success) {
+                setImages(data.images || []);
+            }
+        } catch (err) {
+            console.error('Failed to load images:', err);
+        }
+    }
+
     const handleApprove = async () => {
         setIsActionLoading(true);
         try {
-            await approveVisit(resolvedParams.id, visit?.preferred_date);
-            loadData();
+            const result = await approveVisit(resolvedParams.id, visit?.preferred_date);
+            if (result.success) {
+                loadData();
+            } else {
+                alert(result.error || "Failed to approve visit");
+            }
         } catch (err) { alert("Failed to approve"); }
         finally { setIsActionLoading(false); }
     };
@@ -72,12 +124,18 @@ export default function AgentVisitDetailPage({ params }: { params: Promise<PageP
         if (!reason) return;
         setIsActionLoading(true);
         try {
+            let result;
             if (visit?.status === VisitStatus.COUNTERED) {
-                await respondToCounter(resolvedParams.id, false);
+                result = await respondToCounter(resolvedParams.id, false);
             } else {
-                await rejectVisit(resolvedParams.id, reason);
+                result = await rejectVisit(resolvedParams.id, reason);
             }
-            loadData();
+
+            if (result.success) {
+                loadData();
+            } else {
+                alert(result.error || "Failed to reject visit");
+            }
         } catch (err) { alert("Failed to reject"); }
         finally { setIsActionLoading(false); }
     };
@@ -85,8 +143,12 @@ export default function AgentVisitDetailPage({ params }: { params: Promise<PageP
     const handleAcceptCounter = async () => {
         setIsActionLoading(true);
         try {
-            await respondToCounter(resolvedParams.id, true);
-            loadData();
+            const result = await respondToCounter(resolvedParams.id, true);
+            if (result.success) {
+                loadData();
+            } else {
+                alert(result.error || "Failed to accept counter");
+            }
         } catch (err) { alert("Failed to accept"); }
         finally { setIsActionLoading(false); }
     };
@@ -134,13 +196,67 @@ export default function AgentVisitDetailPage({ params }: { params: Promise<PageP
         );
     };
 
+    const handleVerifyOtp = async () => {
+        if (otpCode.length !== 6) return;
+        setIsVerifyingOtp(true);
+        try {
+            const result = await verifyVisitOTP(resolvedParams.id, otpCode);
+            if (result.success) {
+                setIsVerified(true);
+                setOtpCode("");
+                loadData();
+            } else {
+                alert(result.error || "Verification failed");
+            }
+        } catch (err: any) {
+            alert(err.message || "Failed to verify");
+        } finally {
+            setIsVerifyingOtp(false);
+        }
+    };
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploadingImage(true);
+        try {
+            const result = await uploadVisitImage(resolvedParams.id, file, 'PROPERTY', 'Visit documentation');
+            if (result.success) {
+                loadImages();
+            } else {
+                alert(result.error || 'Failed to upload image');
+            }
+        } catch (err) {
+            alert('Upload failed');
+        } finally {
+            setIsUploadingImage(false);
+        }
+    };
+
+    const handleDeleteImage = async (imageId: string) => {
+        if (!confirm('Delete this image?')) return;
+        try {
+            const result = await deleteVisitImage(resolvedParams.id, imageId);
+            if (result.success) {
+                loadImages();
+            }
+        } catch (err) {
+            alert('Delete failed');
+        }
+    };
+
     const handleComplete = async () => {
         if (!confirm("Complete this visit?")) return;
         setIsActionLoading(true);
         try {
-            await completeVisit(resolvedParams.id);
-            setShowFeedbackForm(true);
-            loadData();
+            const result = await completeVisit(resolvedParams.id);
+            if (result.success) {
+                setShowFeedbackForm(true);
+                loadData();
+            } else {
+                alert(result.error || "Failed to complete visit");
+            }
         } catch (err) { alert("Failed to complete"); }
         finally { setIsActionLoading(false); }
     };
@@ -149,9 +265,13 @@ export default function AgentVisitDetailPage({ params }: { params: Promise<PageP
         if (!confirm("Mark buyer as No Show?")) return;
         setIsActionLoading(true);
         try {
-            await markNoShow(resolvedParams.id);
-            loadData();
-        } catch (err) { alert("Failed"); }
+            const result = await markNoShow(resolvedParams.id);
+            if (result.success) {
+                loadData();
+            } else {
+                alert(result.error || "Failed to mark no-show");
+            }
+        } catch (err) { alert("Failed to mark no-show"); }
         finally { setIsActionLoading(false); }
     };
 
@@ -237,34 +357,135 @@ export default function AgentVisitDetailPage({ params }: { params: Promise<PageP
                     <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-xl overflow-hidden shadow-sm">
                         <div className="aspect-video w-full bg-slate-100 relative">
                             {visit.property?.thumbnail_url ? (
-                                <img src={visit.property.thumbnail_url} className="w-full h-full object-cover" alt="Property" />
+                                <img src={getImageUrl(visit.property.thumbnail_url) || ''} className="w-full h-full object-cover" alt="Property" />
                             ) : (
                                 <div className="flex items-center justify-center h-full text-slate-400">
                                     <MapPin className="w-12 h-12" />
                                 </div>
                             )}
-                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
-                                <h2 className="text-white text-xl font-bold">{visit.property?.title}</h2>
-                            </div>
+                        </div>
+                        <div className="p-4 bg-white">
+                            <h2 className="text-gray-900 text-xl font-bold">{visit.property?.title}</h2>
+                            {visit.property?.latitude && visit.property?.longitude && (
+                                <div className="mt-4 aspect-video w-full rounded-lg overflow-hidden border border-gray-100">
+                                    <iframe
+                                        width="100%"
+                                        height="100%"
+                                        style={{ border: 0 }}
+                                        loading="lazy"
+                                        allowFullScreen
+                                        referrerPolicy="no-referrer-when-downgrade"
+                                        src={`https://maps.google.com/maps?q=${visit.property.latitude},${visit.property.longitude}&z=15&output=embed`}
+                                    ></iframe>
+                                </div>
+                            )}
                         </div>
                     </div>
 
                     {/* Session Active Panel */}
                     {isCheckedIn && (
-                        <div className="p-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl text-white shadow-md">
-                            <div className="flex items-center gap-4 mb-4">
-                                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                                    <Key className="w-6 h-6" />
+                        <div className="space-y-6">
+                            <div className="p-6 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl text-white shadow-md">
+                                <div className="flex items-center gap-4 mb-4">
+                                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                                        <Key className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-lg">Identity Verification</h3>
+                                        <p className="text-blue-100">Confirm buyer's presence at the property</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 className="font-bold text-lg">Visit Session is Active</h3>
-                                    <p className="text-emerald-100">Started on {format(new Date(), 'p')}</p>
-                                </div>
+
+                                {!isVerified ? (
+                                    <div className="space-y-4">
+                                        <div className="bg-white/10 rounded-lg p-4 text-sm leading-relaxed border border-white/10 mb-4">
+                                            Ask the buyer for the 6-digit code sent to their email or displayed on their NestFind app.
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                maxLength={6}
+                                                placeholder="Enter 6-digit OTP"
+                                                value={otpCode}
+                                                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                                                className="flex-1 bg-white/20 border border-white/30 rounded-lg px-4 py-3 text-center text-xl font-mono tracking-[0.5em] focus:outline-none focus:bg-white/30 placeholder:text-blue-200"
+                                            />
+                                            <button
+                                                onClick={handleVerifyOtp}
+                                                disabled={isVerifyingOtp || otpCode.length !== 6}
+                                                className="bg-white text-blue-600 px-6 py-3 rounded-lg font-bold hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            >
+                                                {isVerifyingOtp ? <Loader2 className="w-5 h-5 animate-spin" /> : "Verify"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="bg-white/20 rounded-lg p-4 flex items-center gap-3 border border-white/30">
+                                        <ShieldCheck className="w-8 h-8 text-emerald-300" />
+                                        <div>
+                                            <div className="font-bold text-emerald-50 text-base">OTP Verified Successfully</div>
+                                            <div className="text-blue-100 text-sm">Buyer identity has been confirmed via OTP.</div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                            <div className="bg-white/10 rounded-lg p-4 text-sm leading-relaxed border border-white/10">
-                                <p className="font-semibold mb-1">Verify Buyer Identity</p>
-                                Ask the buyer to show you their verification code (OTP) from their app or email.
-                                Currently, the system has sent an OTP to the buyer.
+
+                            {/* Image Documentation Section */}
+                            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                                            <Camera className="w-5 h-5 text-indigo-600" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-gray-900">Visit Documentation</h3>
+                                            <p className="text-gray-500 text-sm">Upload photos as proof of visit (Optional)</p>
+                                        </div>
+                                    </div>
+                                    <label className="cursor-pointer bg-white border border-gray-200 hover:border-indigo-600 hover:text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2">
+                                        <ImageIcon className="w-4 h-4" />
+                                        Add Photos
+                                        <input
+                                            type="file"
+                                            className="hidden"
+                                            accept="image/*"
+                                            onChange={handleImageUpload}
+                                            disabled={isUploadingImage}
+                                        />
+                                    </label>
+                                </div>
+
+                                {isUploadingImage && (
+                                    <div className="flex items-center justify-center py-8">
+                                        <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+                                        <span className="ml-2 text-sm text-gray-500">Uploading...</span>
+                                    </div>
+                                )}
+
+                                {images.length > 0 ? (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                        {images.map((img) => (
+                                            <div key={img.id} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-100 bg-gray-50">
+                                                <img
+                                                    src={getImageUrl(img.file_url) || ""}
+                                                    alt="documentation"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <button
+                                                    onClick={() => handleDeleteImage(img.id)}
+                                                    className="absolute top-1 right-1 p-1.5 bg-red-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : !isUploadingImage && (
+                                    <div className="text-center py-8 border-2 border-dashed border-gray-100 rounded-xl">
+                                        <Camera className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                                        <p className="text-gray-400 text-sm">No photos uploaded yet</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -376,18 +597,29 @@ export default function AgentVisitDetailPage({ params }: { params: Promise<PageP
 
                             {/* APPROVED */}
                             {visit.status === VisitStatus.APPROVED && (
-                                <button onClick={handleStartSession} disabled={isActionLoading} className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95">
-                                    {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
-                                    Start Visit Session
-                                </button>
+                                <div className="space-y-3">
+                                    <button onClick={handleStartSession} disabled={isActionLoading} className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-md flex items-center justify-center gap-2 transition-transform active:scale-95">
+                                        {isActionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+                                        Start Visit Session
+                                    </button>
+                                    <button onClick={handleNoShow} disabled={isActionLoading} className="w-full py-2.5 border border-gray-300 text-orange-600 rounded-lg font-medium hover:bg-orange-50 flex items-center justify-center gap-2">
+                                        <AlertCircle className="w-4 h-4" /> Mark No-Show
+                                    </button>
+                                </div>
                             )}
 
                             {/* IN PROGRESS */}
                             {isCheckedIn && (
                                 <>
-                                    <button onClick={handleComplete} disabled={isActionLoading} className="w-full py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 flex items-center justify-center gap-2">
-                                        <CheckCircle className="w-4 h-4" /> Complete Visit
-                                    </button>
+                                    {isVerified ? (
+                                        <button onClick={handleComplete} disabled={isActionLoading} className="w-full py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 flex items-center justify-center gap-2">
+                                            <CheckCircle className="w-4 h-4" /> Complete Visit
+                                        </button>
+                                    ) : (
+                                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm flex items-center gap-2">
+                                            <ShieldCheck className="w-4 h-4" /> Verify OTP to complete
+                                        </div>
+                                    )}
                                     <button onClick={handleNoShow} disabled={isActionLoading} className="w-full py-2.5 border border-gray-300 text-orange-600 rounded-lg font-medium hover:bg-orange-50 flex items-center justify-center gap-2">
                                         <AlertCircle className="w-4 h-4" /> Mark No-Show
                                     </button>
@@ -415,6 +647,34 @@ export default function AgentVisitDetailPage({ params }: { params: Promise<PageP
                             )}
                         </div>
                     </div>
+
+                    {/* Follow-up / Next Steps Section - Show for completed visits */}
+                    {visit.status === VisitStatus.COMPLETED && followupContext?.suggested_actions && followupContext.suggested_actions.length > 0 && (
+                        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 rounded-xl p-6 shadow-sm">
+                            <h3 className="font-bold text-gray-900 mb-2">Next Steps</h3>
+                            <p className="text-gray-600 text-sm mb-4">
+                                Keep the momentum going. Follow up with the buyer based on their interest.
+                            </p>
+                            <div className="space-y-3">
+                                {followupContext.suggested_actions.includes('MESSAGE_BUYER') && (
+                                    <button
+                                        onClick={() => router.push(`/agent/messages?recipientId=${visit.buyer_id}`)}
+                                        className="w-full py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 flex items-center justify-center gap-2"
+                                    >
+                                        <MessageSquare className="w-4 h-4" /> Message Buyer
+                                    </button>
+                                )}
+                                {followupContext.suggested_actions.includes('SUGGEST_OFFER') && (
+                                    <button
+                                        onClick={() => alert('Offer suggestion UI coming soon!')}
+                                        className="w-full py-2.5 border border-emerald-200 text-emerald-700 bg-white rounded-lg font-medium hover:bg-emerald-50 flex items-center justify-center gap-2"
+                                    >
+                                        <Star className="w-4 h-4" /> Suggest Offer
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Buyer Info Card */}
                     <div className="bg-white/60 backdrop-blur-xl border border-white/40 rounded-xl p-6 shadow-sm">

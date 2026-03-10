@@ -65,7 +65,7 @@ export default function VisitsPage() {
         id: v.id,
         propertyTitle: v.property?.title || 'Unknown Property',
         propertyAddress: v.property?.address || 'Unknown Address',
-        scheduledDate: v.scheduled_date || new Date().toISOString(),
+        scheduledDate: v.confirmed_date || v.preferred_date || new Date().toISOString(),
         status: v.status
     }));
 
@@ -87,8 +87,8 @@ export default function VisitsPage() {
                                 <button
                                     onClick={() => setViewMode('list')}
                                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${viewMode === 'list'
-                                            ? 'bg-white text-gray-900 shadow-sm'
-                                            : 'text-gray-500 hover:text-gray-700'
+                                        ? 'bg-white text-gray-900 shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                 >
                                     <ListChecks className="w-4 h-4" />
@@ -97,8 +97,8 @@ export default function VisitsPage() {
                                 <button
                                     onClick={() => setViewMode('calendar')}
                                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${viewMode === 'calendar'
-                                            ? 'bg-white text-gray-900 shadow-sm'
-                                            : 'text-gray-500 hover:text-gray-700'
+                                        ? 'bg-white text-gray-900 shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                 >
                                     <CalendarIcon className="w-4 h-4" />
@@ -123,8 +123,8 @@ export default function VisitsPage() {
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`px-6 py-3 rounded-lg text-sm font-semibold transition-all ${activeTab === tab
-                                    ? 'bg-white text-gray-900 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700'
+                                ? 'bg-white text-gray-900 shadow-sm'
+                                : 'text-gray-500 hover:text-gray-700'
                                 }`}
                         >
                             {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -251,7 +251,7 @@ export default function VisitsPage() {
                                         <VisitPreparationChecklist
                                             visitId={selectedVisit.id}
                                             propertyTitle={selectedVisit.property?.title || 'Property'}
-                                            scheduledDate={selectedVisit.scheduled_date || ''}
+                                            scheduledDate={selectedVisit.confirmed_date || selectedVisit.preferred_date || ''}
                                         />
                                     </motion.div>
                                 ) : showRating && selectedVisit ? (

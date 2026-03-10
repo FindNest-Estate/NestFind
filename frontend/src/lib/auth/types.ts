@@ -13,7 +13,9 @@
 // ============================================================================
 
 export enum UserRole {
-    USER = 'USER',
+    USER = 'USER', // Deprecated, kept for backward compatibility during migration
+    BUYER = 'BUYER',
+    SELLER = 'SELLER',
     AGENT = 'AGENT',
     ADMIN = 'ADMIN',
 }
@@ -48,7 +50,9 @@ export interface AuthUser {
     id: string;
     full_name: string;
     email: string;
-    role: UserRole;
+    role: UserRole; // Primary/Default role (for backward compatibility)
+    roles: UserRole[]; // All assigned roles
+    active_context?: UserRole; // Current active context (BUYER | SELLER | AGENT)
     status: UserStatus;
     mobile_number?: string | null;
 }

@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion } from 'framer-motion';
 import {
     LayoutDashboard,
     ClipboardList,
@@ -14,13 +13,15 @@ import {
     ChevronLeft,
     ChevronRight,
     LogOut,
-    Shield,
     MessageSquare,
     FolderOpen,
     Megaphone,
-    Handshake,
-    UserCircle,
-    Settings
+    ArrowRightLeft,
+    Briefcase,
+    FileText,
+    Files,
+    Settings,
+    Flame,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { logout } from '@/lib/authApi';
@@ -32,165 +33,204 @@ interface SidebarProps {
     setCollapsed: (collapsed: boolean) => void;
 }
 
+type NavItem = {
+    icon: any;
+    label: string;
+    href: string;
+    badge?: number;
+};
+
+type NavGroup = {
+    title: string;
+    items: NavItem[];
+};
+
 export default function AgentSidebar({ collapsed, setCollapsed }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
     const [messageCount, setMessageCount] = useState(0);
 
-    // Fetch unread message count from database
     useEffect(() => {
         async function fetchMessageCount() {
             try {
                 const response = await getAgentMessages();
                 if (response.success && response.conversations) {
                     const totalUnread = response.conversations.reduce(
-                        (sum, c) => sum + (c.unread_count || 0),
-                        0
+                        (sum, c) => sum + (c.unread_count || 0), 0
                     );
                     setMessageCount(totalUnread);
                 }
-            } catch (error) {
-                console.error('Failed to fetch message count:', error);
+            } catch {
+                // Silent
             }
         }
         fetchMessageCount();
-        // Refresh every 30 seconds
         const interval = setInterval(fetchMessageCount, 30000);
         return () => clearInterval(interval);
     }, []);
 
-    const navItems = [
-        { icon: LayoutDashboard, label: 'Dashboard', href: '/agent/dashboard' },
-        { icon: ClipboardList, label: 'Assignments', href: '/agent/assignments' },
-        { icon: Users, label: 'Visits', href: '/agent/visits' },
-        { icon: MessageSquare, label: 'Messages', href: '/agent/messages', badge: messageCount > 0 ? messageCount : undefined },
-        { icon: UserCircle, label: 'Lead Pipeline', href: '/agent/crm' },
-        { icon: Calendar, label: 'Calendar', href: '/agent/calendar' },
-        { icon: FolderOpen, label: 'Documents', href: '/agent/documents' },
-        { icon: Megaphone, label: 'Marketing', href: '/agent/marketing' },
-        { icon: Handshake, label: 'Negotiations', href: '/agent/negotiations' },
-        { icon: BarChart3, label: 'Analytics', href: '/agent/analytics' },
-        { icon: User, label: 'Profile', href: '/profile' },
+    const navGroups: NavGroup[] = [
+        {
+            title: 'Overview',
+            items: [
+                { icon: LayoutDashboard, label: 'Dashboard', href: '/agent/dashboard' },
+                { icon: BarChart3, label: 'Analytics', href: '/agent/analytics' },
+            ]
+        },
+        {
+            title: 'Work',
+            items: [
+                { icon: ClipboardList, label: 'Assignments', href: '/agent/assignments' },
+                { icon: Users, label: 'Visits', href: '/agent/visits' },
+                { icon: FileText, label: 'Offers', href: '/agent/offers' },
+                { icon: ArrowRightLeft, label: 'Transactions', href: '/agent/transactions' },
+            ]
+        },
+        {
+            title: 'Pipeline',
+            items: [
+                { icon: Briefcase, label: 'CRM', href: '/agent/crm' },
+                { icon: Flame, label: 'Follow-Ups', href: '/agent/followups' },
+            ]
+        },
+        {
+            title: 'Communication',
+            items: [
+                { icon: MessageSquare, label: 'Messages', href: '/agent/messages', badge: messageCount },
+            ]
+        },
+        {
+            title: 'Resources',
+            items: [
+                { icon: FolderOpen, label: 'Documents', href: '/agent/documents' },
+                { icon: Calendar, label: 'Calendar', href: '/agent/calendar' },
+                { icon: Megaphone, label: 'Marketing', href: '/agent/marketing' },
+            ]
+        },
+        {
+            title: 'Account',
+            items: [
+                { icon: Settings, label: 'Settings', href: '/agent/settings' },
+            ]
+        }
     ];
 
     const handleLogout = async () => {
         try {
             await logout();
             router.push('/');
-        } catch (err) {
-            console.error('Logout failed', err);
+        } catch {
             router.push('/');
         }
     };
 
     return (
-        <motion.aside
-            initial={false}
-            animate={{ width: collapsed ? 64 : 280 }}
-            className="fixed left-0 top-0 z-40 h-screen bg-white/80 backdrop-blur-xl text-gray-800 shadow-2xl flex flex-col border-r border-gray-200/50"
+        <aside
+            className={cn(
+                'fixed left-0 top-0 z-40 h-screen bg-white border-r border-[var(--gray-200)] flex flex-col transition-[width] duration-300 ease-in-out shadow-[1px_0_10px_rgba(0,0,0,0.02)]',
+                collapsed ? 'w-[72px]' : 'w-[280px]'
+            )}
         >
-            {/* Logo Section */}
-            <div className="h-16 flex items-center px-4 border-b border-gray-200/50 relative">
-                <div className="flex items-center gap-3 overflow-hidden whitespace-nowrap">
-                    <div className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-                        <Shield className="w-5 h-5 text-white" />
+            {/* Logo Area */}
+            <div className="h-16 flex items-center px-4 border-b border-[var(--gray-100)] relative shrink-0">
+                <div className={cn(
+                    "flex items-center gap-3 overflow-hidden whitespace-nowrap transition-all duration-300",
+                    collapsed ? "justify-center w-full" : ""
+                )}>
+                    <div className="w-8 h-8 bg-[var(--gray-900)] rounded-lg flex items-center justify-center shrink-0 shadow-sm">
+                        <Files className="w-4 h-4 text-white" />
                     </div>
-                    <motion.div
-                        animate={{ opacity: collapsed ? 0 : 1 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex flex-col"
-                    >
-                        <span className="font-bold text-lg tracking-tight text-rose-500">NestFind</span>
-                        <span className="text-[10px] uppercase tracking-wider text-gray-500">Agent Portal</span>
-                    </motion.div>
+                    {!collapsed && (
+                        <div className="flex flex-col opacity-100 transition-opacity duration-300 delay-100">
+                            <span className="font-bold text-[15px] text-[var(--gray-900)] tracking-tight leading-tight">NestFind</span>
+                            <span className="text-[10px] uppercase tracking-wider text-[var(--gray-500)] font-bold">Agent Portal</span>
+                        </div>
+                    )}
                 </div>
 
-                {/* Collapse Toggle */}
                 <button
                     onClick={() => setCollapsed(!collapsed)}
-                    className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-400 hover:text-rose-500 hover:border-rose-200 transition-colors z-50 shadow-md"
+                    className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border border-[var(--gray-200)] rounded-full flex items-center justify-center text-[var(--gray-400)] hover:text-[var(--gray-900)] hover:border-[var(--gray-300)] hover:shadow-sm transition-all z-50 text-xs"
                 >
-                    {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+                    {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
                 </button>
             </div>
 
-            {/* Navigation */}
-            <div className="flex-1 overflow-y-auto py-4 px-2 space-y-1 scrollbar-hide">
-                {navItems.map((item) => {
-                    const isActive = pathname === item.href || (item.href !== '/profile' && pathname.startsWith(item.href));
+            {/* Navigation Options */}
+            <div className="flex-1 overflow-y-auto py-5 px-3 space-y-7 hide-scrollbar">
+                {navGroups.map((group, groupIdx) => (
+                    <div key={groupIdx} className="space-y-1.5">
+                        {!collapsed && (
+                            <h3 className="px-3 text-[11px] font-bold text-[var(--gray-400)] uppercase tracking-wider mb-2.5 opacity-100 transition-opacity duration-300 delay-100">
+                                {group.title}
+                            </h3>
+                        )}
+                        {group.items.map(item => {
+                            const isActive = pathname === item.href || (item.href !== '/agent/settings' && pathname.startsWith(item.href + '/'));
+                            return (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className={cn(
+                                        'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group relative',
+                                        collapsed ? 'justify-center mx-1' : '',
+                                        isActive
+                                            ? 'bg-[var(--gray-900)] shadow-sm'
+                                            : 'hover:bg-[var(--gray-50)]'
+                                    )}
+                                    title={collapsed ? item.label : undefined}
+                                >
+                                    <item.icon className={cn(
+                                        'w-5 h-5 shrink-0 transition-colors',
+                                        isActive ? 'text-white' : 'text-[var(--gray-500)] group-hover:text-[var(--gray-900)]'
+                                    )} />
 
-                    return (
-                        <Link
-                            key={item.href}
-                            href={item.href}
-                            className={cn(
-                                "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative",
-                                isActive
-                                    ? "bg-rose-50 text-rose-600 font-medium"
-                                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
-                            )}
-                            title={collapsed ? item.label : undefined}
-                        >
-                            <item.icon className={cn(
-                                "w-5 h-5 flex-shrink-0 transition-colors",
-                                isActive ? "text-rose-500" : "text-gray-400 group-hover:text-gray-600"
-                            )} />
+                                    {!collapsed && (
+                                        <span className={cn(
+                                            "truncate flex-1 text-[13px] transition-colors font-medium",
+                                            isActive ? 'text-white' : 'text-[var(--gray-600)] group-hover:text-[var(--gray-900)]'
+                                        )}>
+                                            {item.label}
+                                        </span>
+                                    )}
 
-                            <motion.span
-                                animate={{
-                                    opacity: collapsed ? 0 : 1,
-                                    width: collapsed ? 0 : 'auto',
-                                    display: collapsed ? 'none' : 'block'
-                                }}
-                                className="whitespace-nowrap overflow-hidden flex-1"
-                            >
-                                {item.label}
-                            </motion.span>
+                                    {/* Badge */}
+                                    {item.badge ? (
+                                        !collapsed && (
+                                            <span className={cn(
+                                                "px-1.5 py-0.5 text-[10px] font-bold rounded-full flex items-center justify-center min-w-[1.25rem] transition-colors",
+                                                isActive ? "bg-white/20 text-white" : "bg-[var(--gray-900)] text-white shadow-sm"
+                                            )}>
+                                                {item.badge > 99 ? '99+' : item.badge}
+                                            </span>
+                                        )
+                                    ) : null}
 
-                            {/* Badge for Messages etc */}
-                            {'badge' in item && item.badge && !collapsed && (
-                                <span className="ml-auto w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                                    {item.badge}
-                                </span>
-                            )}
-
-                            {/* Active Indicator Bar */}
-                            {isActive && (
-                                <motion.div
-                                    layoutId="activeTabAgent"
-                                    className="absolute left-0 top-2 bottom-2 w-1 bg-rose-500 rounded-r-full"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                />
-                            )}
-                        </Link>
-                    );
-                })}
+                                    {/* Collapsed Tooltip Indicator */}
+                                    {collapsed && item.badge && (
+                                        <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-red-500 border-2 border-white" />
+                                    )}
+                                </Link>
+                            );
+                        })}
+                    </div>
+                ))}
             </div>
 
-            {/* Footer / User Profile */}
-            <div className="p-4 border-t border-gray-100">
+            {/* Profile / Actions Footer */}
+            <div className="p-4 border-t border-[var(--gray-100)] bg-[var(--gray-50)]/50">
                 <button
                     onClick={handleLogout}
                     className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-red-50 hover:text-red-500 transition-all group",
-                        collapsed && "justify-center px-0"
+                        'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors text-[var(--gray-600)] hover:bg-white hover:text-red-600 hover:shadow-sm hover:border hover:border-red-100 border border-transparent',
+                        collapsed && 'justify-center px-0'
                     )}
+                    title={collapsed ? "Sign Out" : undefined}
                 >
-                    <LogOut className="w-5 h-5 flex-shrink-0" />
-                    <motion.span
-                        animate={{
-                            opacity: collapsed ? 0 : 1,
-                            width: collapsed ? 0 : 'auto',
-                            display: collapsed ? 'none' : 'block'
-                        }}
-                        className="font-medium whitespace-nowrap overflow-hidden"
-                    >
-                        Sign Out
-                    </motion.span>
+                    <LogOut className="w-5 h-5 shrink-0" />
+                    {!collapsed && <span>Sign Out</span>}
                 </button>
             </div>
-        </motion.aside>
+        </aside>
     );
 }

@@ -59,40 +59,42 @@ class AdminUsersService:
             
             offset = (page - 1) * per_page
             
-            # Get users with roles
+            # Get users with roles  — GROUP BY prevents duplicate rows for hybrid-role users
             query = f"""
                 SELECT 
                     u.id, u.email, u.full_name, u.mobile_number,
-                    r.name::text as role, u.status::text as status, u.created_at,
+                    STRING_AGG(r.name::text, ',' ORDER BY r.name) as role,
+                    u.status::text as status, u.created_at,
                     (SELECT COUNT(*) FROM properties p WHERE p.seller_id = u.id) as property_count,
                     (SELECT COUNT(*) FROM transactions t WHERE t.buyer_id = u.id) as purchase_count
                 FROM users u
                 LEFT JOIN user_roles ur ON ur.user_id = u.id
                 LEFT JOIN roles r ON r.id = ur.role_id
                 {where_clause}
+                GROUP BY u.id, u.email, u.full_name, u.mobile_number, u.status, u.created_at
                 ORDER BY u.created_at DESC
                 LIMIT {per_page} OFFSET {offset}
             """
             
             users = await conn.fetch(query, *params)
             
-            # Get total count with same joins
+            # Get total count — use DISTINCT to avoid duplicates from role join
             count_query = f"""
-                SELECT COUNT(*) FROM users u
+                SELECT COUNT(DISTINCT u.id) FROM users u
                 LEFT JOIN user_roles ur ON ur.user_id = u.id
                 LEFT JOIN roles r ON r.id = ur.role_id
                 {where_clause}
             """
             total = await conn.fetchval(count_query, *params)
             
-            # Get stats
+            # Get stats — use DISTINCT for accurate counts
             stats = await conn.fetchrow("""
                 SELECT 
-                    COUNT(*) FILTER (WHERE u.status = 'ACTIVE') as active_count,
-                    COUNT(*) FILTER (WHERE u.status = 'SUSPENDED') as suspended_count,
-                    COUNT(*) FILTER (WHERE r.name::text = 'USER') as user_count,
-                    COUNT(*) FILTER (WHERE r.name::text = 'AGENT') as agent_count,
-                    COUNT(*) FILTER (WHERE r.name::text = 'ADMIN') as admin_count
+                    COUNT(DISTINCT u.id) FILTER (WHERE u.status = 'ACTIVE') as active_count,
+                    COUNT(DISTINCT u.id) FILTER (WHERE u.status = 'SUSPENDED') as suspended_count,
+                    COUNT(DISTINCT u.id) FILTER (WHERE r.name::text = 'USER') as user_count,
+                    COUNT(DISTINCT u.id) FILTER (WHERE r.name::text = 'AGENT') as agent_count,
+                    COUNT(DISTINCT u.id) FILTER (WHERE r.name::text = 'ADMIN') as admin_count
                 FROM users u
                 LEFT JOIN user_roles ur ON ur.user_id = u.id
                 LEFT JOIN roles r ON r.id = ur.role_id
@@ -106,7 +108,8 @@ class AdminUsersService:
                         "email": u['email'],
                         "full_name": u['full_name'],
                         "phone": u['mobile_number'],
-                        "role": u['role'] or 'USER',
+                        # Take the first role for primary display (e.g. 'AGENT,USER' → 'AGENT')
+                        "role": (u['role'] or 'USER').split(',')[0].lower(),
                         "status": u['status'],
                         "created_at": u['created_at'].isoformat() if u['created_at'] else None,
                         "last_login_at": None,  # Not tracked in current schema

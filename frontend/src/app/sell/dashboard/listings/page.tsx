@@ -164,7 +164,8 @@ export default function SellerListingsPage() {
                 </div>
                 <Link
                     href="/sell/create"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#ff385c] text-white rounded-xl font-semibold hover:bg-[#d9324e] transition-all shadow-md"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-br from-[#ff385c] to-rose-600 text-white rounded-xl font-semibold hover:-translate-y-0.5 transition-all shadow-md hover:shadow-lg"
+                    style={{ color: 'white' }}
                 >
                     <Plus className="w-5 h-5" />
                     New Listing
@@ -278,7 +279,8 @@ export default function SellerListingsPage() {
                     {properties.length === 0 && (
                         <Link
                             href="/sell/create"
-                            className="inline-flex items-center gap-2 px-6 py-3 bg-[#ff385c] text-white rounded-xl font-semibold hover:bg-[#d9324e] transition-colors shadow-lg"
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-br from-[#ff385c] to-rose-600 text-white rounded-xl font-semibold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                            style={{ color: 'white' }}
                         >
                             <Plus className="w-5 h-5" />
                             Create New Listing
@@ -294,7 +296,7 @@ export default function SellerListingsPage() {
                         return (
                             <div
                                 key={property.id}
-                                className="group bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                                className="group bg-white/70 backdrop-blur-sm rounded-2xl border border-slate-200/60 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-1.5"
                             >
                                 {/* Image */}
                                 <div className="relative h-48 bg-slate-100 overflow-hidden">
@@ -361,7 +363,8 @@ export default function SellerListingsPage() {
                                             <button
                                                 onClick={() => handleSubmitForReview(property.id, property.title)}
                                                 disabled={submittingId === property.id}
-                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#ff385c] text-white rounded-lg text-sm font-medium hover:bg-[#d9324e] transition-colors disabled:opacity-50"
+                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-br from-[#ff385c] to-rose-600 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none disabled:shadow-none"
+                                                style={{ color: 'white' }}
                                             >
                                                 {submittingId === property.id ? (
                                                     <Loader2 className="w-4 h-4 animate-spin" />
