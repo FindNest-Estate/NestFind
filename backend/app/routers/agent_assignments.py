@@ -39,6 +39,13 @@ class VerificationRequest(BaseModel):
     rejection_reason: Optional[str] = None
     checklist: Optional[dict] = None  # NEW: Document checklist
 
+class DocumentTypeResponse(BaseModel):
+    success: bool
+    document_types: List[dict]
+
+class ChecklistItemResponse(BaseModel):
+    success: bool
+    checklist_items: List[dict]
 
 class VerificationOTPRequest(BaseModel):
     pass  # No body needed, assignment_id in path
@@ -388,6 +395,33 @@ async def complete_verification(
         new_status=result.get("assignment_status"),
         property_status=result.get("property_status")
     )
+
+
+@router.get("/agent/verification/document-types", response_model=DocumentTypeResponse)
+async def get_document_types(
+    property_type: Optional[str] = Query(None, description="Filter by property type (e.g., APARTMENT, LAND)"),
+    current_user: AuthenticatedUser = Depends(require_role("AGENT")),
+    db_pool = Depends(get_db_pool)
+):
+    """
+    Get dynamic document types for verification.
+    """
+    service = AgentAssignmentService(db_pool)
+    result = await service.get_verification_document_types(property_type)
+    return DocumentTypeResponse(**result)
+
+
+@router.get("/agent/verification/checklist-items", response_model=ChecklistItemResponse)
+async def get_checklist_items(
+    current_user: AuthenticatedUser = Depends(require_role("AGENT")),
+    db_pool = Depends(get_db_pool)
+):
+    """
+    Get physical inspection checklist items.
+    """
+    service = AgentAssignmentService(db_pool)
+    result = await service.get_verification_checklist_items()
+    return ChecklistItemResponse(**result)
 
 
 @router.post("/agent/assignments/{assignment_id}/verification/generate-otp", response_model=ActionResponse)

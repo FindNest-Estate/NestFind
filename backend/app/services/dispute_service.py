@@ -56,17 +56,19 @@ class DisputeService:
             dispute = await connection.fetchrow(
                 """
                 INSERT INTO disputes (
-                    deal_id, raised_by_id, dispute_type, status,
-                    description, evidence_urls_jsonb
+                    deal_id, raised_by_id, category, status,
+                    description, evidence_urls, title, against_id
                 )
-                VALUES ($1, $2, $3, 'OPEN', $4, $5)
+                VALUES ($1, $2, $3, 'OPEN', $4, $5, $6, $7)
                 RETURNING id
                 """,
                 deal_id,
                 raised_by_id,
                 dispute_type,
                 description,
-                json.dumps(evidence),
+                evidence,
+                f"Dispute: {dispute_type}",
+                deal["seller_id"] if raised_by_id == deal["buyer_id"] else deal["buyer_id"]
             )
 
             await connection.execute(
@@ -126,8 +128,7 @@ class DisputeService:
                     """
                     UPDATE disputes
                     SET status = $2,
-                        admin_notes = $3,
-                        resolution_entry_id = $4,
+                        resolution_notes = $3,
                         resolved_at = NOW(),
                         updated_at = NOW()
                     WHERE id = $1
@@ -136,7 +137,6 @@ class DisputeService:
                     dispute_id,
                     resolution_status,
                     admin_notes,
-                    resolution_entry_id,
                 )
 
                 if not dispute:
@@ -197,7 +197,7 @@ class DisputeService:
         async with self.db.acquire() as conn:
             if admin_notes is None:
                 current_notes = await conn.fetchval(
-                    "SELECT admin_notes FROM disputes WHERE id = $1", dispute_id
+                    "SELECT resolution_notes FROM disputes WHERE id = $1", dispute_id
                 )
                 if current_notes is None:
                     exists = await conn.fetchval("SELECT 1 FROM disputes WHERE id = $1", dispute_id)
@@ -209,7 +209,7 @@ class DisputeService:
                 """
                 UPDATE disputes
                 SET status = $2,
-                    admin_notes = $3,
+                    resolution_notes = $3,
                     updated_at = NOW()
                 WHERE id = $1
                 RETURNING id
@@ -249,8 +249,8 @@ class DisputeService:
         async with self.db.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT d.id, d.dispute_type, d.status, d.description,
-                       d.created_at, d.admin_notes, d.evidence_urls_jsonb,
+                SELECT d.id, d.category as type, d.status, d.description,
+                       d.created_at, d.resolution_notes as admin_notes, d.evidence_urls,
                        u.full_name as raised_by_name, u.role as raised_by_role
                 FROM disputes d
                 JOIN users u ON u.id = d.raised_by_id
@@ -265,14 +265,14 @@ class DisputeService:
                 "disputes": [
                     {
                         "id": str(r["id"]),
-                        "type": r["dispute_type"],
+                        "type": r["type"],
                         "status": r["status"],
                         "description": r["description"],
                         "raised_by_name": r["raised_by_name"],
                         "raised_by_role": r["raised_by_role"],
                         "created_at": r["created_at"].isoformat(),
                         "admin_notes": r["admin_notes"],
-                        "evidence_urls": json.loads(r["evidence_urls_jsonb"]) if r["evidence_urls_jsonb"] else [],
+                        "evidence_urls": r["evidence_urls"] if r["evidence_urls"] else [],
                     }
                     for r in rows
                 ],
@@ -283,8 +283,8 @@ class DisputeService:
         async with self.db.acquire() as conn:
             rows = await conn.fetch(
                 """
-                SELECT d.id, d.deal_id, d.dispute_type, d.status, d.description,
-                       d.created_at, d.evidence_urls_jsonb,
+                SELECT d.id, d.deal_id, d.category as dispute_type, d.status, d.description,
+                       d.created_at, d.evidence_urls,
                        u.full_name as raised_by_name, u.role as raised_by_role
                 FROM disputes d
                 JOIN users u ON u.id = d.raised_by_id
@@ -305,7 +305,7 @@ class DisputeService:
                         "raised_by_name": r["raised_by_name"],
                         "raised_by_role": r["raised_by_role"],
                         "created_at": r["created_at"].isoformat(),
-                        "evidence_urls": json.loads(r["evidence_urls_jsonb"]) if r["evidence_urls_jsonb"] else [],
+                        "evidence_urls": r["evidence_urls"] if r["evidence_urls"] else [],
                     }
                     for r in rows
                 ],
@@ -316,8 +316,8 @@ class DisputeService:
         async with self.db.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                SELECT d.id, d.deal_id, d.dispute_type, d.status, d.description,
-                       d.admin_notes, d.created_at, d.resolved_at, d.evidence_urls_jsonb,
+                SELECT d.id, d.deal_id, d.category as dispute_type, d.status, d.description,
+                       d.resolution_notes as admin_notes, d.created_at, d.resolved_at, d.evidence_urls,
                        u.full_name as raised_by_name, u.role as raised_by_role,
                        deal.buyer_id, deal.seller_id, deal.agent_id,
                        deal.is_frozen, deal.freeze_reason
@@ -345,7 +345,7 @@ class DisputeService:
                     "resolved_at": row["resolved_at"].isoformat() if row["resolved_at"] else None,
                     "raised_by_name": row["raised_by_name"],
                     "raised_by_role": row["raised_by_role"],
-                    "evidence_urls": json.loads(row["evidence_urls_jsonb"]) if row["evidence_urls_jsonb"] else [],
+                    "evidence_urls": row["evidence_urls"] if row["evidence_urls"] else [],
                     "deal_info": {
                         "is_frozen": row["is_frozen"],
                         "freeze_reason": row["freeze_reason"],

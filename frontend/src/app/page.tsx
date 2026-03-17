@@ -1,334 +1,270 @@
 'use client';
 
 import './landing.css';
-import Navbar from '@/components/Navbar';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, MapPin } from 'lucide-react';
+import Link from 'next/link';
+import { 
+  Search, MapPin, Key, ShieldCheck, Clock, 
+  ArrowRight, HeartHandshake, CheckCircle2, Instagram, Twitter, Facebook, Building
+} from 'lucide-react';
+import { browseProperties, PropertyCard as IPropertyCard } from '@/lib/api/public';
+import PropertyCard from '@/components/PropertyCard';
 
 export default function LandingPage() {
-    const [searchCity, setSearchCity] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [properties, setProperties] = useState<IPropertyCard[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
+
+    useEffect(() => {
+        const fetchLatestProperties = async () => {
+            try {
+                const response = await browseProperties({ per_page: 6, sort_by: 'newest' });
+                setProperties(response.properties);
+            } catch (error) {
+                console.error("Failed to fetch properties", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchLatestProperties();
+    }, []);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
-        if (searchCity.trim()) {
-            router.push(`/properties?city=${encodeURIComponent(searchCity.trim())}`);
+        if (searchQuery.trim()) {
+            router.push(`/properties?city=${encodeURIComponent(searchQuery.trim())}`);
         } else {
             router.push('/properties');
         }
     };
 
     return (
-        <div className="landing-page">
-            <Navbar />
+        <div className="landing-page-root">
+            {/* Navbar */}
+            <nav className="landing-nav">
+                <div className="nav-container">
+                    <Link href="/" className="nav-logo">
+                        <Building size={28} />
+                        NestFind
+                    </Link>
+                    <div className="nav-links">
+                        <Link href="/properties">Buy</Link>
+                        <Link href="/sell">Sell</Link>
+                        <Link href="/agents">Find Agents</Link>
+                        <Link href="#how-it-works">How it Works</Link>
+                    </div>
+                    <div className="nav-auth">
+                        <Link href="/login" className="btn-login">Log in</Link>
+                        <Link href="/register" className="btn-signup">Sign up</Link>
+                    </div>
+                </div>
+            </nav>
 
-            {/* 2. HERO SECTION */}
-            <section className="hero">
+            {/* Hero Section */}
+            <section className="hero-section">
                 <div className="hero-container">
-                    <h1>Find Your Perfect Home with Trusted Agents</h1>
-                    <p>
-                        NestFind connects you with verified real estate agents who prioritize your trust.
-                        Transparent transactions, secure processes, and expert guidance every step of the way.
-                    </p>
+                    <div className="hero-content">
+                        <div className="hero-tag">
+                            <ShieldCheck size={16} /> Verified Premium Real Estate
+                        </div>
+                        <h1 className="hero-title">
+                            Find the home <br /> that perfectly <br /> fits <span>your life.</span>
+                        </h1>
+                        <p className="hero-subtitle">
+                            NestFind connects you with verified agents and premium properties globally. 
+                            Experience transparent transactions and secure processes from start to finish.
+                        </p>
 
-                    {/* Search Bar */}
-                    <form onSubmit={handleSearch} className="hero-search-form">
-                        <div className="hero-search-bar">
-                            <MapPin className="search-icon" />
-                            <input
-                                type="text"
-                                placeholder="Find your dream property..."
-                                value={searchCity}
-                                onChange={(e) => setSearchCity(e.target.value)}
-                                className="search-input"
-                            />
-                            <button type="submit" className="search-button">
-                                <Search size={20} />
-                                Search
+                        <form onSubmit={handleSearch} className="search-wrapper">
+                            <div className="search-input-group">
+                                <MapPin size={24} />
+                                <input 
+                                    type="text" 
+                                    className="search-input" 
+                                    placeholder="City, zip, or neighborhood..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                            <button type="submit" className="search-btn">
+                                Search <ArrowRight size={18} />
                             </button>
-                        </div>
-                    </form>
-
-                    <a href="/properties" className="hero-cta">
-                        Browse All Properties
-                    </a>
-                </div>
-            </section>
-
-            {/* TRUST STATISTICS BAR */}
-            <section className="trust-stats">
-                <div className="stats-container">
-                    <div className="stat-item">
-                        <div className="stat-number">2,500+</div>
-                        <div className="stat-label">Verified Properties</div>
+                        </form>
                     </div>
-                    <div className="stat-item">
-                        <div className="stat-number">15,000+</div>
-                        <div className="stat-label">Successful Visits</div>
-                    </div>
-                    <div className="stat-item">
-                        <div className="stat-number">500+</div>
-                        <div className="stat-label">Verified Agents</div>
-                    </div>
-                    <div className="stat-item">
-                        <div className="stat-number">1,200+</div>
-                        <div className="stat-label">Completed Transactions</div>
-                    </div>
-                </div>
-            </section>
-
-            {/* 3. HOW NESTFIND WORKS */}
-            <section className="how-it-works" id="how-it-works">
-                <div className="section-container">
-                    <h2 className="section-title">How NestFind Works</h2>
-                    <div className="steps-grid">
-                        <div className="step">
-                            <div className="step-number">1</div>
-                            <h3>Browse Listings</h3>
-                            <p>
-                                Explore verified properties from our network of trusted agents.
-                                All listings are verified for accuracy and authenticity.
-                            </p>
-                        </div>
-                        <div className="step">
-                            <div className="step-number">2</div>
-                            <h3>Connect with Agents</h3>
-                            <p>
-                                Reach out to verified agents with proven track records.
-                                View their credentials, reviews, and specialties.
-                            </p>
-                        </div>
-                        <div className="step">
-                            <div className="step-number">3</div>
-                            <h3>Secure Transactions</h3>
-                            <p>
-                                All communications and transactions are monitored for security.
-                                Your information is protected at every stage.
-                            </p>
-                        </div>
-                        <div className="step">
-                            <div className="step-number">4</div>
-                            <h3>Close with Confidence</h3>
-                            <p>
-                                Complete your purchase or sale with full transparency.
-                                We ensure compliance with all legal requirements.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* 4. TRUST SIGNALS */}
-            <section className="trust-signals">
-                <div className="section-container">
-                    <h2 className="section-title">Why Trust NestFind?</h2>
-                    <div className="trust-grid">
-                        <div className="trust-card">
-                            <div className="trust-icon">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
+                    <div className="hero-visual">
+                        <img 
+                            src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80" 
+                            alt="Beautiful modern home" 
+                            className="hero-image-main"
+                        />
+                        <div className="floating-card fc-1">
+                            <div className="fc-icon">
+                                <Key size={24} />
                             </div>
-                            <h3>Verified Agents</h3>
-                            <p>
-                                Every agent on our platform undergoes rigorous background checks
-                                and credential verification. Only licensed professionals are approved.
-                            </p>
-                        </div>
-                        <div className="trust-card">
-                            <div className="trust-icon">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                </svg>
-                            </div>
-                            <h3>Secure Transactions</h3>
-                            <p>
-                                Bank-grade encryption protects all your communications and financial
-                                information. We never share your data without explicit consent.
-                            </p>
-                        </div>
-                        <div className="trust-card">
-                            <div className="trust-icon">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                            </div>
-                            <h3>Full Compliance</h3>
-                            <p>
-                                All transactions comply with local and federal real estate regulations.
-                                Complete audit trails ensure transparency and legal protection.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* 5. FEATURED PROPERTIES */}
-            <section className="featured-properties" id="featured-properties">
-                <div className="section-container">
-                    <h2 className="section-title">Featured Properties</h2>
-                    <p className="properties-disclaimer">Sample listings for demonstration only</p>
-                    <div className="properties-grid">
-                        <div className="property-card">
-                            <div className="property-image-container">
-                                <span className="status-badge status-active">ACTIVE</span>
-                                <div className="property-image"></div>
-                            </div>
-                            <div className="property-info">
-                                <div className="verification-badge">
-                                    <svg viewBox="0 0 24 24" fill="none">
-                                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="#16A34A" strokeWidth="2" />
-                                    </svg>
-                                    <span>Verified by Agent</span>
-                                </div>
-                                <div className="property-price">$750,000</div>
-                                <h3 className="property-title">Modern Family Home</h3>
-                                <p className="property-location">San Francisco, CA</p>
-                                <div className="property-details">
-                                    <span>🛏️ 4 beds</span>
-                                    <span>🛁 3 baths</span>
-                                    <span>📐 2,400 sq ft</span>
-                                </div>
+                            <div className="fc-text">
+                                <h4>100% Secure</h4>
+                                <p>Encrypted Transactions</p>
                             </div>
                         </div>
-
-                        <div className="property-card">
-                            <div className="property-image-container">
-                                <span className="status-badge status-reserved">RESERVED</span>
-                                <div className="property-image"></div>
+                        <div className="floating-card fc-2">
+                            <div className="fc-icon">
+                                <HeartHandshake size={24} />
                             </div>
-                            <div className="property-info">
-                                <div className="verification-badge">
-                                    <svg viewBox="0 0 24 24" fill="none">
-                                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="#16A34A" strokeWidth="2" />
-                                    </svg>
-                                    <span>Verified by Agent</span>
-                                </div>
-                                <div className="property-price">$525,000</div>
-                                <h3 className="property-title">Downtown Luxury Condo</h3>
-                                <p className="property-location">Austin, TX</p>
-                                <div className="property-details">
-                                    <span>🛏️ 2 beds</span>
-                                    <span>🛁 2 baths</span>
-                                    <span>📐 1,200 sq ft</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="property-card">
-                            <div className="property-image-container">
-                                <span className="status-badge status-active">ACTIVE</span>
-                                <div className="property-image"></div>
-                            </div>
-                            <div className="property-info">
-                                <div className="verification-badge">
-                                    <svg viewBox="0 0 24 24" fill="none">
-                                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="#16A34A" strokeWidth="2" />
-                                    </svg>
-                                    <span>Verified by Agent</span>
-                                </div>
-                                <div className="property-price">$920,000</div>
-                                <h3 className="property-title">Waterfront Estate</h3>
-                                <p className="property-location">Seattle, WA</p>
-                                <div className="property-details">
-                                    <span>🛏️ 5 beds</span>
-                                    <span>🛁 4 baths</span>
-                                    <span>📐 3,600 sq ft</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="property-card">
-                            <div className="property-image-container">
-                                <span className="status-badge status-active">ACTIVE</span>
-                                <div className="property-image"></div>
-                            </div>
-                            <div className="property-info">
-                                <div className="verification-badge">
-                                    <svg viewBox="0 0 24 24" fill="none">
-                                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="#16A34A" strokeWidth="2" />
-                                    </svg>
-                                    <span>Verified by Agent</span>
-                                </div>
-                                <div className="property-price">$425,000</div>
-                                <h3 className="property-title">Suburban Retreat</h3>
-                                <p className="property-location">Portland, OR</p>
-                                <div className="property-details">
-                                    <span>🛏️ 3 beds</span>
-                                    <span>🛁 2 baths</span>
-                                    <span>📐 1,800 sq ft</span>
-                                </div>
+                            <div className="fc-text">
+                                <h4>500+ Agents</h4>
+                                <p>Fully Verified</p>
                             </div>
                         </div>
                     </div>
                 </div>
             </section>
 
-            {/* TRUST FOOTER BANNER */}
-            <section className="trust-footer-banner">
-                <div className="trust-banner-content">
-                    <div className="trust-banner-item">
-                        <strong>🔒 Secure Transactions</strong>
-                        <span>Bank-grade encryption on all communications</span>
+            {/* Stats Section */}
+            <section className="stats-section">
+                <div className="stats-grid">
+                    <div className="stat-box">
+                        <div className="stat-num">2.5k+</div>
+                        <div className="stat-label">Verified Listings</div>
                     </div>
-                    <div className="trust-banner-item">
-                        <strong>✓ Fully Compliant</strong>
-                        <span>Licensed & regulated real estate marketplace</span>
+                    <div className="stat-box">
+                        <div className="stat-num">15k+</div>
+                        <div className="stat-label">Happy Families</div>
                     </div>
-                    <div className="trust-banner-item">
-                        <strong>🛡️ Trust Verified</strong>
-                        <span>Every agent undergoes rigorous background checks</span>
+                    <div className="stat-box">
+                        <div className="stat-num">500+</div>
+                        <div className="stat-label">Expert Agents</div>
+                    </div>
+                    <div className="stat-box">
+                        <div className="stat-num">99%</div>
+                        <div className="stat-label">Success Rate</div>
                     </div>
                 </div>
             </section>
 
-            {/* 6. FOOTER */}
-            <footer className="footer">
-                <div className="footer-container">
-                    <div className="footer-grid">
-                        <div className="footer-section">
-                            <h4>Compliance</h4>
-                            <ul>
-                                <li><a href="#privacy">Privacy Policy</a></li>
-                                <li><a href="#terms">Terms of Service</a></li>
-                                <li><a href="#fair-housing">Fair Housing Act</a></li>
-                                <li><a href="#licenses">State Licenses</a></li>
-                            </ul>
-                        </div>
-                        <div className="footer-section">
-                            <h4>Security</h4>
-                            <ul>
-                                <li><a href="#data-protection">Data Protection</a></li>
-                                <li><a href="#encryption">Encryption Standards</a></li>
-                                <li><a href="#secure-payments">Secure Payments</a></li>
-                                <li><a href="#audit-logs">Audit & Transparency</a></li>
-                            </ul>
-                        </div>
-                        <div className="footer-section">
-                            <h4>Contact</h4>
-                            <ul>
-                                <li><a href="mailto:support@nestfind.com">support@nestfind.com</a></li>
-                                <li><a href="tel:1-800-NESTFIND">1-800-NESTFIND</a></li>
-                                <li><a href="#help">Help Center</a></li>
-                                <li><a href="#agents">For Agents</a></li>
-                            </ul>
-                        </div>
-                        <div className="footer-section">
-                            <h4>Company</h4>
-                            <ul>
-                                <li><a href="#about">About NestFind</a></li>
-                                <li><a href="#careers">Careers</a></li>
-                                <li><a href="#press">Press</a></li>
-                                <li><a href="#investors">Investors</a></li>
-                            </ul>
-                        </div>
+            {/* Live Properties Section */}
+            <section className="properties-section">
+                <div className="section-header">
+                    <div className="section-title">
+                        <h2>Explore New Listings</h2>
+                        <p>Discover the latest premium properties added to our platform</p>
                     </div>
-                    <div className="footer-bottom">
-                        © 2025 NestFind. All rights reserved. Licensed real estate marketplace.
+                    <Link href="/properties" className="view-all-link">
+                        View all properties <ArrowRight size={16} />
+                    </Link>
+                </div>
+                
+                <div className="properties-grid">
+                    {isLoading ? (
+                        /* Skeleton loader */
+                        [...Array(6)].map((_, i) => (
+                            <div key={i} className="skeleton-card">
+                                <div className="skeleton-img"></div>
+                                <div className="skeleton-content">
+                                    <div className="skeleton-line"></div>
+                                    <div className="skeleton-line short"></div>
+                                </div>
+                            </div>
+                        ))
+                    ) : properties.length > 0 ? (
+                        properties.map((property) => (
+                            <PropertyCard key={property.id} property={property} />
+                        ))
+                    ) : (
+                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '48px 0', color: '#717171' }}>
+                            No properties available right now. Check back soon!
+                        </div>
+                    )}
+                </div>
+            </section>
+
+            {/* Features Section */}
+            <section className="features-section" id="how-it-works">
+                <div className="section-header" style={{ textAlign: 'center', margin: '0 auto 48px', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="section-title">
+                        <h2>Why choose NestFind?</h2>
+                        <p>We're reinventing the real estate experience</p>
+                    </div>
+                </div>
+                <div className="features-grid">
+                    <div className="feature-card">
+                        <div className="feature-icon"><CheckCircle2 size={32} /></div>
+                        <h3>Verified Excellence</h3>
+                        <p>Every single property and agent undergoes a rigorous vetting process to guarantee authenticity and quality.</p>
+                    </div>
+                    <div className="feature-card">
+                        <div className="feature-icon"><Clock size={32} /></div>
+                        <h3>Streamlined Process</h3>
+                        <p>From virtual tours to digital signing, our platform minimizes hassle and accelerates your journey to ownership.</p>
+                    </div>
+                    <div className="feature-card">
+                        <div className="feature-icon"><ShieldCheck size={32} /></div>
+                        <h3>Complete Security</h3>
+                        <p>Bank-grade encryption and full legal compliance safeguard your data and transactions at every single step.</p>
+                    </div>
+                </div>
+            </section>
+
+            {/* CTA Section */}
+            <section className="cta-section">
+                <div className="cta-container">
+                    <h2 className="cta-title">Ready to find your dream home?</h2>
+                    <p className="cta-subtitle">Join thousands of others who found their perfect match with NestFind's premium real estate platform today.</p>
+                    <Link href="/register" className="cta-btn">Get Started Now</Link>
+                </div>
+            </section>
+
+            {/* Footer Section */}
+            <footer className="footer-section">
+                <div className="footer-grid">
+                    <div className="footer-brand">
+                        <Link href="/" className="nav-logo">
+                            <Building size={24} />
+                            NestFind
+                        </Link>
+                        <p className="footer-desc">
+                            The worlds most trusted real estate marketplace. Verified properties, expert agents, secure transactions.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 className="footer-title">Platform</h4>
+                        <ul className="footer-links">
+                            <li><Link href="/properties">Browse Properties</Link></li>
+                            <li><Link href="/agents">Find an Agent</Link></li>
+                            <li><Link href="/sell">Sell your Home</Link></li>
+                            <li><Link href="/pricing">Pricing Plans</Link></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 className="footer-title">Company</h4>
+                        <ul className="footer-links">
+                            <li><Link href="/about">About Us</Link></li>
+                            <li><Link href="/careers">Careers</Link></li>
+                            <li><Link href="/blog">Blog</Link></li>
+                            <li><Link href="/contact">Contact</Link></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 className="footer-title">Legal</h4>
+                        <ul className="footer-links">
+                            <li><Link href="/privacy">Privacy Policy</Link></li>
+                            <li><Link href="/terms">Terms of Service</Link></li>
+                            <li><Link href="/trust">Trust & Safety</Link></li>
+                            <li><Link href="/licenses">Licenses</Link></li>
+                        </ul>
+                    </div>
+                </div>
+                <div className="footer-bottom">
+                    <p>© 2026 NestFind. All rights reserved.</p>
+                    <div className="footer-socials">
+                        <Link href="#"><Twitter size={20} /></Link>
+                        <Link href="#"><Facebook size={20} /></Link>
+                        <Link href="#"><Instagram size={20} /></Link>
                     </div>
                 </div>
             </footer>
-        </div >
+        </div>
     );
 }

@@ -266,6 +266,41 @@ class MessagingService:
                 f"/messages/{conversation_id}"
             )
             
+            # Fetch the completed message record for broadcasting
+            full_msg = await conn.fetchrow(
+                """
+                SELECT id, sender_id, content, read_at, created_at
+                FROM messages
+                WHERE id = $1
+                """,
+                msg_id
+            )
+            
+            # Fire and forget WebSocket broadcast
+            try:
+                from ..routers.websocket_messaging import manager
+                import asyncio
+                import json
+                
+                payload = {
+                    "type": "new_message",
+                    "conversation_id": str(conversation_id),
+                    "message": {
+                        "id": str(full_msg["id"]),
+                        "sender_id": str(full_msg["sender_id"]),
+                        "sender_name": sender_name,
+                        "content": full_msg["content"],
+                        "read_at": full_msg["read_at"].isoformat() if full_msg["read_at"] else None,
+                        "created_at": full_msg["created_at"].isoformat()
+                    }
+                }
+                
+                # Push to recipient if online
+                asyncio.create_task(manager.send_json_to_user(str(recipient_id), payload))
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Failed to broadcast websocket message: {e}")
+            
             return {
                 "success": True,
                 "message_id": str(msg_id)

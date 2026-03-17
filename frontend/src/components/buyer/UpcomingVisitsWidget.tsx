@@ -62,52 +62,53 @@ export default function UpcomingVisitsWidget() {
     }
 
     return (
-        <div className="bg-white rounded-[var(--card-radius)] border border-[var(--gray-200)] p-5">
-            <div className="flex justify-between items-center mb-5">
-                <h2 className="text-base font-bold text-[var(--gray-900)] flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-[var(--color-brand)]" />
+        <div className="glass-card border border-white/60 p-6 relative overflow-hidden backdrop-blur-xl">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/50 via-transparent to-transparent opacity-50" />
+            <div className="flex justify-between items-center mb-6 relative">
+                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-emerald-500" />
                     Upcoming Tours
                 </h2>
-                <Link href="/visits" className="text-sm font-medium text-[var(--color-brand)] hover:underline flex items-center">
-                    View Schedule <ChevronRight className="w-4 h-4" />
+                <Link href="/visits" className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:underline flex items-center transition-colors">
+                    View Schedule <ChevronRight className="w-4 h-4 ml-0.5" />
                 </Link>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4 relative z-10">
                 {visits.map(visit => {
                     const dateObj = new Date(visit.preferred_date);
                     return (
-                        <div key={visit.id} className="flex gap-4 p-3 rounded-xl border border-[var(--gray-200)] hover:border-[var(--gray-300)] transition-colors bg-white group">
+                        <div key={visit.id} className="flex gap-4 p-4 rounded-2xl border border-white/60 bg-white/40 hover:bg-white/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group">
                             {/* Date Badge */}
-                            <div className="flex-shrink-0 w-14 h-14 bg-[var(--gray-50)] border border-[var(--gray-200)] rounded-lg flex flex-col items-center justify-center text-[var(--color-brand)]">
-                                <span className="text-xs font-bold uppercase">{format(dateObj, 'MMM')}</span>
-                                <span className="text-lg font-black leading-none">{format(dateObj, 'dd')}</span>
+                            <div className="flex-shrink-0 w-14 h-14 bg-gradient-to-b from-emerald-50 to-white border border-emerald-100 rounded-xl flex flex-col items-center justify-center text-emerald-600 shadow-sm group-hover:border-emerald-200 transition-colors">
+                                <span className="text-[10px] font-black uppercase tracking-widest">{format(dateObj, 'MMM')}</span>
+                                <span className="text-xl font-black leading-none mt-0.5 text-emerald-700">{format(dateObj, 'dd')}</span>
                             </div>
 
                             {/* Info */}
                             <div className="flex-1 min-w-0 flex flex-col justify-center">
                                 <Link href={`/visits/${visit.id}`}>
-                                    <h3 className="font-bold text-sm text-[var(--gray-900)] truncate group-hover:text-[var(--color-brand)] transition-colors">
+                                    <h3 className="font-bold text-[15px] text-gray-900 truncate group-hover:text-emerald-600 transition-colors">
                                         {visit.property_title}
                                     </h3>
                                 </Link>
-                                <div className="flex items-center gap-3 mt-1.5 text-xs text-[var(--gray-600)] font-medium">
-                                    <div className="flex items-center gap-1">
-                                        <Clock className="w-3.5 h-3.5" />
+                                <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500 font-medium">
+                                    <div className="flex items-center gap-1.5 bg-gray-50/80 px-2 py-0.5 rounded text-gray-600 border border-gray-100">
+                                        <Clock className="w-3.5 h-3.5 text-gray-400" />
                                         {format(dateObj, 'h:mm a')}
                                     </div>
-                                    <div className="flex items-center gap-1 truncate">
-                                        <MapPin className="w-3.5 h-3.5" />
+                                    <div className="flex items-center gap-1.5 truncate text-gray-500">
+                                        <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                                         <span className="truncate">{visit.property_city}</span>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Options Button */}
-                            <div className="flex-shrink-0 flex items-center justify-center px-2">
+                            <div className="flex-shrink-0 flex items-center justify-center pl-2">
                                 <Link
                                     href={`/visits/${visit.id}`}
-                                    className="text-xs font-semibold px-3 py-1.5 rounded-full bg-[var(--gray-50)] text-[var(--gray-700)] hover:bg-[var(--gray-100)] transition-colors border border-[var(--gray-200)]">
+                                    className="text-xs font-bold px-4 py-2 rounded-xl bg-white text-gray-600 hover:text-emerald-700 hover:bg-emerald-50 shadow-sm border border-gray-100 hover:border-emerald-200 transition-all">
                                     Manage
                                 </Link>
                             </div>

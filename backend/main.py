@@ -1,21 +1,21 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from dotenv import load_dotenv
+from fastapi import FastAPI # type: ignore
+from fastapi.middleware.cors import CORSMiddleware # type: ignore
+from fastapi.staticfiles import StaticFiles # type: ignore
+from dotenv import load_dotenv # type: ignore
 import os
 
 # Load environment variables
 load_dotenv()
 
 
-from app.routers import otp, login, session, refresh, register_user, register_agent, admin_agent_approval, user, seller_properties, property_media, public_properties, public_agents, saved_properties, agent_assignments, messaging, notifications, admin_analytics, admin_transactions, admin_users, admin_properties, admin_audit_logs, buyer, collections, admin_operations
+from app.routers import otp, login, session, refresh, register_user, register_agent, admin_agent_approval, user, seller_properties, property_media, public_properties, public_agents, saved_properties, agent_assignments, messaging, notifications, admin_analytics, admin_transactions, admin_users, admin_properties, admin_audit_logs, buyer, collections, admin_operations # type: ignore
 
 
-from app.routers import visits, offers, reservations, transactions, disputes, property_stats, deals, agreements, finance, settlement
-from app.routers import seller_analytics, seller_offers, seller_visits, seller_transactions, seller_settings
-from app.routers import activate_seller
-from app.core.database import init_db_pool, close_db_pool, get_db_pool
-from app.jobs.scheduler import init_scheduler, start_scheduler, shutdown_scheduler
+from app.routers import visits, offers, reservations, transactions, disputes, property_stats, deals, agreements, finance, settlement # type: ignore
+from app.routers import seller_analytics, seller_offers, seller_visits, seller_transactions, seller_settings # type: ignore
+from app.routers import activate_seller, corporate_inventory, title_escrow, websocket_messaging # type: ignore
+from app.core.database import init_db_pool, close_db_pool, get_db_pool # type: ignore
+from app.jobs.scheduler import init_scheduler, start_scheduler, shutdown_scheduler # type: ignore
 from pathlib import Path
 
 app = FastAPI(
@@ -71,11 +71,13 @@ app.include_router(public_properties.router)
 app.include_router(public_agents.router)
 app.include_router(property_stats.router)  # View tracking and analytics
 
-# Authenticated property routes
-app.include_router(seller_properties.router)
-app.include_router(property_media.router)
+# Exact match authenticated routes MUST come before parameterized routes
 app.include_router(saved_properties.router)
 app.include_router(collections.router)
+
+# Authenticated property routes with /properties/{id}
+app.include_router(seller_properties.router)
+app.include_router(property_media.router)
 
 app.include_router(agent_assignments.router)
 app.include_router(messaging.router)
@@ -92,6 +94,7 @@ app.include_router(deals.router)
 app.include_router(agreements.router)
 app.include_router(finance.router)
 app.include_router(settlement.router)  # Phase 5A: Commission lifecycle & settlement
+app.include_router(title_escrow.router)
 
 # Seller dashboard routers
 app.include_router(seller_analytics.router)
@@ -99,6 +102,9 @@ app.include_router(seller_offers.router)
 app.include_router(seller_visits.router)
 app.include_router(seller_transactions.router)
 app.include_router(seller_settings.router)
+
+# Corporate and iBuyer Platform routers
+app.include_router(corporate_inventory.router)
 
 # Static file serving for uploads
 uploads_dir = Path("uploads")

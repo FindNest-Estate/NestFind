@@ -96,10 +96,10 @@ export async function getActiveOffers(): Promise<ActiveOffer[]> {
 
 export async function getActiveDeals(): Promise<ActiveDeal[]> {
     try {
-        const response = await get<ActiveDealsResponse>('/deals?active_only=true');
+        const response = await get<ActiveDealsResponse>('/deals?per_page=5');
         return response.deals;
     } catch (e) {
-        console.error('Failed to fetch active deals:', e);
+        console.error('Failed to fetch recent deals:', e);
         return [];
     }
 }

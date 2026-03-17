@@ -560,7 +560,7 @@ class AgentAssignmentService:
                 return {"success": False, "error": "Verification not started", "code": 400}
             
             # Generate OTP
-            otp_code = secrets.token_hex(3).upper() # 6 chars
+            otp_code = "".join(secrets.choice("0123456789") for _ in range(6))
             otp_hash = self._hash_otp(otp_code)
             
             # Save to DB
@@ -804,7 +804,96 @@ class AgentAssignmentService:
                     json.dumps(checklist) if checklist else None
                 )
 
+                # =========================================================
+                # ENTERPRISE TRUST ARCHITECTURE INTEGRATION
+                # Parse the raw checklist JSON and populate normalized tables
+                # =========================================================
+                if checklist:
+                    # 1. Update Document Verifications
+                    if "documents" in checklist and isinstance(checklist["documents"], dict):
+                        # Fetch document type mapping
+                        doc_types = await conn.fetch("SELECT id, code FROM verification_document_types")
+                        doc_map = {dt["code"]: dt["id"] for dt in doc_types}
+                        
+                        metadata = checklist.get("metadata", {})
+                        
+                        # We only attempt inserts for known DB schema codes that exactly match
+                        for doc_code, is_verified in checklist["documents"].items():
+                            uppercase_code = doc_code.upper()
+                            if uppercase_code in doc_map:
+                                doc_id = doc_map[uppercase_code]
+                                
+                                # Extract relevant metadata if available
+                                doc_metadata = None
+                                if metadata:
+                                    if uppercase_code == "SALE_DEED":
+                                        doc_metadata = json.dumps({
+                                            "reg_no": metadata.get("sale_deed_reg_no"),
+                                            "year": metadata.get("sale_deed_year")
+                                        })
+                                    elif uppercase_code == "PROPERTY_TAX_RECEIPT":
+                                        doc_metadata = json.dumps({
+                                            "tax_id": metadata.get("tax_id")
+                                        })
+                                
+                                await conn.execute(
+                                    """
+                                    INSERT INTO property_document_verifications 
+                                    (verification_id, document_type_id, verified, metadata, verified_by)
+                                    VALUES ($1, $2, $3, $4::jsonb, $5)
+                                    ON CONFLICT (verification_id, document_type_id) 
+                                    DO UPDATE SET verified = EXCLUDED.verified, metadata = EXCLUDED.metadata
+                                    """,
+                                    verification["id"], doc_id, bool(is_verified), doc_metadata, agent_id
+                                )
+
+                    # 2. Update Checklist Results
+                    if "inspection" in checklist and isinstance(checklist["inspection"], dict):
+                        # Fetch checklist items mapping
+                        check_items = await conn.fetch("SELECT id, code FROM verification_checklist_items")
+                        check_map = {ci["code"]: ci["id"] for ci in check_items}
+                        
+                        for check_code, is_checked in checklist["inspection"].items():
+                            uppercase_code = check_code.upper()
+                            if uppercase_code in check_map:
+                                check_id = check_map[uppercase_code]
+                                await conn.execute(
+                                    """
+                                    INSERT INTO verification_checklist_results 
+                                    (verification_id, checklist_item_id, result)
+                                    VALUES ($1, $2, $3)
+                                    ON CONFLICT (verification_id, checklist_item_id) 
+                                    DO UPDATE SET result = EXCLUDED.result
+                                    """,
+                                    verification["id"], check_id, bool(is_checked)
+                                )
+
+                # 3. Basic Fraud Detection Layer
+                # Check Distance (very basic check)
+                if gps_lat and gps_lng and row.get("latitude") and row.get("longitude"):
+                    import math
+                    R = 6371e3
+                    lat1, lon1 = math.radians(gps_lat), math.radians(gps_lng)
+                    lat2, lon2 = math.radians(row["latitude"]), math.radians(row["longitude"])
+                    dlat = lat2 - lat1
+                    dlon = lon2 - lon1
+                    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+                    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+                    distance = R * c
+                    
+                    if distance > 200:
+                        await conn.execute(
+                            """
+                            INSERT INTO property_fraud_signals 
+                            (property_id, signal_type, severity, description, detected_by)
+                            VALUES ($1, 'GPS_MISMATCH', 'HIGH', 
+                                   $2, 'SYSTEM')
+                            """,
+                            row["property_id"],
+                            f"Agent verified property {distance:.0f}m away from listed coordinates."
+                        )
                 
+
                 if approved:
                     # Property goes ACTIVE
                     await conn.execute(
@@ -838,6 +927,50 @@ class AgentAssignmentService:
                     "property_status": new_prop_status,
                     "assignment_status": new_assign_status
                 }
+
+    async def get_verification_document_types(self, property_type: Optional[str] = None) -> Dict[str, Any]:
+        """Get DB-driven document types, optionally filtered by property type."""
+        async with self.db.acquire() as conn:
+            if property_type:
+                rows = await conn.fetch(
+                    """
+                    SELECT vdt.id, vdt.code, vdt.name, vdt.description, 
+                           COALESCE(pdr.required, vdt.required) as required
+                    FROM verification_document_types vdt
+                    LEFT JOIN property_document_requirements pdr 
+                      ON vdt.id = pdr.document_type_id AND pdr.property_type = $1::property_type
+                    ORDER BY vdt.name ASC
+                    """,
+                    property_type
+                )
+            else:
+                rows = await conn.fetch(
+                    """
+                    SELECT id, code, name, description, required 
+                    FROM verification_document_types
+                    ORDER BY name ASC
+                    """
+                )
+            
+            return {
+                "success": True,
+                "document_types": [dict(row) for row in rows]
+            }
+
+    async def get_verification_checklist_items(self) -> Dict[str, Any]:
+        """Get DB-driven physical inspection checklist items."""
+        async with self.db.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT id, code, name, category 
+                FROM verification_checklist_items
+                ORDER BY category, name ASC
+                """
+            )
+            return {
+                "success": True,
+                "checklist_items": [dict(row) for row in rows]
+            }
 
     # ========================================================================
     # NEW ANALYTICS & CRM FEATURES
@@ -1620,7 +1753,7 @@ class AgentAssignmentService:
             conversations = []
             for r in rows:
                 conversations.append({
-                    "id": str(r['contact_id']),
+                    "id": f"{r['contact_id']}_{r['property_id']}",
                     "contact_name": r['contact_name'],
                     "contact_email": r['contact_email'],
                     "contact_type": r['contact_type'],

@@ -81,31 +81,31 @@ export default function SellerDashboardLayout({
                         <div className="px-6 py-4 border-b border-slate-100">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h2 className="text-lg font-bold text-slate-900">
+                                    <h2 className="text-lg font-bold text-gray-900 tracking-tight">
                                         Seller Portal
                                     </h2>
-                                    <p className="text-xs text-slate-500 mt-0.5">{user?.full_name}</p>
+                                    <p className="text-xs text-gray-500 mt-0.5 font-medium">{user?.full_name}</p>
                                 </div>
                                 <button
                                     onClick={() => setSidebarOpen(false)}
-                                    className="lg:hidden p-2 rounded-lg hover:bg-slate-100"
+                                    className="lg:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-500"
                                 >
-                                    <X className="w-5 h-5 text-slate-500" />
+                                    <X className="w-5 h-5" />
                                 </button>
                             </div>
 
                             {/* Quick Action */}
                             <Link
                                 href="/sell/create"
-                                className="mt-4 flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-[#ff385c] text-white rounded-lg font-semibold hover:bg-[#d9324e] transition-all duration-200 shadow-sm hover:shadow-md text-sm"
+                                className="mt-6 flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-gray-900 border border-gray-800 text-white !text-white rounded-xl font-semibold hover:bg-gray-800 transition-all duration-200 shadow-sm text-sm"
                             >
-                                <Plus className="w-4 h-4" />
-                                New Listing
+                                <Plus className="w-4 h-4 text-white" />
+                                <span className="text-white">New Listing</span>
                             </Link>
                         </div>
 
                         {/* Navigation */}
-                        <nav className="px-4 py-4 space-y-1 overflow-y-auto h-[calc(100%-14rem)]">
+                        <nav className="px-4 py-4 space-y-1.5 overflow-y-auto h-[calc(100%-14rem)]">
                             {navItems.map((item) => {
                                 const Icon = item.icon;
                                 const active = isActive(item.href);
@@ -127,8 +127,8 @@ export default function SellerDashboardLayout({
                                         <span className="font-medium">{item.label}</span>
                                         {item.badge && item.badge > 0 && (
                                             <span className={`
-                                            ml-auto px-2 py-0.5 text-xs font-bold rounded-full
-                                            ${active ? 'bg-rose-100 text-[#ff385c]' : 'bg-slate-100 text-slate-600'}
+                                            ml-auto px-2 py-0.5 text-xs font-semibold rounded-full
+                                            ${active ? 'bg-rose-100 text-[#ff385c]' : 'bg-gray-100 text-gray-600'}
                                         `}>
                                                 {item.badge}
                                             </span>

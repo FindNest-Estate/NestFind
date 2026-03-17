@@ -64,6 +64,27 @@ function formatTime(dateString: string): string {
     }
 }
 
+// Helper to determine if a message should show a date divider
+function shouldShowDateDivider(currentMsg: Message, prevMsg: Message | null): boolean {
+    if (!prevMsg) return true;
+    
+    const currDate = new Date(currentMsg.created_at).toDateString();
+    const prevDate = new Date(prevMsg.created_at).toDateString();
+    
+    return currDate !== prevDate;
+}
+
+// Helper to format date for the divider (e.g., "Today", "Yesterday", "Mar 12")
+function formatDateDivider(dateString: string): string {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffDays = Math.floor((now.setHours(0,0,0,0) - date.setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export default function MessagesPage() {
     const searchParams = useSearchParams();
     const activeId = searchParams.get('id');
@@ -79,6 +100,7 @@ export default function MessagesPage() {
     const [isSending, setIsSending] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const wsRef = useRef<WebSocket | null>(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -108,6 +130,109 @@ export default function MessagesPage() {
         }
         load();
     }, [activeId]);
+
+    // WebSocket Integration
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        // Clean up previous connection if any
+        if (wsRef.current) {
+            wsRef.current.close();
+        }
+
+        const wsUrl = `ws://localhost:8000/api/ws/user?token=${token}`;
+        const ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+            console.log('WebSocket connected');
+            // Start ping loop to keep alive
+            const pingInterval = setInterval(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send('ping');
+                }
+            }, 30000);
+            (ws as any)._pingInterval = pingInterval;
+        };
+
+        ws.onmessage = (event) => {
+            if (event.data === 'pong') return;
+
+            try {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'new_message') {
+                    // 1. Update active message thread if it belongs to the current conversation
+                    setMessages(prev => {
+                        // We check activeConversation.id inside the setter to get latest state context
+                        // but since we can't easily access the current activeConversation state inside here accurately without adding it to dependencies (which resets WS),
+                        // we use a trick: we compare against the `conversation_id` in the payload.
+                        // Actually, better approach: use a ref for activeConversationId or just rely on the fact that if the message belongs here, we insert it.
+                        return prev;
+                    });
+                    
+                    // The safe way to access current state inside event listener without recreating the listener
+                    setActiveConversation(currActive => {
+                        if (currActive?.id === data.conversation_id) {
+                            // Only append if it's not already there (prevent duplicates if REST call was slightly faster)
+                            setMessages(prevMsgs => {
+                                if (!prevMsgs.find(m => m.id === data.message.id)) {
+                                    return [...prevMsgs, data.message];
+                                }
+                                return prevMsgs;
+                            });
+                            
+                            // Mark read automatically since user is looking at it
+                            put(`/conversations/${data.conversation_id}/read`, {}).catch(console.error);
+                        }
+                        return currActive;
+                    });
+
+                    // 2. Update conversation list sidebar
+                    setConversations(prev => {
+                        return prev.map(conv => {
+                            if (conv.id === data.conversation_id) {
+                                return {
+                                    ...conv,
+                                    last_message: data.message.content,
+                                    last_message_at: data.message.created_at,
+                                    // Only increment unread if it's not the active conversation
+                                    unread_count: (activeConversation?.id !== data.conversation_id) 
+                                        ? conv.unread_count + 1 
+                                        : conv.unread_count
+                                };
+                            }
+                            return conv;
+                        });
+                    });
+                }
+            } catch (err) {
+                console.error('Error parsing websocket message:', err);
+            }
+        };
+
+        ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+
+        ws.onclose = () => {
+            console.log('WebSocket disconnected');
+            if ((ws as any)._pingInterval) {
+                clearInterval((ws as any)._pingInterval);
+            }
+        };
+
+        wsRef.current = ws;
+
+        return () => {
+            if (wsRef.current) {
+                if ((wsRef.current as any)._pingInterval) {
+                    clearInterval((wsRef.current as any)._pingInterval);
+                }
+                wsRef.current.close();
+            }
+        };
+    }, []); // Empty dependency array means this runs once on mount
 
     // Load messages when conversation selected
     const loadMessages = useCallback(async (convId: string) => {
@@ -144,14 +269,40 @@ export default function MessagesPage() {
         setIsSending(true);
 
         try {
-            await post(`/conversations/${activeConversation.id}/messages`, { content });
-            // Refresh messages
-            await loadMessages(activeConversation.id);
+            // Optimistic update
+            const optimisticMsg: Message = {
+                id: `temp-${Date.now()}`,
+                sender_id: 'me', // Real ID will come from backend
+                sender_name: 'Me',
+                content: content,
+                is_own: true,
+                read_at: null,
+                created_at: new Date().toISOString()
+            };
+            
+            setMessages(prev => [...prev, optimisticMsg]);
+            
+            // Update sidebar optimistically
+            setConversations(prev => prev.map(c => 
+                c.id === activeConversation.id 
+                    ? { ...c, last_message: content, last_message_at: new Date().toISOString() }
+                    : c
+            ));
+
+            const response = await post<{ message_id: string }>(`/conversations/${activeConversation.id}/messages`, { content });
+            
+            // Replace optimistic ID with real ID
+            setMessages(prev => prev.map(m => 
+                m.id === optimisticMsg.id ? { ...m, id: response.message_id } : m
+            ));
         } catch (err: any) {
             setError(err?.message || 'Failed to send message');
-            setNewMessage(content); // Restore message on error
+            // Remove optimistic message on failure
+            setMessages(prev => prev.filter(m => !m.id.startsWith('temp-')));
+            setNewMessage(content); // Restore message
         } finally {
             setIsSending(false);
+            scrollToBottom();
         }
     };
 
@@ -164,11 +315,15 @@ export default function MessagesPage() {
     }
 
     return (
-        <div className="flex h-[calc(100vh-8rem)] bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="flex h-[calc(100vh-8rem)] glass-card border border-white/60 bg-white/40 backdrop-blur-xl rounded-2xl overflow-hidden shadow-xl drop-shadow-sm">
+            {/* Background Ambient Glow */}
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 via-transparent to-[var(--color-brand)]/5 pointer-events-none -z-10" />
+
             {/* Conversation List */}
-            <div className={`w-full md:w-80 border-r border-gray-200 flex flex-col ${activeConversation ? 'hidden md:flex' : 'flex'}`}>
-                <div className="p-4 border-b border-gray-200">
-                    <h1 className="text-lg font-bold text-gray-900">Messages</h1>
+            <div className={`w-full md:w-80 lg:w-96 border-r border-white/50 bg-white/60 flex flex-col relative z-10 ${activeConversation ? 'hidden md:flex' : 'flex'}`}>
+                <div className="p-5 border-b border-gray-100/50 bg-white/40 backdrop-blur">
+                    <h1 className="text-xl font-black text-gray-900 tracking-tight">Messages</h1>
+                    <p className="text-xs font-semibold text-gray-500 mt-1 uppercase tracking-widest">Inbox</p>
                 </div>
 
                 {conversations.length === 0 ? (
@@ -185,36 +340,41 @@ export default function MessagesPage() {
                             <button
                                 key={conv.id}
                                 onClick={() => handleSelectConversation(conv)}
-                                className={`w-full p-4 flex gap-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-100 ${activeConversation?.id === conv.id ? 'bg-emerald-50 border-l-4 border-l-emerald-600' : ''
-                                    }`}
+                                className={`w-full p-4 flex gap-4 transition-all text-left border-b border-white hover:bg-white/80 ${
+                                    activeConversation?.id === conv.id 
+                                        ? 'bg-white shadow-sm border-l-4 border-l-indigo-600' 
+                                        : 'bg-white/30'
+                                }`}
                             >
-                                <div className="w-10 h-10 bg-emerald-100 rounded-full flex-shrink-0 flex items-center justify-center">
-                                    <User className="w-5 h-5 text-emerald-600" />
+                                <div className={`w-12 h-12 rounded-2xl flex-shrink-0 flex items-center justify-center border shadow-sm ${activeConversation?.id === conv.id ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-gradient-to-br from-indigo-50 to-white text-indigo-600 border-indigo-100'}`}>
+                                    <User className="w-5 h-5" />
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex justify-between items-start">
-                                        <span className="font-medium text-gray-900 truncate">{conv.other_party.name}</span>
+                                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                    <div className="flex justify-between items-baseline mb-1">
+                                        <span className={`font-bold text-[15px] truncate ${conv.unread_count > 0 ? 'text-gray-900' : 'text-gray-800'}`}>{conv.other_party.name}</span>
                                         {conv.last_message_at && (
-                                            <span className="text-xs text-gray-400 ml-2 flex-shrink-0">
+                                            <span className={`text-[10px] font-black tracking-widest uppercase ml-2 flex-shrink-0 ${conv.unread_count > 0 ? 'text-indigo-600' : 'text-gray-400'}`}>
                                                 {formatTime(conv.last_message_at)}
                                             </span>
                                         )}
                                     </div>
                                     {conv.property_title && (
-                                        <div className="flex items-center gap-1 text-xs text-emerald-600 mt-0.5">
+                                        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md w-fit mb-1 border border-indigo-100/50 shadow-sm">
                                             <Home className="w-3 h-3" />
                                             <span className="truncate">{conv.property_title}</span>
                                         </div>
                                     )}
-                                    <p className="text-sm text-gray-500 truncate mt-0.5">
-                                        {conv.last_message || 'No messages yet'}
-                                    </p>
-                                </div>
-                                {conv.unread_count > 0 && (
-                                    <div className="w-5 h-5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
-                                        {conv.unread_count}
+                                    <div className="flex items-center justify-between gap-3">
+                                        <p className={`text-xs truncate ${conv.unread_count > 0 ? 'text-gray-900 font-semibold text-sm' : 'text-gray-500 font-medium'}`}>
+                                            {conv.last_message || 'No messages yet'}
+                                        </p>
+                                        {conv.unread_count > 0 && (
+                                            <div className="w-5 h-5 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 shadow-md">
+                                                {conv.unread_count}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
+                                </div>
                             </button>
                         ))}
                     </div>
@@ -222,28 +382,28 @@ export default function MessagesPage() {
             </div>
 
             {/* Message Thread */}
-            <div className={`flex-1 flex flex-col ${activeConversation ? 'flex' : 'hidden md:flex'}`}>
+            <div className={`flex-1 flex flex-col relative z-10 ${activeConversation ? 'flex' : 'hidden md:flex'}`}>
                 {activeConversation ? (
                     <>
                         {/* Header */}
-                        <div className="p-4 border-b border-gray-200 flex items-center gap-3">
+                        <div className="p-4 md:px-6 border-b border-white/60 bg-white/60 backdrop-blur-md flex items-center gap-4 py-5 shadow-sm">
                             <button
                                 onClick={() => setActiveConversation(null)}
-                                className="md:hidden p-1 text-gray-500 hover:bg-gray-100 rounded"
+                                className="md:hidden p-2 text-gray-500 hover:bg-white hover:shadow-sm rounded-xl transition-all"
                             >
                                 <ArrowLeft className="w-5 h-5" />
                             </button>
-                            <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
-                                <User className="w-5 h-5 text-emerald-600" />
+                            <div className="w-12 h-12 bg-white rounded-2xl border border-gray-100 shadow-sm flex items-center justify-center text-indigo-600">
+                                <User className="w-6 h-6" />
                             </div>
                             <div>
-                                <div className="font-medium text-gray-900">{activeConversation.other_party.name}</div>
-                                <div className="text-xs text-gray-500">{activeConversation.other_party.role}</div>
+                                <div className="font-black text-lg text-gray-900 tracking-tight">{activeConversation.other_party.name}</div>
+                                <div className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">{activeConversation.other_party.role}</div>
                             </div>
                         </div>
 
                         {/* Messages */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-white/20">
                             {isLoadingMsgs ? (
                                 <div className="flex justify-center py-8">
                                     <Loader2 className="w-6 h-6 text-emerald-600 animate-spin" />
@@ -254,57 +414,71 @@ export default function MessagesPage() {
                                     <p>No messages yet. Say hello!</p>
                                 </div>
                             ) : (
-                                messages.map(msg => (
-                                    <div
-                                        key={msg.id}
-                                        className={`flex ${msg.is_own ? 'justify-end' : 'justify-start'}`}
-                                    >
-                                        <div className={`max-w-[70%] rounded-2xl px-4 py-2 ${msg.is_own
-                                                ? 'bg-emerald-600 text-white'
-                                                : 'bg-gray-100 text-gray-900'
-                                            }`}>
-                                            <p className="whitespace-pre-wrap">{msg.content}</p>
-                                            <div className={`text-xs mt-1 ${msg.is_own ? 'text-emerald-200' : 'text-gray-400'}`}>
-                                                {formatTime(msg.created_at)}
+                                messages.map((msg, index) => {
+                                    const showDivider = shouldShowDateDivider(msg, index > 0 ? messages[index - 1] : null);
+                                    
+                                    return (
+                                        <React.Fragment key={msg.id}>
+                                            {showDivider && (
+                                                <div className="flex justify-center my-6">
+                                                    <span className="px-3 py-1 bg-white/60 backdrop-blur border border-white/50 shadow-sm text-[10px] font-black tracking-widest uppercase text-indigo-400 rounded-full">
+                                                        {formatDateDivider(msg.created_at)}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <div
+                                                className={`flex ${msg.is_own ? 'justify-end' : 'justify-start'}`}
+                                            >
+                                                <div className={`max-w-[75%] rounded-2xl px-5 py-3 shadow-sm ${msg.is_own
+                                                        ? 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-tr-sm border border-indigo-700/50'
+                                                        : 'bg-white text-gray-900 rounded-tl-sm border border-white'
+                                                    }`}>
+                                                    <p className="whitespace-pre-wrap text-[15px] font-medium leading-relaxed">{msg.content}</p>
+                                                    <div className={`text-[10px] font-bold tracking-widest uppercase mt-2 text-right ${msg.is_own ? 'text-indigo-200' : 'text-gray-400'}`}>
+                                                        {new Date(msg.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </div>
-                                ))
+                                        </React.Fragment>
+                                    );
+                                })
                             )}
                             <div ref={messagesEndRef} />
                         </div>
 
                         {/* Input */}
-                        <div className="p-4 border-t border-gray-200">
-                            <div className="flex gap-2">
+                        <div className="p-4 md:p-5 border-t border-white/60 bg-white/70 backdrop-blur-md">
+                            <div className="flex gap-3 relative">
                                 <input
                                     type="text"
                                     value={newMessage}
                                     onChange={(e) => setNewMessage(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                                    placeholder="Type a message..."
-                                    className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                    placeholder="Type your message..."
+                                    className="flex-1 px-6 py-3.5 bg-white border border-gray-100 shadow-inner rounded-full focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-300 font-medium text-gray-900 placeholder:text-gray-400 transition-all outline-none"
                                 />
                                 <button
                                     onClick={handleSendMessage}
                                     disabled={!newMessage.trim() || isSending}
-                                    className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 disabled:opacity-50"
+                                    className="p-3.5 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 shadow-md transition-all flex items-center justify-center min-w-[52px]"
                                 >
                                     {isSending ? (
                                         <Loader2 className="w-5 h-5 animate-spin" />
                                     ) : (
-                                        <Send className="w-5 h-5" />
+                                        <Send className="w-5 h-5 -ml-0.5" />
                                     )}
                                 </button>
                             </div>
                         </div>
                     </>
                 ) : (
-                    <div className="flex-1 flex items-center justify-center text-gray-400">
-                        <div className="text-center">
-                            <MessageCircle className="w-16 h-16 mx-auto mb-4" />
-                            <p className="text-lg font-medium">Select a conversation</p>
-                            <p className="text-sm mt-1">Choose from your existing conversations</p>
+                    <div className="flex-1 flex items-center justify-center text-gray-400 bg-white/20">
+                        <div className="text-center bg-white/60 backdrop-blur-md p-10 rounded-3xl border border-white shadow-sm max-w-sm mx-auto">
+                            <div className="w-20 h-20 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center justify-center mx-auto mb-5 shadow-inner">
+                                <MessageCircle className="w-10 h-10 text-indigo-400" />
+                            </div>
+                            <p className="text-xl font-black text-gray-900 tracking-tight">Select a conversation</p>
+                            <p className="text-[13px] font-medium text-gray-500 mt-2 leading-relaxed">Choose from your existing conversations in the inbox to continue chatting.</p>
                         </div>
                     </div>
                 )}

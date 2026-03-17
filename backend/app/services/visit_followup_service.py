@@ -8,7 +8,7 @@ Manages post-visit follow-up workflows for agents and buyers:
 """
 from typing import Dict, Any, Optional, List
 from uuid import UUID
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 import asyncpg
 
 from .notifications_service import NotificationsService
@@ -322,7 +322,8 @@ class VisitFollowUpService:
         notifications_sent = 0
 
         async with self.db.acquire() as conn:
-            now = datetime.now(timezone.utc)
+            # Use naive UTC to match TIMESTAMP columns stored without tz info.
+            now = datetime.utcnow()
 
             # --- 2-hour reminders ---
             two_hours_ago = now - timedelta(hours=2)
@@ -415,3 +416,4 @@ class VisitFollowUpService:
             "success": True,
             "notifications_sent": notifications_sent
         }
+

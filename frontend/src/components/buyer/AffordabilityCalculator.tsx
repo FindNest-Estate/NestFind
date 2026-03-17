@@ -6,9 +6,9 @@ import { Calculator, DollarSign, Percent, ChevronDown, ChevronUp } from 'lucide-
 
 export default function AffordabilityCalculator() {
     const [isExpanded, setIsExpanded] = useState(false);
-    const [homePrice, setHomePrice] = useState(400000);
+    const [homePrice, setHomePrice] = useState(15000000); // 1.5 Cr
     const [downPayment, setDownPayment] = useState(20); // percentage
-    const [interestRate, setInterestRate] = useState(7.0);
+    const [interestRate, setInterestRate] = useState(8.5);
     const [loanTerm, setLoanTerm] = useState(30);
 
     // Calculate monthly payment
@@ -59,13 +59,17 @@ export default function AffordabilityCalculator() {
                     <div>
                         <p className="text-sm font-medium text-gray-600">Estimated Monthly Payment</p>
                         <p className="text-2xl font-bold text-emerald-600 mt-1">
-                            ${Math.round(totalMonthly).toLocaleString()}
+                            ₹{Math.round(totalMonthly).toLocaleString('en-IN')}
                             <span className="text-sm font-normal text-gray-500">/mo</span>
                         </p>
                     </div>
                     <div className="text-right">
                         <p className="text-xs text-gray-500">Home Price</p>
-                        <p className="text-lg font-bold text-gray-900">${(homePrice / 1000).toFixed(0)}K</p>
+                        <p className="text-lg font-bold text-gray-900">
+                            {homePrice >= 10000000 
+                                ? `₹${(homePrice / 10000000).toFixed(1)}Cr` 
+                                : `₹${(homePrice / 100000).toFixed(1)}L`}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -97,16 +101,16 @@ export default function AffordabilityCalculator() {
                                 </label>
                                 <input
                                     type="range"
-                                    min="100000"
-                                    max="2000000"
-                                    step="10000"
+                                    min="1000000"
+                                    max="150000000"
+                                    step="500000"
                                     value={homePrice}
                                     onChange={(e) => setHomePrice(Number(e.target.value))}
                                     className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
                                 />
                                 <div className="flex justify-between text-xs text-gray-400 mt-1">
-                                    <span>$100K</span>
-                                    <span>$2M</span>
+                                    <span>₹10L</span>
+                                    <span>₹15Cr</span>
                                 </div>
                             </div>
 
@@ -125,7 +129,7 @@ export default function AffordabilityCalculator() {
                                             className="w-16 px-3 py-1.5 text-sm font-medium text-right border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                                         />
                                         <span className="text-sm text-gray-500">
-                                            (${(downPaymentAmount / 1000).toFixed(0)}K)
+                                            (₹{downPaymentAmount >= 10000000 ? `${(downPaymentAmount / 10000000).toFixed(2)}Cr` : `${(downPaymentAmount / 100000).toFixed(1)}L`})
                                         </span>
                                     </div>
                                 </label>
@@ -186,7 +190,7 @@ export default function AffordabilityCalculator() {
                                 <p className="text-xs font-medium text-gray-600 mb-1">Income Recommendation</p>
                                 <p className="text-sm text-gray-700">
                                     Suggested annual income: <span className="font-bold text-indigo-700">
-                                        ${Math.round((totalMonthly * 12) / 0.28).toLocaleString()}
+                                        ₹{Math.round((totalMonthly * 12) / 0.28).toLocaleString('en-IN')}
                                     </span>
                                 </p>
                                 <p className="text-xs text-gray-500 mt-1">Based on 28% debt-to-income ratio</p>
@@ -213,7 +217,7 @@ function PaymentRow({ label, amount, isTotal = false, badge }: { label: string; 
                 )}
             </div>
             <span className={`text-sm ${isTotal ? 'font-bold text-emerald-700 text-lg' : 'font-medium text-gray-900'}`}>
-                ${Math.round(amount).toLocaleString()}
+                ₹{Math.round(amount).toLocaleString('en-IN')}
             </span>
         </div>
     );

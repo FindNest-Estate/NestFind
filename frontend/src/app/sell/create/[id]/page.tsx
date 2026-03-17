@@ -17,3 +17,5 @@ export default async function PropertyEditorPage({ params }: PropertyEditorPageP
     const { id } = await params;
     return <PropertyEditor propertyId={id} />;
 }
+
+

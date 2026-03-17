@@ -136,30 +136,32 @@ export default function SellerOffersPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100/60 pb-6 mb-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <HandCoins className="w-7 h-7 text-[#ff385c]" />
+                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3 tracking-tight">
+                        <div className="p-2.5 bg-gradient-to-br from-[#FF385C] to-rose-500 rounded-2xl shadow-sm">
+                            <HandCoins className="w-6 h-6 text-white" />
+                        </div>
                         Offers
                         {pendingCount > 0 && (
-                            <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 text-sm font-semibold rounded-full">
-                                {pendingCount} pending
+                            <span className="ml-2 px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[11px] font-bold uppercase tracking-widest rounded-full shadow-sm">
+                                {pendingCount} Pending
                             </span>
                         )}
                     </h1>
-                    <p className="text-slate-500 mt-1">Manage offers from interested buyers</p>
+                    <p className="text-sm font-medium text-gray-500 mt-2">Manage offers from interested buyers</p>
                 </div>
             </div>
 
             {/* Filters */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 mb-8">
                 {['ALL', 'PENDING', 'ACCEPTED', 'REJECTED', 'COUNTERED'].map((filter) => (
                     <button
                         key={filter}
                         onClick={() => setActiveFilter(filter)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeFilter === filter
-                            ? 'bg-slate-900 text-white shadow-md'
-                            : 'bg-white/70 text-slate-600 hover:bg-white hover:shadow-md border border-slate-200/50'
+                        className={`px-5 py-3 rounded-xl text-sm font-bold transition-all shadow-sm ${activeFilter === filter
+                            ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-indigo-500/20 shadow-lg -translate-y-0.5 border-transparent'
+                            : 'bg-white/90 backdrop-blur-lg text-gray-600 hover:text-gray-900 border border-gray-200/60 hover:border-gray-300 hover:bg-white'
                             }`}
                     >
                         {filter === 'ALL' ? 'All Offers' : filter.charAt(0) + filter.slice(1).toLowerCase()}
@@ -169,12 +171,12 @@ export default function SellerOffersPage() {
 
             {/* Offers List */}
             {offers.length === 0 ? (
-                <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 p-12 text-center shadow-sm">
-                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <HandCoins className="w-8 h-8 text-slate-400" />
+                <div className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-100 p-16 text-center shadow-sm">
+                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                        <HandCoins className="w-10 h-10 text-gray-300" />
                     </div>
-                    <h3 className="text-lg font-semibold text-slate-800">No offers yet</h3>
-                    <p className="text-slate-500 mt-2">When buyers make offers on your properties, they will appear here</p>
+                    <h3 className="text-xl font-bold text-gray-900 mb-3 tracking-tight">No offers yet</h3>
+                    <p className="text-gray-500 font-medium max-w-md mx-auto">When buyers make offers on your properties, they will appear here</p>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -185,65 +187,74 @@ export default function SellerOffersPage() {
                         return (
                             <div
                                 key={offer.id}
-                                className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 p-6 shadow-sm hover:shadow-lg transition-all"
+                                className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-100/60 p-6 shadow-sm hover:shadow-xl transition-all hover:-translate-y-1 group relative overflow-hidden"
                             >
-                                <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 rounded-full -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                                <div className="flex flex-col lg:flex-row lg:items-center gap-6 relative z-10">
                                     {/* Property Info */}
-                                    <div className="flex items-center gap-4 flex-1 min-w-0">
-                                        <div className="w-20 h-16 bg-slate-100 rounded-xl overflow-hidden flex-shrink-0">
+                                    <div className="flex items-center gap-5 flex-1 min-w-0">
+                                        <div className="w-24 h-20 bg-gray-100 rounded-2xl overflow-hidden flex-shrink-0 shadow-sm">
                                             {offer.property.thumbnail_url ? (
                                                 <img
                                                     src={offer.property.thumbnail_url}
                                                     alt={offer.property.title}
-                                                    className="w-full h-full object-cover"
+                                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
                                                 />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center">
-                                                    <Home className="w-6 h-6 text-slate-400" />
+                                                    <div className="p-3 bg-gray-50 border border-gray-100 rounded-2xl group-hover:scale-110 transition-transform shadow-sm">
+                                                        <HandCoins className="w-6 h-6 text-gray-500" />
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
                                         <div className="min-w-0">
-                                            <h3 className="font-semibold text-slate-800 truncate">{offer.property.title}</h3>
-                                            <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
-                                                <User className="w-4 h-4" />
+                                            <h3 className="font-bold text-gray-900 text-lg truncate tracking-tight">{offer.property.title}</h3>
+                                            <div className="flex items-center gap-2 mt-2 text-sm font-medium text-gray-500">
+                                                <User className="w-4 h-4 text-gray-400" />
                                                 <span className="truncate">{offer.buyer.name}</span>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Offer Details */}
-                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 lg:gap-8">
-                                        <div className="text-center">
-                                            <p className="text-xs text-slate-400 uppercase">Offered</p>
-                                            <p className="text-lg font-bold text-slate-800">{formatPrice(offer.offered_price)}</p>
+                                    <div className="flex flex-wrap items-center gap-8">
+                                        <div className="text-left sm:text-center">
+                                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">Offered Price</p>
+                                            <p className="text-xl font-bold text-gray-900 tracking-tight">{formatPrice(offer.offered_price)}</p>
                                         </div>
 
                                         {offer.counter_price && (
-                                            <div className="text-center">
-                                                <p className="text-xs text-slate-400 uppercase">Counter</p>
-                                                <p className="text-lg font-bold text-purple-600">{formatPrice(offer.counter_price)}</p>
-                                            </div>
+                                            <>
+                                                <ArrowRight className="w-5 h-5 text-gray-300 hidden md:block" />
+                                                <div className="text-left sm:text-center">
+                                                    <p className="text-[11px] font-bold text-purple-600 uppercase tracking-widest mb-1">Your Counter</p>
+                                                    <p className="text-xl font-bold text-purple-600 tracking-tight">{formatPrice(offer.counter_price)}</p>
+                                                </div>
+                                            </>
                                         )}
 
-                                        <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border ${status.bgColor}`}>
+                                        <div className={`inline-flex items-center gap-2 px-4 py-2 bg-white/50 backdrop-blur-md rounded-xl border font-bold text-[11px] uppercase tracking-widest shadow-sm ${status.bgColor}`}>
                                             <StatusIcon className={`w-4 h-4 ${status.color}`} />
-                                            <span className={`text-sm font-medium ${status.color}`}>{status.label}</span>
+                                            <span className={`${status.color}`}>{status.label}</span>
                                         </div>
 
-                                        <p className="text-sm text-slate-400">{formatDate(offer.created_at)}</p>
+                                        <div className="text-left sm:text-right hidden sm:block">
+                                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">Date</p>
+                                            <p className="text-sm font-bold text-gray-600">{formatDate(offer.created_at)}</p>
+                                        </div>
                                     </div>
 
                                     {/* Actions */}
                                     {offer.status === 'PENDING' && (
-                                        <div className="flex items-center gap-2 lg:ml-auto">
+                                        <div className="flex items-center gap-3 lg:ml-auto pt-6 lg:pt-0 border-t border-gray-100/60 lg:border-t-0 w-full lg:w-auto mt-6 lg:mt-0 relative z-10">
                                             <button
                                                 onClick={() => handleOfferAction(offer.id, 'ACCEPT')}
                                                 disabled={actionLoading === offer.id}
-                                                className="px-4 py-2 bg-[#ff385c] text-white rounded-lg font-medium hover:bg-[#d9324e] transition-colors disabled:opacity-50"
+                                                className="flex-1 lg:flex-none px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-bold hover:shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:transform-none disabled:shadow-none"
                                             >
                                                 {actionLoading === offer.id ? (
-                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                    <Loader2 className="w-5 h-5 animate-spin mx-auto" />
                                                 ) : (
                                                     'Accept'
                                                 )}
@@ -253,14 +264,14 @@ export default function SellerOffersPage() {
                                                     setSelectedOffer(offer);
                                                     setShowCounterModal(true);
                                                 }}
-                                                className="px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 transition-colors"
+                                                className="flex-1 lg:flex-none px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl font-bold hover:shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5 transition-all"
                                             >
                                                 Counter
                                             </button>
                                             <button
                                                 onClick={() => handleOfferAction(offer.id, 'REJECT')}
                                                 disabled={actionLoading === offer.id}
-                                                className="px-4 py-2 bg-red-100 text-red-600 rounded-lg font-medium hover:bg-red-200 transition-colors disabled:opacity-50"
+                                                className="flex-1 lg:flex-none px-6 py-3 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl font-bold hover:bg-rose-100 transition-colors disabled:opacity-50"
                                             >
                                                 Reject
                                             </button>
@@ -275,35 +286,35 @@ export default function SellerOffersPage() {
 
             {/* Counter Offer Modal */}
             {showCounterModal && selectedOffer && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
-                        <h3 className="text-xl font-bold text-slate-800 mb-4">Counter Offer</h3>
-                        <p className="text-slate-500 mb-4">
-                            Current offer: <span className="font-semibold text-slate-800">{formatPrice(selectedOffer.offered_price)}</span>
+                <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+                    <div className="bg-white/90 backdrop-blur-xl rounded-3xl border border-white/50 p-8 max-w-md w-full shadow-2xl">
+                        <h3 className="text-2xl font-black text-gray-900 mb-2 tracking-tight">Counter Offer</h3>
+                        <p className="text-sm font-medium text-gray-500 mb-8">
+                            Current offer: <span className="font-bold text-gray-900">{formatPrice(selectedOffer.offered_price)}</span>
                         </p>
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Your counter price</label>
-                            <div className="relative">
-                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                        <div className="mb-8">
+                            <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3">Your counter price</label>
+                            <div className="relative group">
+                                <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-purple-500 transition-colors" />
                                 <input
                                     type="number"
                                     value={counterPrice}
                                     onChange={(e) => setCounterPrice(e.target.value)}
                                     placeholder="Enter amount"
-                                    className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#ff385c] focus:border-[#ff385c]"
+                                    className="w-full pl-12 pr-4 py-4 bg-white border border-gray-200 shadow-sm rounded-xl focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 transition-all font-bold text-gray-900 text-lg placeholder:text-gray-300 placeholder:font-medium placeholder:text-base"
                                 />
                             </div>
                         </div>
-                        <div className="flex gap-3">
+                        <div className="flex gap-4">
                             <button
                                 onClick={() => handleOfferAction(selectedOffer.id, 'COUNTER')}
                                 disabled={!counterPrice || actionLoading === selectedOffer.id}
-                                className="flex-1 px-4 py-3 bg-purple-500 text-white rounded-xl font-medium hover:bg-purple-600 transition-colors disabled:opacity-50"
+                                className="flex-1 px-6 py-4 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl font-bold hover:shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:transform-none disabled:shadow-none"
                             >
                                 {actionLoading === selectedOffer.id ? (
                                     <Loader2 className="w-5 h-5 animate-spin mx-auto" />
                                 ) : (
-                                    'Send Counter Offer'
+                                    'Send Counter'
                                 )}
                             </button>
                             <button
@@ -312,7 +323,7 @@ export default function SellerOffersPage() {
                                     setCounterPrice('');
                                     setSelectedOffer(null);
                                 }}
-                                className="px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-medium hover:bg-slate-200 transition-colors"
+                                className="px-6 py-4 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-colors"
                             >
                                 Cancel
                             </button>

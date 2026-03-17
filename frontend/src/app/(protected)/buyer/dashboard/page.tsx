@@ -77,18 +77,19 @@ export default function BuyerDashboardPage() {
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 space-y-8">
 
                 {/* Header Section: Welcome & High-Level Pulse */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-[var(--gray-200)]">
+                <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-gray-100">
+                    <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-brand)]/5 via-transparent to-transparent -z-10 blur-3xl rounded-full opacity-60" />
                     <div>
-                        <h1 className="text-3xl font-bold text-[var(--gray-900)] tracking-tight">
+                        <h1 className="text-3xl font-black text-gray-900 tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600">
                             Welcome back, {userName}
                         </h1>
-                        <p className="text-[var(--gray-600)] mt-1">
+                        <p className="text-gray-500 font-medium mt-1">
                             Here is where you stand on your journey to homeownership.
                         </p>
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <Link href="/properties" className="btn-primary flex items-center gap-2">
+                        <Link href="/properties" className="btn-primary shadow-lg shadow-[var(--color-brand)]/20 hover:-translate-y-0.5 transition-all flex items-center gap-2">
                             <Search className="w-4 h-4" /> Start Browsing
                         </Link>
                     </div>
@@ -128,20 +129,23 @@ export default function BuyerDashboardPage() {
 
                             {/* Full width bottom row for Timeline */}
                             <div className="space-y-6 lg:col-span-2">
-                                <div className="bg-white rounded-[var(--card-radius)] border border-[var(--gray-200)] p-5">
-                                    <div className="flex justify-between items-center mb-6">
+                                <div className="glass-card border border-white/60 p-6 relative overflow-hidden backdrop-blur-xl">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-transparent to-transparent opacity-50" />
+                                    <div className="flex justify-between items-center mb-6 relative">
                                         <div>
-                                            <h2 className="text-base font-bold text-[var(--gray-900)] flex items-center gap-2">
-                                                <Clock className="w-5 h-5 text-[var(--color-brand)]" />
+                                            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                                                <Clock className="w-5 h-5 text-blue-500" />
                                                 Transaction Timeline
                                             </h2>
-                                            <p className="text-sm text-[var(--gray-500)] mt-1">A chronogical history of your tours and offers.</p>
+                                            <p className="text-sm font-medium text-gray-500 mt-1">A chronogical history of your tours and offers.</p>
                                         </div>
-                                        <Link href="/offers" className="text-sm font-medium text-[var(--color-brand)] hover:underline">
-                                            View full history
+                                        <Link href="/offers" className="text-xs font-bold uppercase tracking-widest text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-full hover:bg-blue-100 transition-colors">
+                                            Full History
                                         </Link>
                                     </div>
-                                    <RecentActivityTimeline items={activity} />
+                                    <div className="relative z-10">
+                                        <RecentActivityTimeline items={activity} />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -154,46 +158,43 @@ export default function BuyerDashboardPage() {
                         <RecentConversationsWidget />
 
                         {/* Recommendations */}
-                        <div className="bg-white rounded-[var(--card-radius)] border border-[var(--gray-200)] p-5">
-                            <h2 className="text-sm font-bold text-[var(--gray-900)] mb-4 flex items-center gap-2">
-                                <Home className="w-4 h-4 text-[var(--color-brand)]" />
-                                Recommended
+                        <div className="glass-card border border-white/60 p-6 backdrop-blur-xl">
+                            <h2 className="text-base font-bold text-gray-900 mb-5 flex items-center gap-2">
+                                <Home className="w-5 h-5 text-indigo-500" />
+                                Recommended for You
                             </h2>
                             <div className="space-y-4">
                                 {recommended.map(property => (
-                                    <Link href={`/properties/${property.id}`} key={property.id} className="group block">
-                                        <div className="relative aspect-[4/3] rounded-[var(--radius-sm)] overflow-hidden mb-2">
+                                    <Link href={`/properties/${property.id}`} key={property.id} className="group block mb-5 last:mb-0">
+                                        <div className="relative aspect-[4/3] rounded-2xl overflow-hidden mb-3 border border-white/50 shadow-sm group-hover:shadow-md transition-all">
                                             <div
-                                                className="absolute inset-0 bg-cover bg-center group-hover:scale-105 transition-transform duration-500"
+                                                className="absolute inset-0 bg-cover bg-center group-hover:scale-105 transition-transform duration-700"
                                                 style={{ backgroundImage: `url(${getImageUrl(property.image) || '/placeholder-house.jpg'})` }}
                                             />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                                            <div className="absolute bottom-2 left-2 right-2 text-white">
-                                                <p className="font-bold text-lg">${property.price.toLocaleString()}</p>
-                                                <p className="text-[11px] font-medium opacity-90">{property.specs}</p>
-                                            </div>
-                                            <div className="absolute top-2 right-2 px-2 py-0.5 bg-[var(--color-success)] text-white text-[10px] font-bold rounded-full">
-                                                95% Match
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                                            <div className="absolute bottom-3 left-3 right-3 text-white">
+                                                <p className="font-black text-xl tracking-tight leading-none mb-1 text-white/90">₹{property.price.toLocaleString('en-IN')}</p>
+                                                <p className="text-[10px] font-bold uppercase tracking-widest opacity-80">{property.specs}</p>
                                             </div>
                                         </div>
-                                        <h3 className="font-semibold text-sm text-[var(--gray-900)] group-hover:text-[var(--color-brand)] transition-colors truncate">
+                                        <h3 className="font-bold text-[15px] text-gray-900 group-hover:text-indigo-600 transition-colors truncate">
                                             {property.title}
                                         </h3>
-                                        <div className="flex items-center gap-1 text-[11px] text-[var(--gray-500)] mt-0.5">
-                                            <MapPin className="w-3 h-3" />
+                                        <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mt-1">
+                                            <MapPin className="w-3.5 h-3.5" />
                                             {property.location}
                                         </div>
                                     </Link>
                                 ))}
                                 {recommended.length === 0 && (
-                                    <div className="text-center py-6 bg-[var(--gray-50)] rounded-[var(--radius-sm)]">
-                                        <Home className="w-8 h-8 text-[var(--gray-300)] mx-auto mb-2" />
-                                        <p className="text-xs text-[var(--gray-500)]">No recommendations yet</p>
+                                    <div className="text-center py-8 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                                        <Home className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                                        <p className="text-sm font-medium text-gray-500">No recommendations yet</p>
                                     </div>
                                 )}
                             </div>
                             <Link href="/properties"
-                                className="block w-full text-center py-2.5 border border-[var(--gray-200)] rounded-[var(--radius-sm)] text-xs font-semibold text-[var(--gray-700)] hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] mt-4 transition-colors">
+                                className="block w-full text-center py-3 border border-gray-200 bg-gray-50 rounded-xl text-xs font-bold tracking-widest uppercase text-gray-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 mt-5 transition-all">
                                 View All Properties
                             </Link>
                         </div>
@@ -214,12 +215,13 @@ function StatCard({ icon: Icon, label, value, href }: {
 }) {
     return (
         <Link href={href} className="group block">
-            <div className="bg-white border border-[var(--gray-200)] rounded-[var(--card-radius)] p-5 hover:shadow-[var(--shadow-sm)] transition-shadow">
-                <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 rounded-[var(--radius-sm)] bg-[var(--color-brand-subtle)] flex items-center justify-center">
+            <div className="glass-card relative overflow-hidden backdrop-blur-xl p-6 border border-white/50 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                <div className="absolute -right-6 -top-6 w-24 h-24 bg-gradient-to-br from-[var(--color-brand)]/10 to-transparent rounded-full blur-2xl group-hover:from-[var(--color-brand)]/20 transition-colors" />
+                <div className="flex items-center justify-between mb-4 relative">
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[var(--color-brand-subtle)] to-[var(--color-brand)]/5 flex items-center justify-center border border-white/60 shadow-inner">
                         <Icon className="w-5 h-5 text-[var(--color-brand)]" />
                     </div>
-                    <ChevronRight className="w-4 h-4 text-[var(--gray-300)] group-hover:text-[var(--color-brand)] group-hover:translate-x-0.5 transition-all" />
+                    <ChevronRight className="w-4 h-4 text-[var(--gray-400)] group-hover:text-[var(--color-brand)] group-hover:translate-x-1 transition-all" />
                 </div>
                 <p className="text-2xl font-bold text-[var(--gray-900)] mb-0.5">{value}</p>
                 <p className="text-xs text-[var(--gray-500)] font-medium">{label}</p>

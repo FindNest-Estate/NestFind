@@ -74,15 +74,18 @@ function getEventDescription(event: DealEvent): string {
 export function DealTimeline({ events }: DealTimelineProps) {
     if (events.length === 0) {
         return (
-            <div className="text-center py-8 text-gray-400">
-                <Clock className="w-8 h-8 mx-auto mb-2" />
-                <p>No events recorded yet</p>
+            <div className="text-center py-10 px-4">
+                <div className="w-12 h-12 rounded-full mb-3 mx-auto bg-gray-50 flex items-center justify-center">
+                    <Clock className="w-6 h-6 text-gray-300" />
+                </div>
+                <p className="text-sm font-medium text-gray-500">No events recorded yet</p>
+                <p className="text-xs text-gray-400 mt-1">Timeline events will appear automatically.</p>
             </div>
         );
     }
 
     return (
-        <div className="space-y-0">
+        <div className="space-y-0 px-2">
             {events.map((event, index) => {
                 const Icon = EVENT_ICONS[event.event_type] || Circle;
                 const colors = EVENT_COLORS[event.event_type] || "text-gray-500 bg-gray-50 border-gray-200";
@@ -90,47 +93,48 @@ export function DealTimeline({ events }: DealTimelineProps) {
                 const isLast = index === events.length - 1;
 
                 return (
-                    <div key={event.id} className="relative flex gap-4">
+                    <div key={event.id} className="relative flex gap-4 group">
                         {/* Vertical connector */}
                         {!isLast && (
-                            <div className="absolute left-[15px] top-10 bottom-0 w-0.5 bg-gray-200" />
+                            <div className="absolute left-[15px] top-8 bottom-0 w-[2px] bg-gray-100 group-hover:bg-blue-100 transition-colors" />
                         )}
 
                         {/* Icon */}
                         <div
-                            className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center border flex-shrink-0 ${colors}`}
+                            className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center border-2 border-white shadow-sm flex-shrink-0 ${colors} group-hover:scale-110 transition-transform`}
                         >
-                            <Icon className="w-4 h-4" />
+                            <Icon className="w-3.5 h-3.5" />
                         </div>
 
                         {/* Content */}
-                        <div className={`flex-1 pb-6 ${isLast ? "" : ""}`}>
-                            <div className="flex items-start justify-between gap-2">
-                                <div>
-                                    <p className="font-medium text-gray-900 text-sm">
+                        <div className={`flex-1 pb-8 ${isLast ? "" : ""}`}>
+                            <div className="flex items-start justify-between gap-3 bg-white p-3 rounded-xl border border-transparent group-hover:border-gray-100 group-hover:shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-all">
+                                <div className="flex-1">
+                                    <p className="font-bold text-gray-900 text-sm tracking-tight group-hover:text-blue-700 transition-colors">
                                         {getEventDescription(event)}
                                     </p>
                                     {event.notes && (
-                                        <p className="text-sm text-gray-500 mt-0.5">{event.notes}</p>
+                                        <p className="text-xs text-gray-500 mt-1 leading-relaxed bg-gray-50 p-2 rounded-lg border border-gray-100/50">{event.notes}</p>
                                     )}
-                                </div>
-                                <span className="text-xs text-gray-400 whitespace-nowrap">
-                                    {format(new Date(event.created_at), "MMM d, h:mm a")}
-                                </span>
-                            </div>
 
-                            {/* Actor badge */}
-                            <div className="flex items-center gap-2 mt-1.5">
-                                <span
-                                    className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${roleBadge.bg} ${roleBadge.text}`}
-                                >
-                                    {event.actor_role}
-                                </span>
-                                {event.actor_name && (
-                                    <span className="text-xs text-gray-500">
-                                        {event.actor_name}
-                                    </span>
-                                )}
+                                    {/* Actor badge */}
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <span
+                                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest ${roleBadge.bg} ${roleBadge.text}`}
+                                        >
+                                            {event.actor_role}
+                                        </span>
+                                        {event.actor_name && (
+                                            <span className="text-xs font-semibold text-gray-500">
+                                                {event.actor_name}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 whitespace-nowrap group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                    {format(new Date(event.created_at), "MMM d, h:mm a")}
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -499,6 +499,7 @@ export interface AuditLogResponse {
 export interface AuditLogFilters {
     page?: number;
     per_page?: number;
+    search?: string;
     action?: string;
     user_id?: string;
     entity_type?: string;

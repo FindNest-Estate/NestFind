@@ -980,6 +980,10 @@ class DealService:
                        p.address as property_address, p.price as property_price,
                        p.type as property_type, p.status as property_status,
                        p.bedrooms, p.bathrooms, p.area_sqft,
+                       p.property_sub_type, p.floor_number, p.total_floors,
+                       p.property_age_years, p.balconies, p.parking_available,
+                       p.parking_count, p.furnishing_status, p.facing_direction,
+                       p.price_negotiable, p.maintenance_charges, p.ownership_type,
                        buyer.full_name as buyer_name,
                        seller.full_name as seller_name,
                        agent_user.full_name as agent_name,
@@ -1033,10 +1037,12 @@ class DealService:
                 "deal": {
                     **self._format_deal(deal, deal['property_title']),
                     "execution_stage": deal.get('execution_stage'),
+                    "pre_dispute_status": deal.get('pre_dispute_status'),
                     "is_frozen": deal.get('is_frozen', False),
                     "freeze_reason": deal.get('freeze_reason'),
                     "registration_date": deal.get('registration_date').isoformat() if deal.get('registration_date') else None,
                     "registration_notes": deal.get('registration_notes'),
+                    "agent_commission": float(deal['agent_commission']) if deal.get('agent_commission') else None,
                     "property": {
                         "id": str(deal['property_id']),
                         "title": deal['property_title'],
@@ -1047,7 +1053,19 @@ class DealService:
                         "status": deal['property_status'],
                         "bedrooms": deal.get('bedrooms'),
                         "bathrooms": deal.get('bathrooms'),
-                        "area_sqft": float(deal['area_sqft']) if deal.get('area_sqft') else None
+                        "area_sqft": float(deal['area_sqft']) if deal.get('area_sqft') else None,
+                        "property_sub_type": deal.get('property_sub_type'),
+                        "floor_number": deal.get('floor_number'),
+                        "total_floors": deal.get('total_floors'),
+                        "property_age_years": deal.get('property_age_years'),
+                        "balconies": deal.get('balconies'),
+                        "parking_available": deal.get('parking_available'),
+                        "parking_count": deal.get('parking_count'),
+                        "furnishing_status": deal.get('furnishing_status'),
+                        "facing_direction": deal.get('facing_direction'),
+                        "price_negotiable": deal.get('price_negotiable'),
+                        "maintenance_charges": float(deal['maintenance_charges']) if deal.get('maintenance_charges') else None,
+                        "ownership_type": deal.get('ownership_type')
                     },
                     "parties": {
                         "buyer": {
@@ -1548,12 +1566,13 @@ class DealService:
                 # Audit log
                 await conn.execute("""
                     INSERT INTO audit_logs (
-                        user_id, role, action, entity_type, entity_id,
+                        user_id, action, entity_type, entity_id,
                         ip_address, details
                     )
-                    VALUES ($1, $2, 'DEAL_CANCELLED', 'deal', $3, $4, $5)
-                """, actor_id, actor_role, deal_id, ip_address,
+                    VALUES ($1, 'DEAL_CANCELLED', 'deal', $2, $3, $4)
+                """, actor_id, deal_id, ip_address,
                     json.dumps({
+                        "actor_role": actor_role,
                         "from_status": current_status,
                         "reason": reason,
                         "cancellation_type": "FREE"
@@ -1664,12 +1683,13 @@ class DealService:
             # Audit log
             await conn.execute("""
                 INSERT INTO audit_logs (
-                    user_id, role, action, entity_type, entity_id,
+                    user_id, action, entity_type, entity_id,
                     ip_address, details
                 )
-                VALUES ($1, $2, 'DEAL_CANCEL_PENALTY', 'deal', $3, $4, $5)
-            """, actor_id, actor_role, deal_id, ip_address,
+                VALUES ($1, 'DEAL_CANCEL_PENALTY', 'deal', $2, $3, $4)
+            """, actor_id, deal_id, ip_address,
                 json.dumps({
+                    "actor_role": actor_role,
                     "from_status": "TOKEN_PAID",
                     "deal_role": deal_role,
                     "refund_status": refund_status,

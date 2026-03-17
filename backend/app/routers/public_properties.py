@@ -117,6 +117,7 @@ class PropertyDetailResponse(BaseModel):
     highlights: Optional[PropertyHighlightsResponse] = None
     price_history: List[PriceHistoryItem] = []
     viewer: Optional[ViewerContext] = None  # Only populated if user is authenticated
+    status: Optional[str] = None
     created_at: str
     updated_at: str
 

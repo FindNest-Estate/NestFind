@@ -298,19 +298,19 @@ export default function OfferStrengthIndicator({
                         <div className="text-center p-3 bg-gray-50 rounded-xl">
                             <p className="text-sm text-gray-600 mb-1">Your Offer</p>
                             <p className="text-xl font-bold text-gray-900">
-                                ${(offerAmount / 1000).toFixed(0)}K
+                                ₹{(offerAmount / 100000).toFixed(1)}L
                             </p>
                         </div>
                         <div className="text-center p-3 bg-gray-50 rounded-xl">
                             <p className="text-sm text-gray-600 mb-1">List Price</p>
                             <p className="text-xl font-bold text-gray-900">
-                                ${(listingPrice / 1000).toFixed(0)}K
+                                ₹{(listingPrice / 100000).toFixed(1)}L
                             </p>
                         </div>
                         <div className="text-center p-3 bg-gray-50 rounded-xl">
                             <p className="text-sm text-gray-600 mb-1">Market Avg</p>
                             <p className="text-xl font-bold text-gray-900">
-                                ${(marketAverage / 1000).toFixed(0)}K
+                                ₹{(marketAverage / 100000).toFixed(1)}L
                             </p>
                         </div>
                     </div>

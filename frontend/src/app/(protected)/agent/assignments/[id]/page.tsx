@@ -38,281 +38,6 @@ import { Modal } from '@/components/ui/Modal';
 import { Alert } from '@/components/ui/Alert';
 import { OTPInput } from '@/components/OTPInput';
 
-// Verification Modal with OTP Flow
-function VerificationModal({
-    isOpen,
-    onClose,
-    onComplete,
-    assignmentId,
-}: {
-    isOpen: boolean;
-    onClose: () => void;
-    onComplete: (data: any) => Promise<void>;
-    assignmentId: string;
-}) {
-    const [step, setStep] = useState<'otp_request' | 'otp_verify' | 'gps_check'>('otp_request');
-    const [otp, setOtp] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    // GPS State
-    const [gpsLocation, setGpsLocation] = useState<{ lat: number, lng: number } | null>(null);
-    const [isGettingLocation, setIsGettingLocation] = useState(false);
-
-    // Decision State
-    const [verifyApproved, setVerifyApproved] = useState(true);
-    const [verifyReason, setVerifyReason] = useState('');
-    const [verifyNotes, setVerifyNotes] = useState('');
-
-    const handleSendOtp = async () => {
-        setIsLoading(true);
-        setError('');
-        try {
-            const res = await generateOtp(assignmentId);
-            if (res.success) {
-                setStep('otp_verify');
-            } else {
-                setError('Failed to send OTP');
-            }
-        } catch (err) {
-            setError('Error generating OTP');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleVerifyOtp = async (code?: string) => {
-        const codeToVerify = code || otp;
-        if (!codeToVerify || codeToVerify.length !== 6) return;
-
-        setIsLoading(true);
-        setError('');
-        try {
-            const res = await verifyOtp(assignmentId, codeToVerify);
-            if (res.success) {
-                setStep('gps_check');
-            } else {
-                setError('Invalid OTP. Please try again.');
-            }
-        } catch (err) {
-            setError('Verification failed');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const getGPS = () => {
-        setIsGettingLocation(true);
-        setError('');
-        if (!navigator.geolocation) {
-            setError('Geolocation is not supported by your browser');
-            setIsGettingLocation(false);
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                setGpsLocation({
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                });
-                setIsGettingLocation(false);
-            },
-            () => {
-                setError('Unable to retrieve your location');
-                setIsGettingLocation(false);
-            }
-        );
-    };
-
-    const handleSubmit = async () => {
-        if (!gpsLocation) {
-            setError('GPS location is required');
-            return;
-        }
-
-        setIsLoading(true);
-        try {
-            await onComplete({
-                approved: verifyApproved,
-                gps_lat: gpsLocation.lat,
-                gps_lng: gpsLocation.lng,
-                notes: verifyNotes || undefined,
-                rejection_reason: !verifyApproved ? verifyReason : undefined
-            });
-        } catch (err) {
-            setError('Failed to complete verification');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <Modal
-            open={isOpen}
-            onClose={onClose}
-            title="Property Verification"
-            description="Follow the steps to verify this property."
-        >
-            <div className="space-y-6">
-                {/* Steps Indicator */}
-                <div className="flex items-center justify-between text-sm border-b border-[var(--gray-200)] pb-4">
-                    <div className={`flex items-center gap-2 ${step === 'otp_request' ? 'text-[var(--color-brand)] font-bold' : 'text-[var(--gray-400)]'}`}>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${step === 'otp_request' ? 'border-[var(--color-brand)] bg-[var(--color-brand-subtle)]' : 'border-[var(--gray-200)]'}`}>1</div>
-                        <span>Request OTP</span>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-[var(--gray-300)]" />
-                    <div className={`flex items-center gap-2 ${step === 'otp_verify' ? 'text-[var(--color-brand)] font-bold' : step === 'gps_check' ? 'text-[var(--color-brand)]' : 'text-[var(--gray-400)]'}`}>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${step === 'otp_verify' ? 'border-[var(--color-brand)] bg-[var(--color-brand-subtle)]' : step === 'gps_check' ? 'border-[var(--color-brand)] text-[var(--color-brand)]' : 'border-[var(--gray-200)]'}`}>2</div>
-                        <span>Verify OTP</span>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-[var(--gray-300)]" />
-                    <div className={`flex items-center gap-2 ${step === 'gps_check' ? 'text-[var(--color-brand)] font-bold' : 'text-[var(--gray-400)]'}`}>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center border ${step === 'gps_check' ? 'border-[var(--color-brand)] bg-[var(--color-brand-subtle)]' : 'border-[var(--gray-200)]'}`}>3</div>
-                        <span>Inspect</span>
-                    </div>
-                </div>
-
-                {error && (
-                    <Alert variant="error" title="Error" description={error} />
-                )}
-
-                {/* Step 1: Request OTP */}
-                {step === 'otp_request' && (
-                    <div className="space-y-4 py-4 text-center">
-                        <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-2">
-                            <MessageSquare className="w-8 h-8 text-blue-500" />
-                        </div>
-                        <h3 className="font-semibold text-[var(--gray-900)]">Ask Seller for OTP</h3>
-                        <p className="text-[var(--gray-500)] text-sm">
-                            Click below to send a 6-digit verification code to the seller's registered mobile number/email.
-                        </p>
-                        <Button onClick={handleSendOtp} disabled={isLoading} className="w-full">
-                            {isLoading ? 'Sending...' : 'Send OTP to Seller'}
-                        </Button>
-                    </div>
-                )}
-
-                {/* Step 2: Verify OTP */}
-                {step === 'otp_verify' && (
-                    <div className="space-y-4 py-4 text-center">
-                        <h3 className="font-bold text-[var(--gray-900)]">Enter Verification Code</h3>
-                        <p className="text-[var(--gray-500)] text-sm mb-4">Enter the 6-digit code received by the seller.</p>
-
-                        <div className="flex justify-center">
-                            <OTPInput
-                                length={6}
-                                onComplete={(code) => {
-                                    setOtp(code);
-                                    handleVerifyOtp(code);
-                                }}
-                            />
-                        </div>
-
-                        <div className="flex gap-3 mt-6">
-                            <Button variant="ghost" onClick={() => setStep('otp_request')} className="flex-1">Back</Button>
-                            <Button onClick={() => handleVerifyOtp()} disabled={isLoading || otp.length !== 6} className="flex-1">
-                                {isLoading ? 'Verifying...' : 'Verify Code'}
-                            </Button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Step 3: GPS + Inspection */}
-                {step === 'gps_check' && (
-                    <div className="space-y-4">
-
-                        {/* GPS Section */}
-                        <div className="bg-[var(--gray-50)] p-4 rounded-lg border border-[var(--gray-200)]">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="font-semibold text-sm">Location Check</span>
-                                {gpsLocation && <CheckCircle className="w-4 h-4 text-emerald-500" />}
-                            </div>
-
-                            {!gpsLocation ? (
-                                <button
-                                    onClick={getGPS}
-                                    disabled={isGettingLocation}
-                                    className="flex items-center gap-2 text-sm text-[var(--color-brand)] font-medium hover:underline"
-                                >
-                                    <MapPin className="w-4 h-4" />
-                                    {isGettingLocation ? 'Getting location...' : 'Capture GPS Location'}
-                                </button>
-                            ) : (
-                                <div className="text-xs text-[var(--gray-600)] font-mono">
-                                    {gpsLocation.lat.toFixed(6)}, {gpsLocation.lng.toFixed(6)}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Approval Section */}
-                        <div className="space-y-3">
-                            <label className="block text-sm font-medium">Verification Result</label>
-                            <div className="grid grid-cols-2 gap-3">
-                                <button
-                                    onClick={() => setVerifyApproved(true)}
-                                    className={`p-3 rounded-lg border text-sm font-semibold flex items-center justify-center gap-2 transition-all ${verifyApproved
-                                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500'
-                                        : 'border-[var(--gray-200)] text-[var(--gray-500)] hover:bg-[var(--gray-50)]'
-                                        }`}
-                                >
-                                    <CheckCircle className="w-4 h-4" /> Approved
-                                </button>
-                                <button
-                                    onClick={() => setVerifyApproved(false)}
-                                    className={`p-3 rounded-lg border text-sm font-semibold flex items-center justify-center gap-2 transition-all ${!verifyApproved
-                                        ? 'border-[var(--color-error)] bg-[var(--color-error-bg)] text-[var(--color-error)] ring-1 ring-[var(--color-error)]'
-                                        : 'border-[var(--gray-200)] text-[var(--gray-500)] hover:bg-[var(--gray-50)]'
-                                        }`}
-                                >
-                                    <XCircle className="w-4 h-4" /> Rejected
-                                </button>
-                            </div>
-                        </div>
-
-                        {!verifyApproved && (
-                            <div>
-                                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--gray-500)] mb-1">Rejection Reason</label>
-                                <select
-                                    value={verifyReason}
-                                    onChange={(e) => setVerifyReason(e.target.value)}
-                                    className="w-full px-3 py-2 rounded-md border border-[var(--gray-300)] text-sm"
-                                >
-                                    <option value="">Select reason...</option>
-                                    <option value="property_mismatch">Property details do not match</option>
-                                    <option value="seller_unavailable">Seller unavailable</option>
-                                    <option value="access_issue">Cannot access property</option>
-                                    <option value="condition_issue">Poor condition</option>
-                                </select>
-                            </div>
-                        )}
-
-                        <div>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--gray-500)] mb-1">Notes</label>
-                            <textarea
-                                value={verifyNotes}
-                                onChange={(e) => setVerifyNotes(e.target.value)}
-                                className="w-full px-3 py-2 rounded-md border border-[var(--gray-300)] text-sm focus:ring-1 focus:ring-[var(--color-brand)] outline-none"
-                                rows={3}
-                                placeholder="Any additional observations..."
-                            />
-                        </div>
-
-                        <Button
-                            onClick={handleSubmit}
-                            disabled={isLoading || !gpsLocation || (!verifyApproved && !verifyReason)}
-                            className="w-full"
-                        >
-                            {isLoading ? 'Processing...' : verifyApproved ? 'Complete & Approve' : 'Reject Verification'}
-                        </Button>
-                    </div>
-                )}
-            </div>
-        </Modal>
-    );
-}
 
 // Decline Modal
 function DeclineModal({ isOpen, onClose, onConfirm }: { isOpen: boolean; onClose: () => void; onConfirm: (reason: string) => void }) {
@@ -353,7 +78,6 @@ export default function AssignmentDetailPage() {
     const [error, setError] = useState('');
     const [isActionLoading, setIsActionLoading] = useState(false);
     const [showDeclineModal, setShowDeclineModal] = useState(false);
-    const [showVerifyModal, setShowVerifyModal] = useState(false);
 
     useEffect(() => {
         if (params.id) {
@@ -411,31 +135,12 @@ export default function AssignmentDetailPage() {
         try {
             const res = await startVerification(assignment.id);
             if (res.success) {
-                loadAssignment(assignment.id);
-                // Automatically open modal if needed, or wait for user to click "Complete"
+                router.push(`/agent/verification/${assignment.id}`);
             }
         } catch (err) {
             console.error(err);
         } finally {
             setIsActionLoading(false);
-        }
-    };
-
-    const handleCompleteVerification = async (data: any) => {
-        if (!assignment) return;
-        try {
-            const res = await completeVerification(
-                assignment.id,
-                data
-            );
-
-            if (res.success) {
-                setShowVerifyModal(false);
-                loadAssignment(assignment.id);
-            }
-        } catch (err) {
-            // Error handled in modal
-            throw err;
         }
     };
 
@@ -562,7 +267,7 @@ export default function AssignmentDetailPage() {
                                         Start Verification
                                     </Button>
                                 ) : property.status === 'VERIFICATION_IN_PROGRESS' ? (
-                                    <Button className="w-full" onClick={() => setShowVerifyModal(true)}>
+                                    <Button className="w-full" onClick={() => router.push(`/agent/verification/${assignment.id}`)}>
                                         <CheckCircle className="w-4 h-4 mr-2" />
                                         Complete Verification
                                     </Button>
@@ -616,13 +321,7 @@ export default function AssignmentDetailPage() {
                 </div>
             </div>
 
-            {/* Verification Modal */}
-            <VerificationModal
-                isOpen={showVerifyModal}
-                onClose={() => setShowVerifyModal(false)}
-                onComplete={handleCompleteVerification}
-                assignmentId={assignment.id}
-            />
+
 
             {/* Decline Modal */}
             <DeclineModal

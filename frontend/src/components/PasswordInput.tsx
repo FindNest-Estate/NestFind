@@ -30,6 +30,7 @@ export default function PasswordInput({
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={placeholder}
                 disabled={disabled}
+                required
                 className={`block w-full pr-10 ${className}`}
             />
             <button

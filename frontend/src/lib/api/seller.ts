@@ -1,4 +1,5 @@
 import { get, post, put, del } from '@/lib/api';
+import { getToken } from '@/lib/auth';
 import {
     PropertyDetail,
     CreatePropertyRequest,
@@ -201,9 +202,14 @@ export async function uploadPropertyMedia(
     const formData = new FormData();
     formData.append('file', file);
 
+    const token = getToken();
+
     const response = await fetch(`${API_BASE_URL}/properties/${propertyId}/media`, {
         method: 'POST',
         credentials: 'include',
+        headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: formData,
         // Don't set Content-Type - browser sets it with boundary for multipart
     });

@@ -199,10 +199,6 @@ async def update_property(
         else:
             raise HTTPException(status_code=code, detail=error)
     
-    # No-op case: success but no fields were updated (e.g. all values were null)
-    if "property" not in result:
-        return {"id": str(property_id), "status": "unchanged"}
-    
     return result["property"]
 
 

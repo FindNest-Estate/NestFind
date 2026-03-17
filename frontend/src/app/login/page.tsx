@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * Login Page - Airbnb-Inspired Design
- * 
- * Premium two-column layout with trust signals
- */
-
 import { useState, useEffect, FormEvent, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -13,6 +7,12 @@ import { login as loginApi } from '@/lib/authApi';
 import { useAuth } from '@/lib/auth';
 import { RateLimitError } from '@/lib/api';
 import PasswordInput from '@/components/PasswordInput';
+import {
+    ShieldCheck,
+    Lock,
+    X,
+    ArrowRight
+} from 'lucide-react';
 
 interface LockoutState {
     isLocked: boolean;
@@ -26,7 +26,6 @@ function LoginContent() {
     const { login: authLogin } = useAuth();
     const returnUrl = searchParams.get('returnUrl') || '/dashboard';
     const isAdminLogin = returnUrl.includes('admin') || returnUrl.includes('Admin');
-    const sessionExpired = false; // Removed per user request
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -38,7 +37,11 @@ function LoginContent() {
         remainingSeconds: 0,
     });
 
-    // Countdown timer effect
+    const [isMounted, setIsMounted] = useState(false);
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     useEffect(() => {
         if (!lockout.isLocked || lockout.remainingSeconds <= 0) return;
 
@@ -75,7 +78,6 @@ function LoginContent() {
         try {
             const response = await loginApi({ email, password, portal: 'user' });
 
-            // Check if response is error with lockout
             if ('locked_until' in response && response.locked_until) {
                 const lockedUntil = new Date(response.locked_until);
                 const now = new Date();
@@ -93,11 +95,8 @@ function LoginContent() {
                 return;
             }
 
-            // Check for generic error
             if ('success' in response && !response.success) {
                 const errorMessage = (response as any).message || response.error || 'Login failed';
-
-                // Provide user-friendly error messages
                 if (errorMessage.toLowerCase().includes('invalid credentials')) {
                     setError('Incorrect email or password. Please try again.');
                 } else if (errorMessage.toLowerCase().includes('admin portal')) {
@@ -108,16 +107,10 @@ function LoginContent() {
                 return;
             }
 
-            // Success - has access_token
             if ('access_token' in response) {
-                // Use centralized auth context to persist token and update state
                 authLogin(response.access_token, response.user, response.refresh_token);
 
-                // Redirect based on user status ONLY
-                // Role-based routing is handled by Server Component in protected layout
                 if (response.user.status === 'ACTIVE') {
-                    // Navigate to protected area - Server Component handles role routing
-                    // If returnUrl is present (e.g. /admin), use it, otherwise default to dashboard
                     if (returnUrl && returnUrl !== '/dashboard' && !returnUrl.includes('/login')) {
                         router.push(returnUrl);
                     } else {
@@ -150,79 +143,70 @@ function LoginContent() {
     };
 
     return (
-        <div className="flex min-h-screen bg-white">
-            {/* Left Side - Hero Image (Desktop Only) */}
-            <div className="hidden lg:block lg:w-1/2 relative bg-gray-900">
-                <div
-                    className="absolute inset-0 bg-cover bg-center transition-transform duration-700 hover:scale-105"
-                    style={{
-                        backgroundImage: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.6)), url('https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80')`,
-                    }}
-                >
-                </div>
-                <div className="absolute inset-0 flex flex-col justify-end p-16 text-white z-10">
-                    <h2 className="text-5xl font-bold tracking-tight mb-6 drop-shadow-2xl leading-none">
-                        Discover a place<br />you'll love to live.
+        <div className="h-screen w-full flex bg-white overflow-hidden">
+            {/* Left Side: Image Showcase */}
+            <div className="hidden md:flex w-1/2 relative bg-gray-900 isolation-auto">
+                <img 
+                    src="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80"
+                    alt="Premium Real Estate Showcase"
+                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${isMounted ? 'opacity-100' : 'opacity-0'} z-0`}
+                />
+                
+                {/* Heavy dark overlay to ensure text readability */}
+                <div className="absolute inset-0 bg-gray-950/60 z-10" />
+                
+                <div className={`absolute inset-0 z-20 w-full h-full flex flex-col justify-end p-12 lg:p-20 text-white transition-all duration-1000 delay-300 ${isMounted ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
+                    <h2 style={{ color: 'white', textShadow: '0 4px 8px rgba(0,0,0,0.5)' }} className="text-4xl xl:text-5xl font-bold tracking-tight mb-6 select-none leading-tight">
+                        Find your place in the world.
                     </h2>
-                    <p className="text-xl text-gray-100 drop-shadow-lg font-medium max-w-lg mb-8">
-                        Join our community of verified buyers and trusted agents to find your dream home with confidence.
+                    <div className="w-12 h-1 bg-[#FF385C] mb-6 shadow-sm" />
+                    <p style={{ color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }} className="text-lg lg:text-xl font-medium max-w-lg leading-relaxed select-none">
+                        "NestFind transformed how we approach real estate. The platform's clarity and focus on quality made finding our dream home a seamless experience."
                     </p>
-                    {/* Trust indicators */}
-                    <div className="flex gap-6 text-sm font-semibold text-white/90">
-                        <div className="flex items-center gap-2">
-                            <div className="bg-white/20 p-1.5 rounded-full backdrop-blur-md">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-white">
-                                    <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
-                                </svg>
-                            </div>
-                            <span>Verified Listings</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="bg-white/20 p-1.5 rounded-full backdrop-blur-md">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-white">
-                                    <path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" />
-                                </svg>
-                            </div>
-                            <span>Bank-Grade Security</span>
-                        </div>
-                    </div>
                 </div>
             </div>
 
-            {/* Right Side - Login Form */}
-            <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 lg:px-20 xl:px-24 bg-white relative">
-                <div className="mx-auto w-full max-w-sm lg:w-[420px]"> {/* Slightly wider for premium feel */}
-                    <div className="mb-10">
-                        {/* Mobile Logo */}
-                        <div className="lg:hidden mb-10 text-center">
-                            <span className="text-[#FF385C] text-3xl font-bold tracking-tight">NestFind</span>
-                        </div>
+            {/* Right Side: Simple Auth Form */}
+            <div className="w-full md:w-1/2 flex flex-col items-center justify-center relative p-8 sm:p-12 xl:p-24 h-full">
+                
+                {/* Brand Logo - Top Left */}
+                <div className="absolute top-8 left-8 sm:top-12 sm:left-12 md:hidden">
+                    <Link href="/" className="inline-block">
+                        <span className="text-2xl font-black text-[#FF385C] tracking-tight hover:text-gray-900 transition-colors duration-300">NestFind</span>
+                    </Link>
+                </div>
+                <div className="absolute top-8 left-8 lg:top-12 lg:left-12 hidden md:block">
+                    <Link href="/" className="inline-block">
+                        <span className="text-3xl font-black text-[#FF385C] tracking-tight hover:text-gray-900 transition-colors duration-300">NestFind</span>
+                    </Link>
+                </div>
 
-                        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 mb-2">
-                            {isAdminLogin ? 'Admin Portal' : 'Welcome back'}
+                <div className={`w-full max-w-md transition-all duration-700 ${isMounted ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
+                    
+                    <div className="mb-10 lg:mb-12 mt-8 lg:mt-0">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                            {isAdminLogin ? 'Admin Sign In' : 'Welcome back'}
                         </h1>
-                        <p className="text-base text-gray-600">
-                            {isAdminLogin ? 'Secure access for administrators.' : 'Please enter your details to sign in.'}
+                        <p className="text-gray-500 text-base">
+                            {isAdminLogin ? 'Please enter your credentials to access the admin portal.' : 'Please enter your details to access your account.'}
                         </p>
-
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
+                        
                         {error && (
-                            <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm flex items-start gap-3 animate-fadeIn">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500">
-                                    <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clipRule="evenodd" />
-                                </svg>
-                                <span className="font-medium">{error}</span>
+                            <div className="p-4 rounded-xl bg-red-50 border border-red-100 flex items-start gap-3">
+                                <X className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500" />
+                                <span className="text-sm font-medium text-red-700">{error}</span>
                             </div>
                         )}
 
                         {lockout.isLocked && (
-                            <div className="p-4 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm flex items-start gap-3 animate-fadeIn">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-600">
-                                    <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zm-1.72 6.97a.75.75 0 10-1.06 1.06L10.94 12l-1.72 1.72a.75.75 0 101.06 1.06L12 13.06l1.72 1.72a.75.75 0 101.06-1.06L13.06 12l1.72-1.72a.75.75 0 10-1.06-1.06L12 10.94l-1.72-1.72z" clipRule="evenodd" />
-                                </svg>
-                                <span>Account locked. Try again in <span className="font-bold font-mono">{formatTime(lockout.remainingSeconds)}</span></span>
+                            <div className="p-4 rounded-xl bg-amber-50 border border-amber-100 flex items-start gap-3">
+                                <Lock className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-500" />
+                                <span className="text-sm font-medium text-amber-800">
+                                    Account locked. Try again in <span className="font-bold ml-1">{formatTime(lockout.remainingSeconds)}</span>
+                                </span>
                             </div>
                         )}
 
@@ -235,11 +219,12 @@ function LoginContent() {
                                     type="email"
                                     name="email"
                                     id="email"
-                                    className="block w-full h-12 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:border-transparent focus:ring-2 focus:ring-[#FF385C] sm:text-base transition-all duration-200 ease-in-out placeholder-gray-400"
-                                    placeholder="name@example.com"
+                                    className="block w-full h-12 px-4 rounded-xl border border-gray-300 bg-white text-gray-900 focus:border-[#FF385C] focus:ring-1 focus:ring-[#FF385C] outline-none transition-shadow sm:text-base placeholder-gray-400"
+                                    placeholder="Enter your email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     disabled={isSubmitting || lockout.isLocked}
+                                    required
                                 />
                             </div>
 
@@ -248,10 +233,7 @@ function LoginContent() {
                                     <label htmlFor="password" className="block text-sm font-semibold text-gray-700">
                                         Password
                                     </label>
-                                    <Link
-                                        href="/forgot-password"
-                                        className="text-sm font-medium text-[#FF385C] hover:text-[#E31C5F] transition-colors"
-                                    >
+                                    <Link href="/forgot-password" className="text-sm font-medium text-[#FF385C] hover:text-[#E31C5F] transition-colors">
                                         Forgot password?
                                     </Link>
                                 </div>
@@ -260,78 +242,58 @@ function LoginContent() {
                                     value={password}
                                     onChange={setPassword}
                                     disabled={isSubmitting || lockout.isLocked}
-                                    className="h-12 px-4 rounded-xl border border-gray-200 outline-none shadow-sm focus:border-transparent focus:ring-2 focus:ring-[#FF385C] sm:text-base transition-all duration-200 ease-in-out placeholder-gray-400"
+                                    placeholder="Enter your password"
+                                    className="block w-full h-12 px-4 rounded-xl border border-gray-300 bg-white text-gray-900 focus:border-[#FF385C] focus:ring-1 focus:ring-[#FF385C] outline-none transition-shadow sm:text-base placeholder-gray-400"
                                 />
                             </div>
                         </div>
 
-                        <div>
-                            <button
-                                type="submit"
-                                disabled={isSubmitting || lockout.isLocked}
-                                className="group relative flex w-full justify-center items-center rounded-xl bg-gradient-to-r from-[#FF385C] to-[#E61E4D] py-4 px-4 text-base font-bold text-white shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
-                            >
-                                {isSubmitting ? (
-                                    <>
-                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        Signing in...
-                                    </>
-                                ) : (
-                                    'Sign in'
-                                )}
-                            </button>
-                        </div>
-
-                        <div className="relative my-8">
-                            <div className="absolute inset-0 flex items-center">
-                                <div className="w-full border-t border-gray-200"></div>
-                            </div>
-                            <div className="relative flex justify-center text-sm">
-                                <span className="px-4 bg-white text-gray-500 font-medium">New to NestFind?</span>
-                            </div>
-                        </div>
-
-                        <div className="text-center">
-                            {isAdminLogin ? (
-                                <Link
-                                    href="/login"
-                                    className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
-                                >
-                                    ← Back to Employee/User Login
-                                </Link>
+                        <button
+                            type="submit"
+                            disabled={isSubmitting || lockout.isLocked}
+                            className="w-full flex justify-center items-center gap-2 h-12 px-4 border border-transparent text-base font-semibold rounded-xl text-white bg-[#FF385C] hover:bg-[#E61E4D] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#FF385C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Signing in...
+                                </>
                             ) : (
                                 <>
-                                    <Link
-                                        href="/register"
-                                        className="inline-block text-base font-semibold text-gray-900 hover:text-[#FF385C] transition duration-200 hover:underline underline-offset-4"
-                                    >
-                                        Create an account
-                                    </Link>
-                                    <div className="mt-6 pt-6 border-t border-gray-100">
-                                        <Link
-                                            href="/admin-login"
-                                            className="text-sm font-medium text-gray-500 hover:text-[#FF385C] transition-colors"
-                                        >
-                                            Login as Admin
-                                        </Link>
-                                    </div>
+                                    Sign In
+                                    <ArrowRight className="w-4 h-4" />
                                 </>
                             )}
-                        </div>
+                        </button>
                     </form>
 
-                    {/* Safe Mode Footer */}
-                    <div className="mt-10 pt-6 border-t border-gray-100 flex justify-center">
-                        <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
-                                <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clipRule="evenodd" />
-                            </svg>
-                            <span>Secure Connection • 256-bit Encryption</span>
+                    <div className="mt-8 pt-8 text-center space-y-4">
+                        {!isAdminLogin && (
+                            <p className="text-sm font-medium text-gray-600">
+                                Don't have an account?{' '}
+                                <Link href="/register" className="text-[#FF385C] font-semibold hover:text-[#E61E4D] transition-colors hover:underline underline-offset-4">
+                                    Sign up
+                                </Link>
+                            </p>
+                        )}
+
+                        <div className="pt-6 border-t border-gray-100">
+                            {isAdminLogin ? (
+                                <Link href="/login" className="text-xs font-semibold text-gray-500 hover:text-gray-900 transition-colors">
+                                    Return to Standard Login
+                                </Link>
+                            ) : (
+                                <Link href="/admin-login" className="text-xs font-semibold text-gray-500 hover:text-[#FF385C] transition-colors flex items-center justify-center gap-1.5">
+                                    <ShieldCheck className="w-4 h-4" />
+                                    Admin Portal
+                                </Link>
+                            )}
                         </div>
                     </div>
+
                 </div>
             </div>
         </div>
@@ -342,10 +304,7 @@ export default function LoginPage() {
     return (
         <Suspense fallback={
             <div className="min-h-screen flex items-center justify-center bg-white">
-                <svg className="animate-spin h-8 w-8 text-[#FF385C]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+                <div className="w-8 h-8 rounded-full border-4 border-gray-200 border-t-[#FF385C] animate-spin" />
             </div>
         }>
             <LoginContent />

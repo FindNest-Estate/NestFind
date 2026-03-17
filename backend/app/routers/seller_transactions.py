@@ -137,8 +137,11 @@ async def get_seller_transactions(
         params = [current_user.user_id]
         
         if status:
-            base_query += f" AND t.status = ${len(params) + 1}"
-            params.append(status.upper())
+            if status.upper() == 'VERIFIED':
+                base_query += " AND t.status IN ('BUYER_VERIFIED', 'SELLER_VERIFIED')"
+            else:
+                base_query += f" AND t.status = ${len(params) + 1}"
+                params.append(status.upper())
         
         # Get total count
         count_query = f"SELECT COUNT(*) FROM ({base_query}) sub"

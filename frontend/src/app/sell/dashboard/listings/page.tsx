@@ -154,18 +154,19 @@ export default function SellerListingsPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100/60 pb-6 mb-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Home className="w-7 h-7 text-[#ff385c]" />
+                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3 tracking-tight">
+                        <div className="p-2.5 bg-gradient-to-br from-[#FF385C] to-rose-500 rounded-2xl shadow-sm">
+                            <Home className="w-6 h-6 text-white" />
+                        </div>
                         My Listings
                     </h1>
-                    <p className="text-slate-500 mt-1">Manage and track all your properties</p>
+                    <p className="text-sm font-medium text-gray-500 mt-2">Manage and track all your properties</p>
                 </div>
                 <Link
                     href="/sell/create"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-br from-[#ff385c] to-rose-600 text-white rounded-xl font-semibold hover:-translate-y-0.5 transition-all shadow-md hover:shadow-lg"
-                    style={{ color: 'white' }}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#FF385C] via-rose-500 to-orange-500 text-white rounded-xl font-bold hover:shadow-lg hover:shadow-rose-500/20 hover:-translate-y-1 transition-all"
                 >
                     <Plus className="w-5 h-5" />
                     New Listing
@@ -173,48 +174,56 @@ export default function SellerListingsPage() {
             </div>
 
             {/* Quick Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-sm">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-slate-100 rounded-lg">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-start gap-4">
+                        <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl shadow-sm">
                             <Home className="w-5 h-5 text-slate-600" />
                         </div>
-                        <div>
-                            <p className="text-2xl font-bold text-slate-800">{stats.total}</p>
-                            <p className="text-sm text-slate-500">Total</p>
+                        <div className="relative z-10 flex items-start justify-between">
+                            <div>
+                                <p className="text-2xl font-bold text-gray-900 tracking-tight leading-none mb-1">{stats.total}</p>
+                                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Total</p>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-sm">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-rose-50 rounded-lg">
-                            <TrendingUp className="w-5 h-5 text-[#ff385c]" />
+                <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-start gap-4">
+                        <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl shadow-sm">
+                            <TrendingUp className="w-5 h-5 text-emerald-600" />
                         </div>
-                        <div>
-                            <p className="text-2xl font-bold text-slate-800">{stats.active}</p>
-                            <p className="text-sm text-slate-500">Active</p>
+                        <div className="relative z-10 flex items-start justify-between">
+                            <div>
+                                <p className="text-2xl font-bold text-gray-900 tracking-tight leading-none mb-1">{stats.active}</p>
+                                <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-widest">Active</p>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-sm">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-amber-100 rounded-lg">
+                <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-start gap-4">
+                        <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl shadow-sm">
                             <Clock className="w-5 h-5 text-amber-600" />
                         </div>
-                        <div>
-                            <p className="text-2xl font-bold text-slate-800">{stats.draft}</p>
-                            <p className="text-sm text-slate-500">Drafts</p>
+                        <div className="relative z-10 flex items-start justify-between">
+                            <div>
+                                <p className="text-2xl font-bold text-gray-900 tracking-tight leading-none mb-1">{stats.draft}</p>
+                                <p className="text-[11px] font-bold text-amber-600 uppercase tracking-widest">Drafts</p>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-sm">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-purple-100 rounded-lg">
+                <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-start gap-4">
+                        <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl shadow-sm">
                             <CheckCircle className="w-5 h-5 text-purple-600" />
                         </div>
-                        <div>
-                            <p className="text-2xl font-bold text-slate-800">{stats.sold}</p>
-                            <p className="text-sm text-slate-500">Sold</p>
+                        <div className="relative z-10 flex items-start justify-between">
+                            <div>
+                                <p className="text-2xl font-bold text-gray-900 tracking-tight leading-none mb-1">{stats.sold}</p>
+                                <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-widest">Sold</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -235,25 +244,25 @@ export default function SellerListingsPage() {
             )}
 
             {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <div className="flex flex-col sm:flex-row gap-4 mt-8">
+                <div className="relative flex-1 group">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
                     <input
                         type="text"
                         placeholder="Search properties..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 bg-white/70 backdrop-blur-sm border border-slate-200/50 rounded-xl focus:ring-2 focus:ring-[#ff385c] focus:border-[#ff385c] transition-all"
+                        className="w-full pl-12 pr-4 py-3.5 bg-white/90 backdrop-blur-lg border border-gray-200/60 rounded-xl shadow-sm hover:border-gray-300 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium text-gray-900 placeholder:text-gray-400"
                     />
                 </div>
-                <div className="flex gap-2 overflow-x-auto pb-2">
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none items-center">
                     {['ALL', 'DRAFT', 'ACTIVE', 'RESERVED', 'SOLD'].map((status) => (
                         <button
                             key={status}
                             onClick={() => setStatusFilter(status)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${statusFilter === status
-                                ? 'bg-slate-900 text-white shadow-md'
-                                : 'bg-white/70 text-slate-600 hover:bg-white hover:shadow-md border border-slate-200/50'
+                            className={`px-5 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all shadow-sm ${statusFilter === status
+                                ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-indigo-500/20 shadow-lg -translate-y-0.5 border-transparent'
+                                : 'bg-white/90 backdrop-blur-lg text-gray-600 hover:text-gray-900 border border-gray-200/60 hover:border-gray-300 hover:bg-white'
                                 }`}
                         >
                             {status === 'ALL' ? 'All' : statusStyles[status]?.label || status}
@@ -264,14 +273,14 @@ export default function SellerListingsPage() {
 
             {/* Property List */}
             {filteredProperties.length === 0 ? (
-                <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 p-12 text-center shadow-sm">
-                    <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Plus className="w-8 h-8 text-[#ff385c]" />
+                <div className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-100 p-16 text-center shadow-sm">
+                    <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                        <Plus className="w-10 h-10 text-rose-500" />
                     </div>
-                    <h3 className="text-xl font-bold text-slate-800 mb-2">
+                    <h3 className="text-xl font-bold text-gray-900 mb-3 tracking-tight">
                         {properties.length === 0 ? 'Create your first listing' : 'No properties match your filters'}
                     </h3>
-                    <p className="text-slate-500 mb-6 max-w-md mx-auto">
+                    <p className="text-gray-500 mb-8 max-w-md mx-auto font-medium">
                         {properties.length === 0
                             ? 'Start your selling journey by creating a property draft. You can save your progress and finish later.'
                             : 'Try adjusting your search or filter criteria.'}
@@ -279,8 +288,7 @@ export default function SellerListingsPage() {
                     {properties.length === 0 && (
                         <Link
                             href="/sell/create"
-                            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-br from-[#ff385c] to-rose-600 text-white rounded-xl font-semibold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
-                            style={{ color: 'white' }}
+                            className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-[#FF385C] via-rose-500 to-orange-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-rose-500/20 hover:shadow-xl hover:-translate-y-1"
                         >
                             <Plus className="w-5 h-5" />
                             Create New Listing
@@ -296,63 +304,67 @@ export default function SellerListingsPage() {
                         return (
                             <div
                                 key={property.id}
-                                className="group bg-white/70 backdrop-blur-sm rounded-2xl border border-slate-200/60 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-1.5"
+                                className="group bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
                             >
                                 {/* Image */}
-                                <div className="relative h-48 bg-slate-100 overflow-hidden">
+                                <div className="relative h-[220px] bg-gray-100 overflow-hidden">
                                     {imageUrl ? (
                                         <img
                                             src={imageUrl}
                                             alt={property.title}
-                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
                                         />
                                     ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
-                                            <Home className="w-12 h-12 text-slate-300" />
+                                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+                                            <Home className="w-12 h-12 text-gray-300" />
                                         </div>
                                     )}
 
                                     {/* Status Badge */}
-                                    <div className={`absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-semibold border ${style.bg} ${style.text} ${style.border}`}>
+                                    <div className={`absolute top-4 left-4 px-3 py-1.5 rounded-xl text-[11px] font-bold uppercase tracking-widest border shadow-sm ${style.bg} ${style.text} ${style.border}`}>
                                         {style.label}
                                     </div>
 
                                     {/* Stats Overlay */}
                                     {property.stats && (
-                                        <div className="absolute bottom-3 left-3 right-3 flex gap-2">
-                                            <span className="px-2 py-1 bg-black/50 backdrop-blur-sm rounded-lg text-white text-xs flex items-center gap-1">
-                                                <Eye className="w-3 h-3" />
-                                                {property.stats.views}
+                                        <div className="absolute bottom-4 left-4 right-4 flex gap-2">
+                                            <span className="px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-xl text-white text-[11px] font-bold flex items-center gap-1.5">
+                                                <Eye className="w-3.5 h-3.5" />
+                                                {property.stats.views} Views
                                             </span>
-                                            <span className="px-2 py-1 bg-black/50 backdrop-blur-sm rounded-lg text-white text-xs flex items-center gap-1">
-                                                <Users className="w-3 h-3" />
-                                                {property.stats.inquiries}
+                                            <span className="px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-xl text-white text-[11px] font-bold flex items-center gap-1.5">
+                                                <Users className="w-3.5 h-3.5" />
+                                                {property.stats.inquiries} Inquiries
                                             </span>
                                         </div>
                                     )}
                                 </div>
 
                                 {/* Content */}
-                                <div className="p-5">
-                                    <h3 className="font-bold text-slate-800 text-lg mb-1 line-clamp-1">
-                                        {property.title || 'Untitled Property'}
-                                    </h3>
-                                    <p className="text-xs text-slate-400 mb-3">ID: {property.id.slice(0, 8)}...</p>
+                                <div className="py-5 px-6 flex-1 flex flex-col relative z-20">
+                                    <Link href={`/properties/${property.id}`} className="group block mb-4 flex-1">
+                                        <h3 className="font-bold text-gray-900 text-lg mb-1 line-clamp-1 tracking-tight group-hover:text-indigo-600 transition-colors">
+                                            {property.title || 'Untitled Property'}
+                                        </h3>
+                                        <p className="text-sm font-medium text-gray-500 flex items-center gap-1.5 line-clamp-1">ID: {property.id.slice(0, 8)}</p>
+                                    </Link>
 
                                     {/* Price */}
-                                    <div className="flex items-center gap-1 mb-4">
-                                        <IndianRupee className="w-4 h-4 text-slate-900" />
-                                        <span className="text-lg font-bold text-slate-800">
-                                            {formatPrice(property.price) || <span className="text-slate-400 font-normal text-sm">Not set</span>}
-                                        </span>
+                                    <div className="pt-5 mt-auto border-t border-gray-100/60 flex items-center justify-between">
+                                        <div>
+                                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Price</p>
+                                            <span className="text-xl font-bold text-gray-900 tracking-tight">
+                                                {formatPrice(property.price) || <span className="text-gray-400 font-medium text-base">Not set</span>}
+                                            </span>
+                                        </div>
                                     </div>
 
                                     {/* Actions */}
-                                    <div className="flex items-center gap-2 pt-4 border-t border-slate-100">
+                                    <div className="flex items-center gap-3 pt-5 border-t border-gray-100/60">
                                         {property.allowed_actions.includes('edit') && (
                                             <Link
                                                 href={`/sell/create/${property.id}`}
-                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
+                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-50 border border-gray-200 text-gray-700 rounded-xl text-sm font-bold hover:bg-gray-100 hover:border-gray-300 transition-colors"
                                             >
                                                 <Edit2 className="w-4 h-4" />
                                                 Edit
@@ -363,8 +375,7 @@ export default function SellerListingsPage() {
                                             <button
                                                 onClick={() => handleSubmitForReview(property.id, property.title)}
                                                 disabled={submittingId === property.id}
-                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-br from-[#ff385c] to-rose-600 text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none disabled:shadow-none"
-                                                style={{ color: 'white' }}
+                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#FF385C] to-rose-600 text-white rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg shadow-rose-500/20 hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none disabled:shadow-none"
                                             >
                                                 {submittingId === property.id ? (
                                                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -381,10 +392,10 @@ export default function SellerListingsPage() {
                                             <Link
                                                 href={`/properties/${property.id}`}
                                                 target="_blank"
-                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
+                                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-br from-indigo-500 to-purple-600 text-white !text-white rounded-xl text-sm font-bold hover:shadow-lg shadow-indigo-500/20 transition-all hover:-translate-y-0.5"
                                             >
-                                                <ExternalLink className="w-4 h-4" />
-                                                View Live
+                                                <ExternalLink className="w-4 h-4 text-white" />
+                                                <span className="text-white">View Live</span>
                                             </Link>
                                         )}
 
@@ -392,13 +403,13 @@ export default function SellerListingsPage() {
                                             <button
                                                 onClick={() => handleDelete(property.id, property.title)}
                                                 disabled={deletingId === property.id}
-                                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                                                className="p-2.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors disabled:opacity-50 border border-transparent hover:border-rose-100"
                                                 title="Delete"
                                             >
                                                 {deletingId === property.id ? (
-                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                    <Loader2 className="w-5 h-5 animate-spin" />
                                                 ) : (
-                                                    <Trash2 className="w-4 h-4" />
+                                                    <Trash2 className="w-5 h-5" />
                                                 )}
                                             </button>
                                         )}

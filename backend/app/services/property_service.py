@@ -1,4 +1,4 @@
-"""
+﻿"""
 Property Service implementing SELLER_PROPERTY_LISTING workflow.
 
 Handles property CRUD operations with state machine enforcement.
@@ -95,14 +95,15 @@ class PropertyService:
         """
         property_type = property_data.get("type")
         
-        # Required fields by property type
+        # Required fields common to all types
         COMMON_REQUIRED = ["title", "description", "type", "city", "latitude", "longitude", "price"]
         
+        # Required fields per property type
         TYPE_SPECIFIC_REQUIRED = {
             "LAND": ["area_sqft"],
-            "HOUSE": ["bedrooms", "bathrooms", "area_sqft"],
-            "APARTMENT": ["bedrooms", "bathrooms", "area_sqft"],
-            "COMMERCIAL": ["area_sqft"],
+            "HOUSE": ["bedrooms", "bathrooms", "area_sqft", "furnishing_status"],
+            "APARTMENT": ["bedrooms", "bathrooms", "area_sqft", "furnishing_status", "total_floors"],
+            "COMMERCIAL": ["area_sqft", "property_sub_type"],
             None: []  # No type selected yet
         }
         
@@ -110,26 +111,30 @@ class PropertyService:
         type_fields = TYPE_SPECIFIC_REQUIRED.get(property_type, [])
         required_fields = COMMON_REQUIRED + type_fields
         
+        # Map DB field names to human-readable labels
+        field_labels = {
+            "title": "Property Title",
+            "description": "Description",
+            "type": "Property Type",
+            "property_sub_type": "Property Sub-Type",
+            "city": "City",
+            "latitude": "Location (Map)",
+            "longitude": "Location (Map)",
+            "price": "Price",
+            "area_sqft": "Area (sq ft)",
+            "bedrooms": "Bedrooms",
+            "bathrooms": "Bathrooms",
+            "furnishing_status": "Furnishing Status",
+            "total_floors": "Total Floors",
+        }
+        
         # Calculate missing fields
         missing = []
         for field in required_fields:
             value = property_data.get(field)
             if value is None or value == "":
-                # Map DB field names to human-readable labels
-                field_labels = {
-                    "title": "Property Title",
-                    "description": "Description",
-                    "type": "Property Type",
-                    "city": "City",
-                    "latitude": "Location",
-                    "longitude": "Location",
-                    "price": "Price",
-                    "area_sqft": "Area",
-                    "bedrooms": "Bedrooms",
-                    "bathrooms": "Bathrooms"
-                }
                 label = field_labels.get(field, field)
-                # Avoid duplicate "Location" entries
+                # Avoid duplicate "Location (Map)" entries
                 if label not in missing:
                     missing.append(label)
         
@@ -139,8 +144,6 @@ class PropertyService:
         
         # Determine semantic level
         level = "READY_FOR_AGENT" if len(missing) == 0 else "BASIC"
-        
-        # Can hire agent only if fully complete
         can_hire_agent = level == "READY_FOR_AGENT"
         
         return {
@@ -161,6 +164,10 @@ class PropertyService:
                 return parts[-2].strip()
         return None
     
+    def _row_get(self, row: asyncpg.Record, key: str, default: Any = None) -> Any:
+        """Safely read optional columns from asyncpg rows."""
+        return row[key] if key in row else default
+
     # ========================================================================
     # CRUD OPERATIONS
     # ========================================================================
@@ -384,30 +391,55 @@ class PropertyService:
                 }
             
             # Build property response
+            getv = lambda key, default=None: self._row_get(row, key, default)
             property_data = {
-                "id": row["id"],
-                "title": row["title"],
-                "description": row["description"],
-                "type": row["type"],
-                "price": float(row["price"]) if row["price"] else None,
-                "latitude": row["latitude"],
-                "longitude": row["longitude"],
-                "address": row["address"],
-                "city": row["city"],
-                "state": row["state"],
-                "pincode": row["pincode"],
-                "bedrooms": row["bedrooms"],
-                "bathrooms": row["bathrooms"],
-                "area_sqft": float(row["area_sqft"]) if row["area_sqft"] else None,
+                "id": getv("id"),
+                "title": getv("title"),
+                "description": getv("description"),
+                "type": getv("type"),
+                "property_sub_type": getv("property_sub_type"),
+                # Pricing
+                "price": float(getv("price")) if getv("price") else None,
+                "price_negotiable": getv("price_negotiable"),
+                "maintenance_charges": float(getv("maintenance_charges")) if getv("maintenance_charges") else None,
+                # Location
+                "latitude": getv("latitude"),
+                "longitude": getv("longitude"),
+                "address": getv("address"),
+                "city": getv("city"),
+                "state": getv("state"),
+                "pincode": getv("pincode"),
+                # Dimensions
+                "bedrooms": getv("bedrooms"),
+                "bathrooms": getv("bathrooms"),
+                "area_sqft": float(getv("area_sqft")) if getv("area_sqft") else None,
+                "floor_number": getv("floor_number"),
+                "total_floors": getv("total_floors"),
+                "balconies": getv("balconies"),
+                # Features
+                "furnishing_status": getv("furnishing_status"),
+                "facing_direction": getv("facing_direction"),
+                "parking_available": getv("parking_available"),
+                "parking_count": getv("parking_count"),
+                # Land-specific
+                "road_access": getv("road_access"),
+                "land_type": getv("land_type"),
+                # Listing details
+                "listing_type": getv("listing_type"),
+                "availability_status": getv("availability_status"),
+                "property_age_years": getv("property_age_years"),
+                "ownership_type": getv("ownership_type"),
+                # Amenities
+                "amenities": json.loads(getv("amenities")) if isinstance(getv("amenities"), str) else (getv("amenities") or []),
+                # State
                 "status": status,
                 "display_status": self._get_display_status(status),
                 "allowed_actions": self._compute_allowed_actions(status),
                 "visibility": self._compute_visibility(status),
                 "agent": agent,
                 "media": [dict(m) for m in media],
-
-                "created_at": row["created_at"].isoformat(),
-                "updated_at": row["updated_at"].isoformat(),
+                "created_at": getv("created_at").isoformat() if getv("created_at") else None,
+                "updated_at": getv("updated_at").isoformat() if getv("updated_at") else None,
                 "has_media": len(media) > 0
             }
             
@@ -465,20 +497,74 @@ class PropertyService:
                 param_idx = 1
                 
                 allowed_fields = [
-                    "title", "description", "type", "price", 
+                    # Basic
+                    "title", "description", "type", "property_sub_type",
+                    # Pricing
+                    "price", "price_negotiable", "maintenance_charges",
+                    # Location
                     "latitude", "longitude", "address", "city", "state", "pincode",
-                    "bedrooms", "bathrooms", "area_sqft"
+                    # Dimensions
+                    "bedrooms", "bathrooms", "area_sqft",
+                    "floor_number", "total_floors", "balconies",
+                    # Features
+                    "furnishing_status", "facing_direction",
+                    "parking_available", "parking_count",
+                    # Land-specific
+                    "road_access", "land_type",
+                    # Listing details
+                    "listing_type", "availability_status",
+                    "property_age_years", "ownership_type",
+                    # Amenities (JSONB)
+                    "amenities",
                 ]
                 
+                existing_columns = {
+                    r["column_name"]
+                    for r in await conn.fetch(
+                        """
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = 'properties'
+                        """
+                    )
+                }
+
                 for field in allowed_fields:
-                    if field in updates and updates[field] is not None:
+                    if field not in existing_columns:
+                        continue
+                    if field in updates:
+                        value = updates[field]
+                        # For amenities, serialize list to JSON string for asyncpg
+                        if field == "amenities" and isinstance(value, list):
+                            import json as _json
+                            value = _json.dumps(value)
+                        # Allow explicit None for boolean/optional fields, but skip on non-amenity null
+                        if value is None and field not in (
+                            "price_negotiable", "parking_available", "road_access"
+                        ):
+                            continue
                         update_fields.append(f"{field} = ${param_idx}")
-                        values.append(updates[field])
+                        values.append(value)
                         param_idx += 1
-                        print(f"[PropertyService] Updating field: {field} = {updates[field]}")
+                        print(f"[PropertyService] Updating field: {field}")
                 
                 if not update_fields:
-                    return {"success": True, "message": "No changes to save"}
+                    # Get current property for response even if no changes
+                    updated = await conn.fetchrow(
+                        "SELECT p.* FROM properties p WHERE p.id = $1",
+                        property_id
+                    )
+                    property_dict = dict(updated)
+                    return {
+                        "success": True,
+                        "property": {
+                            "id": property_id,
+                            "status": str(updated["status"]),
+                            "display_status": self._get_display_status(str(updated["status"])),
+                            "allowed_actions": self._compute_allowed_actions(str(updated["status"])),
+                            "completeness": self._compute_completeness(property_dict)
+                        }
+                    }
                 
                 values.append(property_id)
                 
@@ -507,9 +593,9 @@ class PropertyService:
                 # Get updated property for response
                 updated = await conn.fetchrow(
                     """
-                    SELECT id, title, description, type, price, latitude, longitude, 
-                           address, city, bedrooms, bathrooms, area_sqft, status::text
-                    FROM properties WHERE id = $1
+                    SELECT p.*
+                    FROM properties p
+                    WHERE p.id = $1
                     """,
                     property_id
                 )
@@ -527,9 +613,9 @@ class PropertyService:
                     "success": True,
                     "property": {
                         "id": property_id,
-                        "status": updated["status"],
-                        "display_status": self._get_display_status(updated["status"]),
-                        "allowed_actions": self._compute_allowed_actions(updated["status"]),
+                        "status": str(updated["status"]),
+                        "display_status": self._get_display_status(str(updated["status"])),
+                        "allowed_actions": self._compute_allowed_actions(str(updated["status"])),
                         "completeness": self._compute_completeness(property_dict)
                     }
                 }
@@ -920,6 +1006,7 @@ class PropertyService:
                     ],
                     "highlights": highlights,
                     "price_history": price_history,
+                    "status": str(row["status"]),
                     "created_at": row["created_at"].isoformat(),
                     "updated_at": row["updated_at"].isoformat()
                 }
@@ -1015,5 +1102,8 @@ class PropertyService:
                     "old_status": old_status,
                     "new_status": new_status
                 }
+
+
+
 
 

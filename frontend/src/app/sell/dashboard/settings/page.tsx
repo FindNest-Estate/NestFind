@@ -136,50 +136,55 @@ export default function SellerSettingsPage() {
     return (
         <div className="space-y-6 max-w-3xl">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border-b border-gray-100/60 pb-6 mb-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Settings className="w-7 h-7 text-[#ff385c]" />
+                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3 tracking-tight">
+                        <div className="p-2.5 bg-gradient-to-br from-[#FF385C] to-rose-500 rounded-2xl shadow-sm">
+                            <Settings className="w-6 h-6 text-white" />
+                        </div>
                         Settings
                     </h1>
-                    <p className="text-slate-500 mt-1">Manage your notification and display preferences</p>
+                    <p className="text-sm font-medium text-gray-500 mt-2">Manage your notification and display preferences</p>
                 </div>
                 <button
                     onClick={saveSettings}
                     disabled={isSaving}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-[#ff385c] text-white rounded-xl font-medium hover:bg-[#d9324e] transition-colors shadow-lg disabled:opacity-50"
+                    className="flex items-center justify-center gap-2 px-8 py-3.5 bg-gradient-to-r from-[#ff385c] to-rose-600 text-white rounded-xl font-bold hover:shadow-lg shadow-rose-500/20 hover:-translate-y-0.5 transition-all disabled:opacity-50 w-full sm:w-auto"
                 >
                     {isSaving ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-5 h-5 animate-spin" />
                     ) : saveSuccess ? (
-                        <CheckCircle className="w-4 h-4" />
+                        <CheckCircle className="w-5 h-5" />
                     ) : (
-                        <Save className="w-4 h-4" />
+                        <Save className="w-5 h-5" />
                     )}
-                    {saveSuccess ? 'Saved!' : 'Save Changes'}
+                    {saveSuccess ? 'Saved Successfully!' : 'Save Changes'}
                 </button>
             </div>
 
             {/* Notification Preferences */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 bg-slate-50/50 border-b border-slate-100">
-                    <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                        <Bell className="w-5 h-5 text-amber-500" />
-                        Notification Preferences
-                    </h2>
+            <div className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-100/60 shadow-sm overflow-hidden mb-8">
+                <div className="px-8 py-6 bg-amber-50/50 border-b border-gray-100/60 flex items-center gap-4">
+                    <div className="p-3 bg-amber-100 rounded-xl">
+                        <Bell className="w-6 h-6 text-amber-600" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-900 tracking-tight">Notification Preferences</h2>
+                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Control how we alert you</p>
+                    </div>
                 </div>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-gray-100/60">
                     {/* Email Notifications */}
-                    <div className="p-6">
-                        <h3 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-4 flex items-center gap-2">
+                    <div className="p-8">
+                        <h3 className="text-[11px] font-bold text-indigo-500 uppercase tracking-widest mb-6 flex items-center gap-2">
                             <Mail className="w-4 h-4" />
                             Email Notifications
                         </h3>
-                        <div className="space-y-4">
+                        <div className="space-y-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="font-medium text-slate-800">New Offers</p>
-                                    <p className="text-sm text-slate-500">Get notified when buyers make offers</p>
+                                    <p className="text-sm font-bold text-gray-900">New Offers</p>
+                                    <p className="text-[11px] font-medium text-gray-500 mt-1">Get notified when buyers make offers</p>
                                 </div>
                                 <ToggleSwitch
                                     enabled={settings.notifications.email_offers}
@@ -188,8 +193,8 @@ export default function SellerSettingsPage() {
                             </div>
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="font-medium text-slate-800">Visit Requests</p>
-                                    <p className="text-sm text-slate-500">Notifications for property tour requests</p>
+                                    <p className="text-sm font-bold text-gray-900">Visit Requests</p>
+                                    <p className="text-[11px] font-medium text-gray-500 mt-1">Notifications for property tour requests</p>
                                 </div>
                                 <ToggleSwitch
                                     enabled={settings.notifications.email_visits}
@@ -198,8 +203,8 @@ export default function SellerSettingsPage() {
                             </div>
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="font-medium text-slate-800">Messages</p>
-                                    <p className="text-sm text-slate-500">Buyer and agent messages</p>
+                                    <p className="text-sm font-bold text-gray-900">Messages</p>
+                                    <p className="text-[11px] font-medium text-gray-500 mt-1">Buyer and agent messages</p>
                                 </div>
                                 <ToggleSwitch
                                     enabled={settings.notifications.email_messages}
@@ -208,8 +213,8 @@ export default function SellerSettingsPage() {
                             </div>
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="font-medium text-slate-800">Marketing</p>
-                                    <p className="text-sm text-slate-500">Tips, updates, and promotional emails</p>
+                                    <p className="text-sm font-bold text-gray-900">Marketing</p>
+                                    <p className="text-[11px] font-medium text-gray-500 mt-1">Tips, updates, and promotional emails</p>
                                 </div>
                                 <ToggleSwitch
                                     enabled={settings.notifications.email_marketing}
@@ -220,16 +225,16 @@ export default function SellerSettingsPage() {
                     </div>
 
                     {/* Push Notifications */}
-                    <div className="p-6">
-                        <h3 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-4 flex items-center gap-2">
+                    <div className="p-8">
+                        <h3 className="text-[11px] font-bold text-rose-500 uppercase tracking-widest mb-6 flex items-center gap-2">
                             <Smartphone className="w-4 h-4" />
                             Push Notifications
                         </h3>
-                        <div className="space-y-4">
+                        <div className="space-y-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="font-medium text-slate-800">New Offers</p>
-                                    <p className="text-sm text-slate-500">Instant notifications for offers</p>
+                                    <p className="text-sm font-bold text-gray-900">New Offers</p>
+                                    <p className="text-[11px] font-medium text-gray-500 mt-1">Instant notifications for offers</p>
                                 </div>
                                 <ToggleSwitch
                                     enabled={settings.notifications.push_offers}
@@ -238,8 +243,8 @@ export default function SellerSettingsPage() {
                             </div>
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="font-medium text-slate-800">Visit Reminders</p>
-                                    <p className="text-sm text-slate-500">Reminders before scheduled visits</p>
+                                    <p className="text-sm font-bold text-gray-900">Visit Reminders</p>
+                                    <p className="text-[11px] font-medium text-gray-500 mt-1">Reminders before scheduled visits</p>
                                 </div>
                                 <ToggleSwitch
                                     enabled={settings.notifications.push_visits}
@@ -248,8 +253,8 @@ export default function SellerSettingsPage() {
                             </div>
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="font-medium text-slate-800">Messages</p>
-                                    <p className="text-sm text-slate-500">Real-time message alerts</p>
+                                    <p className="text-sm font-bold text-gray-900">Messages</p>
+                                    <p className="text-[11px] font-medium text-gray-500 mt-1">Real-time message alerts</p>
                                 </div>
                                 <ToggleSwitch
                                     enabled={settings.notifications.push_messages}
@@ -262,18 +267,21 @@ export default function SellerSettingsPage() {
             </div>
 
             {/* Privacy Settings */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 bg-slate-50/50 border-b border-slate-100">
-                    <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                        <User className="w-5 h-5 text-purple-500" />
-                        Privacy & Profile
-                    </h2>
+            <div className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-100/60 shadow-sm overflow-hidden mb-8">
+                <div className="px-8 py-6 bg-purple-50/50 border-b border-gray-100/60 flex items-center gap-4">
+                    <div className="p-3 bg-purple-100 rounded-xl">
+                        <User className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-900 tracking-tight">Privacy & Profile</h2>
+                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Manage your public information</p>
+                    </div>
                 </div>
-                <div className="p-6 space-y-4">
+                <div className="p-8 space-y-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="font-medium text-slate-800">Show Phone Number</p>
-                            <p className="text-sm text-slate-500">Allow verified buyers to see your contact number</p>
+                            <p className="text-sm font-bold text-gray-900">Show Phone Number</p>
+                            <p className="text-[11px] font-medium text-gray-500 mt-1">Allow verified buyers to see your contact number</p>
                         </div>
                         <ToggleSwitch
                             enabled={settings.contact_phone_visible}
@@ -282,8 +290,8 @@ export default function SellerSettingsPage() {
                     </div>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="font-medium text-slate-800">Auto-respond to Inquiries</p>
-                            <p className="text-sm text-slate-500">Send automatic acknowledgment to buyer inquiries</p>
+                            <p className="text-sm font-bold text-gray-900">Auto-respond to Inquiries</p>
+                            <p className="text-[11px] font-medium text-gray-500 mt-1">Send automatic acknowledgment to buyer inquiries</p>
                         </div>
                         <ToggleSwitch
                             enabled={settings.auto_respond_inquiries}
@@ -294,29 +302,32 @@ export default function SellerSettingsPage() {
             </div>
 
             {/* Display Preferences */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 bg-slate-50/50 border-b border-slate-100">
-                    <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                        <Globe className="w-5 h-5 text-blue-500" />
-                        Display Preferences
-                    </h2>
+            <div className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-100/60 shadow-sm overflow-hidden mb-8">
+                <div className="px-8 py-6 bg-blue-50/50 border-b border-gray-100/60 flex items-center gap-4">
+                    <div className="p-3 bg-blue-100 rounded-xl">
+                        <Globe className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-900 tracking-tight">Display Preferences</h2>
+                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Customize your viewing experience</p>
+                    </div>
                 </div>
-                <div className="p-6 space-y-4">
+                <div className="p-8 space-y-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="font-medium text-slate-800">Currency</p>
-                            <p className="text-sm text-slate-500">Default currency for prices</p>
+                            <p className="text-sm font-bold text-gray-900">Currency</p>
+                            <p className="text-[11px] font-medium text-gray-500 mt-1">Default currency for prices</p>
                         </div>
-                        <span className="px-4 py-2 bg-slate-100 rounded-lg text-slate-600 font-medium">
+                        <span className="px-5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 font-bold tracking-tight shadow-inner">
                             {settings.display.default_currency}
                         </span>
                     </div>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="font-medium text-slate-800">Timezone</p>
-                            <p className="text-sm text-slate-500">For scheduling and notifications</p>
+                            <p className="text-sm font-bold text-gray-900">Timezone</p>
+                            <p className="text-[11px] font-medium text-gray-500 mt-1">For scheduling and notifications</p>
                         </div>
-                        <span className="px-4 py-2 bg-slate-100 rounded-lg text-slate-600 font-medium">
+                        <span className="px-5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 font-bold tracking-tight shadow-inner text-sm">
                             {settings.display.timezone}
                         </span>
                     </div>

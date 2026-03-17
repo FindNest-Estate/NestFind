@@ -57,19 +57,20 @@ export default function SavedPropertiesPreview() {
     }
 
     return (
-        <div className="bg-white rounded-[var(--card-radius)] border border-[var(--gray-200)] p-5 relative overflow-hidden">
-            <div className="flex justify-between items-center mb-5 relative z-10">
-                <h2 className="text-base font-bold text-[var(--gray-900)] flex items-center gap-2">
-                    <Heart className="w-5 h-5 text-[var(--color-brand)] fill-[var(--color-brand)] opacity-20" />
-                    <span className="relative -ml-6 mr-1"><Heart className="w-5 h-5 text-[var(--color-brand)]" /></span>
+        <div className="glass-card border border-white/60 p-6 relative overflow-hidden backdrop-blur-xl">
+            <div className="absolute inset-0 bg-gradient-to-br from-rose-50/50 via-transparent to-transparent opacity-50" />
+            <div className="flex justify-between items-center mb-6 relative z-10">
+                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                    <Heart className="w-5 h-5 text-rose-500 fill-rose-500 opacity-20" />
+                    <span className="relative -ml-6 mr-1"><Heart className="w-5 h-5 text-rose-500" /></span>
                     Saved Collections
                 </h2>
                 <div className="flex items-center gap-3">
-                    <Link href="/collections" className="text-xs font-semibold px-3 py-1.5 rounded-full bg-[var(--gray-50)] text-[var(--gray-700)] hover:bg-[var(--gray-100)] transition-colors border border-[var(--gray-200)] hidden sm:flex items-center gap-1.5">
+                    <Link href="/collections" className="text-xs font-bold px-4 py-2 rounded-xl bg-white text-gray-600 hover:text-rose-700 hover:bg-rose-50 shadow-sm border border-gray-100 hover:border-rose-200 transition-all hidden sm:flex items-center gap-1.5">
                         <Grid className="w-3.5 h-3.5" /> Manage
                     </Link>
-                    <Link href="/saved" className="text-sm font-medium text-[var(--color-brand)] hover:underline flex items-center">
-                        View All <ChevronRight className="w-4 h-4" />
+                    <Link href="/saved" className="text-sm font-semibold text-rose-600 hover:text-rose-700 hover:underline flex items-center transition-colors">
+                        View All <ChevronRight className="w-4 h-4 ml-0.5" />
                     </Link>
                 </div>
             </div>
@@ -106,7 +107,7 @@ export default function SavedPropertiesPreview() {
             </div>
 
             {/* Background Decoration */}
-            <div className="absolute -top-10 -right-10 opacity-[0.03] z-0 pointer-events-none">
+            <div className="absolute -top-10 -right-10 opacity-[0.02] z-0 pointer-events-none text-rose-500">
                 <Heart className="w-64 h-64" />
             </div>
         </div>

@@ -75,13 +75,38 @@ export default function MessagesPage() {
         try {
             const res = await getAgentMessages();
             if (res.success) {
-                // Determine user ID (assuming 'me' for now as current user isn't in context easily)
-                // Real implementation would filter based on current user ID
-                setConversations(res.conversations as unknown as Conversation[]);
+                const mappedConversations: Conversation[] = (res.conversations || []).map(c => ({
+                    id: c.id,
+                    participant: {
+                        id: 'unknown',
+                        name: c.contact_name || 'Unknown User',
+                        role: c.contact_type,
+                        status: 'offline' as const
+                    },
+                    last_message: {
+                        id: `last-${c.id}`,
+                        sender_id: 'unknown',
+                        content: c.last_message || 'No messages yet',
+                        timestamp: c.last_message_time || new Date().toISOString(),
+                        status: 'delivered' as const,
+                        type: 'text' as const
+                    },
+                    unread_count: c.unread_count || 0,
+                    messages: (c.messages || []).map(m => ({
+                        id: m.id,
+                        sender_id: m.sender_id,
+                        content: m.content,
+                        timestamp: m.sent_at,
+                        status: m.read ? 'read' as const : 'delivered' as const,
+                        type: (m.message_type as 'text' | 'image' | 'file') || 'text'
+                    }))
+                }));
+
+                setConversations(mappedConversations);
 
                 // Select first conversation if desktop and none selected
-                if (window.innerWidth >= 768 && !selectedId && res.conversations.length > 0) {
-                    setSelectedId(res.conversations[0].id);
+                if (window.innerWidth >= 768 && !selectedId && mappedConversations.length > 0) {
+                    setSelectedId(mappedConversations[0].id);
                 }
             }
         } catch (error) {

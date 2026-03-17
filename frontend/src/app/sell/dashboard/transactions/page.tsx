@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { get } from '@/lib/api';
+import { get, getImageUrl } from '@/lib/api';
 import {
     Receipt,
     Loader2,
@@ -126,61 +126,68 @@ export default function SellerTransactionsPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100/60 pb-6 mb-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Receipt className="w-7 h-7 text-[#ff385c]" />
+                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3 tracking-tight">
+                        <div className="p-2.5 bg-gradient-to-br from-[#FF385C] to-rose-500 rounded-2xl shadow-sm">
+                            <Receipt className="w-6 h-6 text-white" />
+                        </div>
                         Transactions
                     </h1>
-                    <p className="text-slate-500 mt-1">Track your property sales and earnings</p>
+                    <p className="text-sm font-medium text-gray-500 mt-2">Track your property sales and earnings</p>
                 </div>
             </div>
 
             {/* Earnings Summary */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-[#ff385c] rounded-2xl p-6 text-white shadow-lg">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                            <TrendingUp className="w-5 h-5" />
+                <div className="relative bg-gradient-to-r from-[#FF385C] via-rose-500 to-orange-500 rounded-3xl p-8 shadow-lg overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-125 transition-transform duration-1000" />
+                    <div className="flex items-center gap-3 mb-6 relative z-10">
+                        <div className="p-3 bg-white/20 rounded-xl backdrop-blur-md shadow-inner border border-white/30">
+                            <TrendingUp className="w-6 h-6 text-white" />
                         </div>
-                        <span className="text-white/90">Net Earnings</span>
+                        <span className="text-white/90 font-bold uppercase tracking-widest text-[11px] shadow-sm">Net Earnings</span>
                     </div>
-                    <p className="text-3xl font-bold">{formatPrice(summary.net_earnings)}</p>
-                    <p className="text-sm text-white/80 mt-1">From {summary.completed} completed sales</p>
+                    <p className="text-3xl font-bold text-white tracking-tight drop-shadow-sm relative z-10">{formatPrice(summary.net_earnings)}</p>
+                    <p className="text-xs text-white/80 font-medium mt-2 relative z-10">From {summary.completed} completed sales</p>
                 </div>
 
-                <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 p-6 shadow-sm">
+                <div className="bg-white/90 backdrop-blur-lg rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-all">
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-blue-100 rounded-lg">
-                            <IndianRupee className="w-5 h-5 text-blue-600" />
+                        <div className="p-2.5 bg-blue-50 rounded-xl">
+                            <IndianRupee className="w-6 h-6 text-blue-600" />
                         </div>
-                        <span className="text-slate-500">Total Revenue</span>
+                        <span className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">Total Revenue</span>
                     </div>
-                    <p className="text-3xl font-bold text-slate-800">{formatPrice(summary.total_revenue)}</p>
-                    <p className="text-sm text-slate-400 mt-1">Before fees</p>
+                    <div className="relative z-10">
+                        <h3 className="text-2xl font-bold text-gray-900 tracking-tight leading-none mb-1">{formatPrice(summary.total_revenue)}</h3>
+                        <p className="text-[10px] text-gray-400 font-medium mt-1">Before fees</p>
+                    </div>
                 </div>
 
-                <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 p-6 shadow-sm">
+                <div className="bg-white/90 backdrop-blur-lg rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-all">
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-amber-100 rounded-lg">
-                            <Receipt className="w-5 h-5 text-amber-600" />
+                        <div className="p-2.5 bg-rose-50 rounded-xl">
+                            <Receipt className="w-6 h-6 text-rose-500" />
                         </div>
-                        <span className="text-slate-500">Platform Fees</span>
+                        <span className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">Platform Fees</span>
                     </div>
-                    <p className="text-3xl font-bold text-slate-800">{formatPrice(summary.total_fees)}</p>
-                    <p className="text-sm text-slate-400 mt-1">Commission + service fee</p>
+                    <div className="relative z-10">
+                        <h3 className="text-2xl font-bold text-gray-900 tracking-tight leading-none mb-1">{formatPrice(summary.total_fees)}</h3>
+                        <p className="text-[10px] text-gray-400 font-medium mt-1">Commission + service fee</p>
+                    </div>
                 </div>
             </div>
 
             {/* Filters */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 mb-8 mt-8">
                 {['ALL', 'INITIATED', 'VERIFIED', 'COMPLETED', 'CANCELLED'].map((filter) => (
                     <button
                         key={filter}
                         onClick={() => setActiveFilter(filter)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeFilter === filter
-                            ? 'bg-slate-900 text-white shadow-md'
-                            : 'bg-white/70 text-slate-600 hover:bg-white hover:shadow-md border border-slate-200/50'
+                        className={`px-5 py-3 rounded-xl text-sm font-bold transition-all shadow-sm ${activeFilter === filter
+                            ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-indigo-500/20 shadow-lg -translate-y-0.5 border-transparent'
+                            : 'bg-white/90 backdrop-blur-lg text-gray-600 hover:text-gray-900 border border-gray-200/60 hover:border-gray-300 hover:bg-white'
                             }`}
                     >
                         {filter === 'ALL' ? 'All Transactions' : filter.charAt(0) + filter.slice(1).toLowerCase().replace('_', ' ')}
@@ -190,12 +197,12 @@ export default function SellerTransactionsPage() {
 
             {/* Transactions List */}
             {transactions.length === 0 ? (
-                <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 p-12 text-center shadow-sm">
-                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Receipt className="w-8 h-8 text-slate-400" />
+                <div className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-100 p-16 text-center shadow-sm">
+                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                        <Receipt className="w-10 h-10 text-gray-300" />
                     </div>
-                    <h3 className="text-lg font-semibold text-slate-800">No transactions yet</h3>
-                    <p className="text-slate-500 mt-2">When your properties are sold, transactions will appear here</p>
+                    <h3 className="text-xl font-bold text-gray-900 mb-3 tracking-tight">No transactions yet</h3>
+                    <p className="text-gray-500 font-medium max-w-md mx-auto">When your properties are sold, transactions will appear here</p>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -206,71 +213,75 @@ export default function SellerTransactionsPage() {
                         return (
                             <div
                                 key={txn.id}
-                                className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 p-6 shadow-sm hover:shadow-lg transition-all"
+                                className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-100/60 p-6 shadow-sm hover:shadow-xl transition-all hover:-translate-y-1 group relative overflow-hidden"
                             >
-                                <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 rounded-full -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                                <div className="flex flex-col lg:flex-row lg:items-center gap-6 relative z-10">
                                     {/* Property Info */}
-                                    <div className="flex items-center gap-4 flex-1 min-w-0">
-                                        <div className="w-20 h-16 bg-slate-100 rounded-xl overflow-hidden flex-shrink-0">
+                                    <div className="flex items-center gap-5 flex-1 min-w-0">
+                                        <div className="w-20 h-16 bg-gray-100 rounded-2xl overflow-hidden flex-shrink-0 shadow-sm relative">
                                             {txn.property.thumbnail_url ? (
                                                 <img
-                                                    src={txn.property.thumbnail_url}
+                                                    src={getImageUrl(txn.property.thumbnail_url) || ''}
                                                     alt={txn.property.title}
-                                                    className="w-full h-full object-cover"
+                                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out absolute inset-0"
                                                 />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center">
-                                                    <Home className="w-6 h-6 text-slate-400" />
+                                                    <Home className="w-6 h-6 text-gray-300" />
                                                 </div>
                                             )}
                                         </div>
                                         <div className="min-w-0">
-                                            <h3 className="font-semibold text-slate-800 truncate">{txn.property.title}</h3>
-                                            <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
-                                                <User className="w-3 h-3" />
+                                            <h3 className="font-bold text-gray-900 text-lg truncate tracking-tight">{txn.property.title}</h3>
+                                            <div className="flex items-center gap-2 mt-2 text-sm font-medium text-gray-500">
+                                                <User className="w-4 h-4 text-gray-400" />
                                                 <span>Sold to {txn.buyer.name}</span>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Transaction Details */}
-                                    <div className="flex flex-wrap items-center gap-6">
-                                        <div className="text-center">
-                                            <p className="text-xs text-slate-400 uppercase">Sale Price</p>
-                                            <p className="text-lg font-bold text-slate-800">{formatPrice(txn.total_price)}</p>
+                                    <div className="flex flex-wrap items-center gap-8">
+                                        <div className="text-left sm:text-center">
+                                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">Sale Price</p>
+                                            <p className="text-xl font-bold text-gray-900 tracking-tight">{formatPrice(txn.total_price)}</p>
                                         </div>
 
-                                        <ArrowRight className="w-4 h-4 text-slate-300 hidden md:block" />
+                                        <ArrowRight className="w-5 h-5 text-gray-300 hidden md:block" />
 
-                                        <div className="text-center">
-                                            <p className="text-xs text-slate-400 uppercase">You Receive</p>
-                                            <p className="text-lg font-bold text-[#ff385c]">{formatPrice(txn.seller_receives)}</p>
+                                        <div className="text-left sm:text-center">
+                                            <p className="text-[11px] font-bold text-[#ff385c] uppercase tracking-widest mb-1">You Receive</p>
+                                            <p className="text-xl font-bold text-[#ff385c] tracking-tight">{formatPrice(txn.seller_receives)}</p>
                                         </div>
 
-                                        <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border ${status.bgColor}`}>
+                                        <div className={`inline-flex items-center gap-2 px-4 py-2 bg-white/50 backdrop-blur-md rounded-xl border font-bold text-[11px] uppercase tracking-widest shadow-sm ${status.bgColor}`}>
                                             <StatusIcon className={`w-4 h-4 ${status.color}`} />
-                                            <span className={`text-sm font-medium ${status.color}`}>{txn.status_display}</span>
+                                            <span className={`${status.color}`}>{txn.status_display}</span>
                                         </div>
 
-                                        <p className="text-sm text-slate-400">{formatDate(txn.created_at)}</p>
+                                        <div className="text-left sm:text-right hidden lg:block">
+                                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">Date</p>
+                                            <p className="text-sm font-bold text-gray-600">{formatDate(txn.created_at)}</p>
+                                        </div>
                                     </div>
                                 </div>
 
                                 {/* Fee Breakdown (expanded on hover or for completed) */}
                                 {txn.status === 'COMPLETED' && (
-                                    <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-6 text-sm">
-                                        <div>
-                                            <span className="text-slate-400">Platform Fee:</span>
-                                            <span className="ml-2 text-slate-600">{formatPrice(txn.platform_fee)}</span>
+                                    <div className="mt-6 pt-6 border-t border-gray-100/60 flex flex-wrap gap-8 text-sm font-medium relative z-10">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-gray-400 uppercase tracking-widest text-[11px] font-bold">Platform Fee</span>
+                                            <span className="text-gray-900 font-bold">{formatPrice(txn.platform_fee)}</span>
                                         </div>
-                                        <div>
-                                            <span className="text-slate-400">Agent Commission:</span>
-                                            <span className="ml-2 text-slate-600">{formatPrice(txn.agent_commission)}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-gray-400 uppercase tracking-widest text-[11px] font-bold">Agent Commission</span>
+                                            <span className="text-gray-900 font-bold">{formatPrice(txn.agent_commission)}</span>
                                         </div>
                                         {txn.completed_at && (
-                                            <div>
-                                                <span className="text-slate-400">Completed:</span>
-                                                <span className="ml-2 text-slate-600">{formatDate(txn.completed_at)}</span>
+                                            <div className="flex items-center gap-2 lg:ml-auto">
+                                                <span className="text-gray-400 uppercase tracking-widest text-[11px] font-bold">Completed</span>
+                                                <span className="text-gray-600 font-bold">{formatDate(txn.completed_at)}</span>
                                             </div>
                                         )}
                                     </div>

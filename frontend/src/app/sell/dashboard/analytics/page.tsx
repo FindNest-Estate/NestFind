@@ -13,7 +13,12 @@ import {
     Calendar,
     Home,
     ArrowUpRight,
-    ArrowDownRight
+    ArrowDownRight,
+    Trophy,
+    Zap,
+    AlertCircle,
+    ArrowRight,
+    Activity
 } from 'lucide-react';
 
 interface TrendPoint {
@@ -140,27 +145,29 @@ export default function SellerAnalyticsPage() {
     return (
         <div className="space-y-8">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100/60 pb-6 mb-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <BarChart3 className="w-7 h-7 text-[#ff385c]" />
+                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3 tracking-tight">
+                        <div className="p-2.5 bg-gradient-to-br from-[#FF385C] to-rose-500 rounded-2xl shadow-sm">
+                            <BarChart3 className="w-6 h-6 text-white" />
+                        </div>
                         Analytics
                     </h1>
-                    <p className="text-slate-500 mt-1">Track your property performance and buyer engagement</p>
+                    <p className="text-sm font-medium text-gray-500 mt-2">Track your property performance and buyer engagement</p>
                 </div>
 
                 {/* Time Range Selector */}
-                <div className="flex items-center gap-2 bg-white/70 backdrop-blur-sm rounded-xl p-1 border border-slate-200/50">
+                <div className="flex items-center gap-2 bg-white/50 backdrop-blur-md rounded-2xl p-1.5 border border-gray-200/60 shadow-inner">
                     {[7, 30, 90].map((days) => (
                         <button
                             key={days}
                             onClick={() => setTimeRange(days as 7 | 30 | 90)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === days
-                                ? 'bg-[#ff385c] text-white shadow-md'
-                                : 'text-slate-600 hover:bg-slate-100'
+                            className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${timeRange === days
+                                ? 'bg-white text-gray-900 shadow-md ring-1 ring-gray-200/50'
+                                : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'
                                 }`}
                         >
-                            {days}D
+                            {days} Days
                         </button>
                     ))}
                 </div>
@@ -173,27 +180,28 @@ export default function SellerAnalyticsPage() {
                     return (
                         <div
                             key={metric.title}
-                            className={`relative overflow-hidden bg-gradient-to-br ${metric.bgColor} rounded-2xl p-6 border border-white/50 shadow-sm`}
+                            className={`relative overflow-hidden bg-white/90 backdrop-blur-lg rounded-3xl p-5 border border-gray-100 shadow-sm hover:shadow-xl transition-all hover:-translate-y-1 group`}
                         >
-                            <div className="flex items-start justify-between">
-                                <div className={`p-3 rounded-xl bg-gradient-to-br ${metric.color} shadow-lg`}>
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br opacity-5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-700 ease-out" />
+                            <div className="flex items-start justify-between relative z-10">
+                                <div className={`p-4 rounded-2xl bg-gradient-to-br ${metric.color} shadow-lg shadow-${metric.color.split('-')[1]}-500/20 group-hover:scale-110 transition-transform`}>
                                     <Icon className="w-6 h-6 text-white" />
                                 </div>
-                                <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${metric.change >= 0
-                                    ? 'bg-emerald-100 text-emerald-700'
-                                    : 'bg-red-100 text-red-700'
+                                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold shadow-sm ${metric.change >= 0
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                    : 'bg-rose-50 text-rose-700 border-rose-100'
                                     }`}>
                                     {metric.change >= 0 ? (
-                                        <ArrowUpRight className="w-3 h-3" />
+                                        <ArrowUpRight className="w-3.5 h-3.5" />
                                     ) : (
-                                        <ArrowDownRight className="w-3 h-3" />
+                                        <ArrowDownRight className="w-3.5 h-3.5" />
                                     )}
                                     {Math.abs(metric.change)}%
                                 </div>
                             </div>
-                            <div className="mt-4">
-                                <p className="text-3xl font-bold text-slate-800">{metric.value.toLocaleString()}</p>
-                                <p className="text-sm text-slate-500 mt-1">{metric.title}</p>
+                            <div className="mt-6 relative z-10">
+                                <p className="text-2xl font-bold text-gray-900 tracking-tight">{metric.value.toLocaleString()}</p>
+                                <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">{metric.title}</p>
                             </div>
                         </div>
                     );
@@ -201,91 +209,93 @@ export default function SellerAnalyticsPage() {
             </div>
 
             {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
                 {/* Views Trend */}
-                <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 p-6 shadow-sm">
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <h3 className="font-bold text-slate-800">Views Trend</h3>
-                            <p className="text-sm text-slate-500">Daily property views</p>
-                        </div>
-                        <div className="p-2 bg-blue-100 rounded-lg">
-                            <Eye className="w-5 h-5 text-blue-600" />
-                        </div>
+                <div className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-100 p-8 shadow-sm relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/30 to-blue-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    <div className="relative z-10">
+                        <h3 className="font-bold text-gray-900 text-xl tracking-tight">Views Trend</h3>
+                        <p className="text-sm font-medium text-gray-500 mt-1 mb-6">Property page views over the last {timeRange} days</p>
+                        {analytics?.views_trend && analytics.views_trend.length > 0 ? (
+                            <SimpleBarChart data={analytics.views_trend} color="bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-t-lg" />
+                        ) : (
+                            <div className="h-24 flex items-center justify-center text-gray-400 font-medium text-sm">
+                                No data available
+                            </div>
+                        )}
                     </div>
-                    {analytics?.views_trend && analytics.views_trend.length > 0 ? (
-                        <SimpleBarChart data={analytics.views_trend} color="bg-gradient-to-t from-blue-500 to-blue-400" />
-                    ) : (
-                        <div className="h-24 flex items-center justify-center text-slate-400 text-sm">
-                            No data available
-                        </div>
-                    )}
                 </div>
 
                 {/* Saves Trend */}
-                <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 p-6 shadow-sm">
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <h3 className="font-bold text-slate-800">Saves Trend</h3>
-                            <p className="text-sm text-slate-500">Properties saved by buyers</p>
-                        </div>
-                        <div className="p-2 bg-pink-100 rounded-lg">
-                            <Heart className="w-5 h-5 text-pink-600" />
-                        </div>
+                <div className="bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-100 p-8 shadow-sm relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-rose-50/30 to-pink-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    <div className="relative z-10">
+                        <h3 className="font-bold text-gray-900 text-xl tracking-tight">Saves Trend</h3>
+                        <p className="text-sm font-medium text-gray-500 mt-1 mb-6">Properties saved by buyers over the last {timeRange} days</p>
+                        {analytics?.saves_trend && analytics.saves_trend.length > 0 ? (
+                            <SimpleBarChart data={analytics.saves_trend} color="bg-gradient-to-t from-rose-500 to-rose-400 rounded-t-lg" />
+                        ) : (
+                            <div className="h-24 flex items-center justify-center text-gray-400 font-medium text-sm">
+                                No data available
+                            </div>
+                        )}
                     </div>
-                    {analytics?.saves_trend && analytics.saves_trend.length > 0 ? (
-                        <SimpleBarChart data={analytics.saves_trend} color="bg-gradient-to-t from-pink-500 to-pink-400" />
-                    ) : (
-                        <div className="h-24 flex items-center justify-center text-slate-400 text-sm">
-                            No data available
-                        </div>
-                    )}
                 </div>
             </div>
 
             {/* Top Performing Property */}
             {analytics?.top_property && (
-                <div className="bg-[#ff385c] rounded-2xl p-6 text-white shadow-lg">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                            <TrendingUp className="w-6 h-6" />
+                <div className="relative bg-gradient-to-r from-[#FF385C] via-rose-500 to-orange-500 rounded-3xl p-8 shadow-lg overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-125 transition-transform duration-1000" />
+                    <div className="absolute top-1/2 right-4 -translate-y-1/2 opacity-10">
+                        <TrendingUp className="w-48 h-48 text-white scale-125 group-hover:scale-110 transition-transform duration-700" />
+                    </div>
+                    <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
+                        <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-md shadow-inner border border-white/30">
+                            <TrendingUp className="w-8 h-8 text-white" />
                         </div>
-                        <div className="flex-1">
-                            <p className="text-white/80 text-sm">Top Performing Property</p>
-                            <h3 className="text-xl font-bold mt-1">{analytics.top_property.title}</h3>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-3xl font-bold">{analytics.top_property.views}</p>
-                            <p className="text-white/80 text-sm">total views</p>
+                        <div className="relative z-20 flex-1 pl-4 sm:pl-8">
+                            <p className="text-[11px] font-bold text-indigo-200 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                <Trophy className="w-4 h-4 text-amber-300" />
+                                Top Performing Property
+                            </p>
+                            <h3 className="text-xl font-bold text-white tracking-tight drop-shadow-sm">{analytics.top_property.title}</h3>
+                            <div className="mt-6 flex flex-wrap gap-8">
+                                <div>
+                                    <p className="text-3xl font-bold text-white leading-none mb-1 shadow-sm">{analytics.top_property.views.toLocaleString()}</p>
+                                    <p className="text-xs font-medium text-indigo-100 uppercase tracking-wider">Total Views</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Insights */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-white/50 p-6 shadow-sm">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
-                    <TrendingUp className="w-5 h-5 text-[#ff385c]" />
-                    Key Insights
+            {/* Deep Insights Widget */}
+            <div className="mt-8 bg-white/90 backdrop-blur-lg rounded-3xl border border-gray-100 p-8 shadow-sm relative overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.03),transparent_40%)]" />
+                <h3 className="font-bold text-gray-900 text-xl tracking-tight flex items-center gap-3 mb-8 border-b border-gray-100/60 pb-6">
+                    <Zap className="w-6 h-6 text-amber-500" />
+                    Actionable Insights
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 bg-slate-50 rounded-xl">
-                        <p className="text-sm text-slate-500">Average Daily Views</p>
-                        <p className="text-2xl font-bold text-slate-800 mt-1">
-                            {analytics ? Math.round(analytics.total_views_30d / timeRange) : 0}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="p-6 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-slate-100/80 transition-colors">
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Average Daily Views</p>
+                        <p className="text-3xl font-bold text-gray-900">
+                            {analytics ? Math.round(analytics.total_views_30d / timeRange).toLocaleString() : 0}
                         </p>
                     </div>
-                    <div className="p-4 bg-slate-50 rounded-xl">
-                        <p className="text-sm text-slate-500">Save Rate</p>
-                        <p className="text-2xl font-bold text-slate-800 mt-1">
+                    <div className="p-6 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-slate-100/80 transition-colors">
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Save Rate</p>
+                        <p className="text-3xl font-bold text-gray-900">
                             {analytics && analytics.total_views_30d > 0
                                 ? ((analytics.total_saves_30d / analytics.total_views_30d) * 100).toFixed(1)
                                 : 0}%
                         </p>
                     </div>
-                    <div className="p-4 bg-slate-50 rounded-xl">
-                        <p className="text-sm text-slate-500">Inquiry Rate</p>
-                        <p className="text-2xl font-bold text-slate-800 mt-1">
+                    <div className="p-6 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-slate-100/80 transition-colors">
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Inquiry Rate</p>
+                        <p className="text-3xl font-bold text-gray-900">
                             {analytics && analytics.total_views_30d > 0
                                 ? ((analytics.total_inquiries_30d / analytics.total_views_30d) * 100).toFixed(1)
                                 : 0}%

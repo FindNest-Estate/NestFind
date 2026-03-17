@@ -27,10 +27,12 @@ export default function Navbar() {
     const { user, isLoading, logout, activeContext, switchContext } = useAuth();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [mounted, setMounted] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
 
     useEffect(() => {
+        setMounted(true);
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsDropdownOpen(false);
@@ -117,7 +119,7 @@ export default function Navbar() {
 
                 {/* Right side */}
                 <div className="auth-buttons">
-                    {isLoading ? (
+                    {!mounted || isLoading ? (
                         <div className="w-9 h-9 rounded-full bg-[var(--gray-200)] animate-pulse" />
                     ) : user ? (
                         <div className="flex items-center gap-3">

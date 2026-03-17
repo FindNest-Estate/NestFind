@@ -10,7 +10,7 @@
  * instead of silently redirecting, when the user is logged in but lacks the role.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
@@ -40,6 +40,11 @@ export default function RoleGuard({
 }: RoleGuardProps) {
     const { user, isLoading, activeContext } = useAuth();
     const router = useRouter();
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     // STRICT CHECK: User must be logged in AND their current active context must match allowedRoles
     // This prevents a user from accessing Seller routes while in Buyer context
@@ -64,8 +69,8 @@ export default function RoleGuard({
         }
     }, [isLoading, isAuthorized, router, fallbackUrl, showActivationPrompt, isMissingRole, hasRoleButWrongContext]);
 
-    // Show spinner while auth is loading
-    if (isLoading) {
+    // Show spinner while auth is loading or component is not mounted
+    if (!isMounted || isLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50">
                 <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#FF385C]"></div>

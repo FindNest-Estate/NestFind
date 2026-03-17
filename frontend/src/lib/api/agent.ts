@@ -228,7 +228,7 @@ export async function completeVerification(
         gps_lng?: number;
         notes?: string;
         rejection_reason?: string;
-        checklist?: Record<string, boolean>;
+        checklist?: Record<string, any>;
     }
 ): Promise<ActionResponse> {
     return post<ActionResponse>(`/agent/assignments/${assignmentId}/complete-verification`, data);

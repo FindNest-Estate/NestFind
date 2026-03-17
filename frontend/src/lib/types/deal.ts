@@ -102,6 +102,7 @@ export interface Deal {
 
     // Phase 3: Execution Readiness
     execution_stage?: string | null;  // e.g. 'AWAITING_DOCS', 'DOCS_REVIEW', 'READY_FOR_REGISTRATION'
+    pre_dispute_status?: string | null;
     is_frozen?: boolean; // Phase 4B
     freeze_reason?: string;
     registration_date?: string | null; // ISO Date string
@@ -120,6 +121,18 @@ export interface DealDetail extends Deal {
         bedrooms?: number | null;
         bathrooms?: number | null;
         area_sqft?: number | null;
+        property_sub_type?: string | null;
+        floor_number?: number | null;
+        total_floors?: number | null;
+        property_age_years?: number | null;
+        balconies?: number | null;
+        parking_available?: boolean | null;
+        parking_count?: number | null;
+        furnishing_status?: string | null;
+        facing_direction?: string | null;
+        price_negotiable?: boolean | null;
+        maintenance_charges?: number | null;
+        ownership_type?: string | null;
     };
     parties: {
         buyer: { id: string; name: string; email?: string; mobile_number?: string; };

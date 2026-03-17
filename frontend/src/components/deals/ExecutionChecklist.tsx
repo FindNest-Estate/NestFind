@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { DealDetail, DealStatus } from "@/lib/types/deal";
 import { transitionDeal } from "@/lib/api/deals";
-import { CheckCircle2, Circle, Clock, FileText, DollarSign, Calendar, Loader2, Upload, ChevronRight } from "lucide-react";
+import { CheckCircle2, Circle, Clock, FileText, DollarSign, Calendar, Loader2, Upload, ChevronRight, AlertCircle } from "lucide-react";
 import { BookingProofUpload } from "./BookingProofUpload";
 import { useToast } from "@/components/ui/Toast";
 import Link from "next/link";
+import { motion } from "framer-motion";
 
 interface ExecutionChecklistProps {
     deal: DealDetail;
@@ -236,19 +237,18 @@ export function ExecutionChecklist({ deal, currentUserRole, onRefresh }: Executi
     // -----------------------------------------------------------------------
     if (currentStepIndex < 0) {
         return (
-            <div className="bg-white rounded-[var(--card-radius)] border border-[var(--gray-200)] p-5">
+            <div className="glass-card border border-gray-200 p-6 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1.5 h-full bg-gray-300" />
                 <div className="flex items-center gap-2 mb-4">
-                    <Clock className="w-5 h-5 text-[var(--color-brand)]" />
-                    <h2 className="text-sm font-bold text-[var(--gray-900)]">Execution Checklist</h2>
+                    <Clock className="w-5 h-5 text-gray-400" />
+                    <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Execution Checklist</h2>
                 </div>
-                <div className="p-4 bg-[var(--gray-50)] rounded-lg text-center text-sm text-[var(--gray-500)]">
-                    <Clock className="w-6 h-6 mx-auto mb-2 text-[var(--gray-300)]" />
-                    Checklist unlocks once price is agreed and token payment is due.
-                    <div className="mt-2">
-                        <span className="font-medium text-[var(--gray-700)]">Current Stage:</span>{' '}
-                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold border border-blue-100">
-                            {deal.status.replace(/_/g, ' ')}
-                        </span>
+                <div className="p-6 bg-gray-50/50 rounded-xl text-center text-sm text-gray-500 border border-gray-100 border-dashed">
+                    <AlertCircle className="w-8 h-8 mx-auto mb-3 text-gray-300" />
+                    <p className="max-w-xs mx-auto">Checklist unlocks once the price is agreed and the initial token payment is due.</p>
+                    <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg shadow-sm">
+                        <span className="font-medium text-gray-600 text-xs uppercase tracking-wider">Current Stage:</span>
+                        <span className="text-blue-700 font-bold block">{deal.display_status || deal.status.replace(/_/g, ' ')}</span>
                     </div>
                 </div>
             </div>
@@ -256,56 +256,110 @@ export function ExecutionChecklist({ deal, currentUserRole, onRefresh }: Executi
     }
 
     return (
-        <div className="bg-white rounded-[var(--card-radius)] border border-[var(--gray-200)] p-5">
-            <div className="flex items-center gap-2 mb-5">
-                <CheckCircle2 className="w-5 h-5 text-[var(--color-brand)]" />
-                <h2 className="text-sm font-bold text-[var(--gray-900)]">Execution Checklist</h2>
+        <div className="glass-card p-6 md:p-8 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-blue-500 to-purple-600" />
+            
+            <div className="flex items-center gap-3 mb-8">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                    <h2 className="text-lg font-bold text-gray-900 tracking-tight">Execution Checklist</h2>
+                    <p className="text-xs text-gray-500 font-medium">Complete these milestones to close the deal.</p>
+                </div>
             </div>
-            <div className="space-y-1">
+
+            <motion.div 
+                className="space-y-4"
+                initial="hidden"
+                animate="visible"
+                variants={{
+                    visible: { transition: { staggerChildren: 0.1 } }
+                }}
+            >
                 {steps.map((step, index) => {
                     const Icon = step.icon;
                     const isLast = index === steps.length - 1;
+                    const isCurrent = step.status === 'CURRENT';
+                    const isCompleted = step.status === 'COMPLETED';
+                    const isPending = step.status === 'PENDING';
+
                     return (
-                        <div key={step.id} className="relative pl-9">
+                        <motion.div 
+                            key={step.id} 
+                            variants={{
+                                hidden: { opacity: 0, x: -20 },
+                                visible: { opacity: 1, x: 0 }
+                            }}
+                            className="relative"
+                        >
                             {/* Connector line */}
                             {!isLast && (
-                                <div className={`absolute left-[14px] top-8 bottom-0 w-0.5 ${step.status === 'COMPLETED' ? 'bg-emerald-200' : 'bg-[var(--gray-100)]'}`} />
+                                <div className={`absolute left-[19px] top-10 bottom-[-16px] w-[2px] z-0 ${isCompleted ? 'bg-emerald-400' : 'bg-gray-200'}`} />
                             )}
 
-                            {/* Icon bubble */}
-                            <div className={`absolute left-0 top-0.5 w-7 h-7 rounded-full flex items-center justify-center border-2 ${step.status === 'COMPLETED' ? 'bg-emerald-500 border-emerald-500 text-white' :
-                                    step.status === 'CURRENT' ? 'bg-blue-600 border-blue-600 text-white' :
-                                        'bg-white border-[var(--gray-200)] text-[var(--gray-400)]'
-                                }`}>
-                                {step.status === 'COMPLETED' ? (
-                                    <CheckCircle2 className="w-4 h-4" />
-                                ) : step.status === 'CURRENT' ? (
-                                    <Clock className="w-3.5 h-3.5 animate-pulse" />
-                                ) : (
-                                    <Icon className="w-3.5 h-3.5" />
-                                )}
-                            </div>
-
-                            {/* Content */}
-                            <div className={`pb-7 transition-opacity ${step.status === 'PENDING' ? 'opacity-40' : ''}`}>
-                                <h3 className={`text-sm font-semibold ${step.status === 'CURRENT' ? 'text-blue-700' : 'text-[var(--gray-900)]'}`}>
-                                    {step.title}
-                                    {step.status === 'COMPLETED' && (
-                                        <span className="ml-2 text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Done</span>
+                            <div className={`relative z-10 flex gap-4 p-4 rounded-2xl border-2 transition-all duration-300 ${
+                                isCurrent 
+                                    ? 'bg-blue-50/50 border-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.1)] scale-[1.02] transform-gpu' 
+                                    : isCompleted
+                                        ? 'bg-white border-emerald-100 hover:border-emerald-200'
+                                        : 'bg-gray-50/50 border-transparent opacity-60 grayscale-[0.5]'
+                            }`}>
+                                {/* Icon bubble */}
+                                <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center border-2 shadow-sm ${
+                                    isCompleted 
+                                        ? 'bg-emerald-500 border-emerald-500 text-white' 
+                                        : isCurrent 
+                                            ? 'bg-blue-600 border-blue-600 text-white' 
+                                            : 'bg-white border-gray-300 text-gray-400'
+                                    }`}>
+                                    {isCompleted ? (
+                                        <CheckCircle2 className="w-5 h-5" />
+                                    ) : isCurrent ? (
+                                        <Clock className="w-5 h-5 animate-pulse" />
+                                    ) : (
+                                        <Icon className="w-5 h-5" />
                                     )}
-                                </h3>
-                                <p className="text-xs text-[var(--gray-500)] mt-0.5 leading-relaxed">{step.description}</p>
+                                </div>
 
-                                {step.status === 'CURRENT' && step.renderAction && (
-                                    <div className="mt-1">
-                                        {step.renderAction()}
+                                {/* Content */}
+                                <div className="flex-1 pt-1">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <h3 className={`text-base font-bold tracking-tight ${isCurrent ? 'text-blue-900' : isCompleted ? 'text-gray-900' : 'text-gray-600'}`}>
+                                                {step.title}
+                                            </h3>
+                                            <p className={`text-sm mt-1 leading-relaxed ${isCurrent ? 'text-blue-700/80' : 'text-gray-500'}`}>
+                                                {step.description}
+                                            </p>
+                                        </div>
+                                        {isCompleted && (
+                                            <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[10px] uppercase font-black tracking-widest rounded-full">
+                                                Done
+                                            </span>
+                                        )}
+                                        {isCurrent && (
+                                            <span className="px-2.5 py-1 bg-blue-100 text-blue-800 text-[10px] uppercase font-black tracking-widest rounded-full animate-pulse">
+                                                Action Required
+                                            </span>
+                                        )}
                                     </div>
-                                )}
+
+                                    {isCurrent && step.renderAction && (
+                                        <motion.div 
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: 'auto' }}
+                                            className="mt-4 pt-4 border-t border-blue-200/50"
+                                        >
+                                            {step.renderAction()}
+                                        </motion.div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        </motion.div>
                     );
                 })}
-            </div>
+            </motion.div>
         </div>
     );
 }

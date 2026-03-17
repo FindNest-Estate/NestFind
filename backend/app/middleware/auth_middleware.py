@@ -249,3 +249,26 @@ async def get_optional_user(
             return context
 
     return None
+
+async def get_current_user_ws(
+    websocket: Request, # Works for WebSocket scope as well
+    token: Optional[str] = None,
+    db_pool=Depends(get_db_pool)
+) -> str:
+    """
+    WebSocket specific authenticaton.
+    Extracts token from query parameters.
+    Returns user_id as string.
+    """
+    if not token:
+        # Try to get from query params directly if not injected
+        token = websocket.query_params.get("token")
+        
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
+
+    context = await _build_user_context(token, db_pool)
+    if not context or context.status != "ACTIVE":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    return str(context.user_id)
