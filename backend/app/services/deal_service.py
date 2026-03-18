@@ -365,6 +365,19 @@ class DealService:
                 "deal": self._format_deal(deal, property_data['title']),
                 "message": "Deal created successfully. Property is now under deal."
             }
+
+        # Trust Engine: velocity fraud detection (best-effort)
+        try:
+            from .trust_fraud_engine import FraudDetectionService
+            fd = FraudDetectionService(self.db)
+            await fd.run_detectors("DEAL_CREATION", {
+                "property_id": property_id,
+                "buyer_id": buyer_id,
+            })
+        except Exception:
+            pass
+
+        return result_from_deal
     
     async def finalize_deal_from_offer(
         self,
@@ -611,6 +624,16 @@ class DealService:
                         "success": False,
                         "error": "Cannot advance to REGISTRATION — SALE agreement must be signed by buyer and seller first."
                     }
+
+                # Guard 5b (Phase 6): Title clear gate
+                from .title_escrow_engine import TitleSearchService
+                ts_svc = TitleSearchService(self.db)
+                title_is_clear = await ts_svc.check_title_clear(deal_id)
+                if not title_is_clear:
+                    return {
+                        "success": False,
+                        "error": "Cannot advance to REGISTRATION — title search must be in CLEAR status. Complete a title search first."
+                    }
             
             # Guard 6 (Phase 5A): Commission release gate
             if new_status == 'COMMISSION_RELEASED':
@@ -652,6 +675,27 @@ class DealService:
                         import logging
                         logging.getLogger(__name__).warning(
                             f"Commission lifecycle hook failed for deal {deal_id}: {e}"
+                        )
+
+                    # Trust Engine: recompute scores on deal completion
+                    try:
+                        from .trust_fraud_engine import TrustScoreService, AgentScoreService
+                        _ts = TrustScoreService(self.db)
+                        await _ts.compute_property_score(deal['property_id'], trigger_source="DEAL_COMPLETED")
+                        _ag = AgentScoreService(self.db)
+                        await _ag.compute_agent_score(deal['agent_id'], trigger_source="DEAL_COMPLETED")
+                    except Exception:
+                        pass
+
+                    # Phase 6: Generate escrow disbursement schedule on completion
+                    try:
+                        from .title_escrow_engine import EscrowService
+                        escrow_svc = EscrowService(self.db)
+                        await escrow_svc.generate_disbursement_schedule(deal_id)
+                    except Exception as _e:
+                        import logging
+                        logging.getLogger(__name__).warning(
+                            f"Escrow schedule generation failed for deal {deal_id}: {_e}"
                         )
                 
                 # Phase 5A: Commission release — mark as SETTLED
@@ -780,6 +824,55 @@ class DealService:
                         cancellation_reason = $3
                     WHERE id = $1
                 """, deal_id, actor_id, reason)
+                
+                # Payment Engine Refund Integration
+                if deal.get('reservation_id'):
+                    reservation = await conn.fetchrow("""
+                        SELECT payment_intent_id, amount
+                        FROM reservations
+                        WHERE id = $1
+                    """, deal['reservation_id'])
+                    
+                    if reservation and reservation.get('payment_intent_id'):
+                        intent = await conn.fetchrow("""
+                            SELECT id, status FROM payment_intents
+                            WHERE id = $1 AND status IN ('CAPTURED', 'SETTLED')
+                        """, reservation['payment_intent_id'])
+                        
+                        if intent:
+                            try:
+                                from .payment_engine.payment_service import PaymentService
+                                payment_svc = PaymentService(self.db)
+                                await payment_svc.request_refund(
+                                    intent_id=intent['id'],
+                                    amount=Decimal(str(reservation['amount'])),
+                                    reason=f"Deal cancelled based on reason: {reason}" if reason else "Deal cancelled before completion",
+                                    requested_by=actor_id
+                                )
+                                # Update reservation refund amount
+                                await conn.execute("""
+                                    UPDATE reservations
+                                    SET refund_amount = $2
+                                    WHERE id = $1
+                                """, deal['reservation_id'], reservation['amount'])
+                                
+                                # Record refund in ledger
+                                from .ledger_service import LedgerService
+                                ledger_svc = LedgerService(self.db)
+                                await ledger_svc.record_entry(
+                                    deal_id=deal_id,
+                                    entry_type='TOKEN_REFUNDED',
+                                    amount=Decimal(str(reservation['amount'])),
+                                    direction='DEBIT',
+                                    description=f"Token refunded due to deal cancellation. Reason: {reason}" if reason else "Token refunded due to deal cancellation.",
+                                    user_id=actor_id,
+                                    verification_status='VERIFIED'
+                                )
+                            except Exception as e:
+                                import logging
+                                logging.getLogger(__name__).warning(
+                                    f"Refund failed during deal {deal_id} cancellation: {e}"
+                                )
                 
                 # Revert property to ACTIVE
                 await conn.execute("""
@@ -1603,6 +1696,7 @@ class DealService:
         """
         deal_id = deal['id']
         token_amount = deal['token_amount'] or Decimal('0')
+        refund_result = None
         
         if deal_role == 'BUYER':
             # BUYER cancels at TOKEN_PAID → token forfeited
@@ -2019,3 +2113,7 @@ class DealService:
             "cancellation_reason": deal['cancellation_reason'],
             "pre_dispute_status": deal.get('pre_dispute_status', None)
         }
+
+
+
+

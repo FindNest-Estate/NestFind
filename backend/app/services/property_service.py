@@ -234,7 +234,7 @@ class PropertyService:
                     json.dumps({"title": title, "type": property_type})
                 )
                 
-                return {
+                result_data = {
                     "success": True,
                     "property": {
                         "id": property_id,
@@ -247,6 +247,31 @@ class PropertyService:
                         }
                     }
                 }
+
+        # Trust Engine hooks (best-effort, outside transaction)
+        try:
+            from .trust_fraud_engine import FraudDetectionService, TrustScoreService
+            async with self.db.acquire() as _conn:
+                await _conn.execute(
+                    """
+                    INSERT INTO property_trust_scores (property_id, trust_score)
+                    VALUES ($1, 0)
+                    ON CONFLICT (property_id) DO NOTHING
+                    """,
+                    property_id
+                )
+            fraud_svc = FraudDetectionService(self.db)
+            await fraud_svc.run_detectors("PROPERTY_SUBMISSION", {
+                "property_id": property_id, "address": None, "city": None,
+                "latitude": None, "longitude": None,
+                "price": None, "area_sqft": None, "property_type": property_type,
+            })
+            trust_svc = TrustScoreService(self.db)
+            await trust_svc.compute_property_score(property_id, trigger_source="PROPERTY_SUBMISSION")
+        except Exception:
+            pass
+
+        return result_data
     
     async def get_seller_properties(
         self,

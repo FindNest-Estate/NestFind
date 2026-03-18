@@ -28,6 +28,7 @@ class ReservationService:
     
     # Valid state transitions
     VALID_TRANSITIONS = {
+        'PAYMENT_PENDING': ['ACTIVE', 'EXPIRED', 'CANCELLED'],
         'ACTIVE': ['COMPLETED', 'EXPIRED', 'CANCELLED'],
         'COMPLETED': [],
         'EXPIRED': [],
@@ -36,6 +37,7 @@ class ReservationService:
     
     # Display status labels
     DISPLAY_STATUS = {
+        'PAYMENT_PENDING': 'Payment Pending',
         'ACTIVE': 'Active',
         'COMPLETED': 'Completed',
         'EXPIRED': 'Expired',
@@ -57,6 +59,10 @@ class ReservationService:
         """Compute allowed actions based on status."""
         actions = []
         
+        if status == 'PAYMENT_PENDING' and is_buyer:
+            actions.append('pay_now')
+            actions.append('cancel')
+
         if status == 'ACTIVE' and is_buyer:
             actions.append('cancel')
             actions.append('proceed_to_registration')
@@ -587,3 +593,240 @@ class ReservationService:
                 "success": True,
                 "expired_count": len(expired)
             }
+
+    async def create_reservation_with_payment_intent(
+        self,
+        offer_id: UUID,
+        buyer_id: UUID,
+        ip_address: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create reservation in PAYMENT_PENDING and return checkout URL."""
+        async with self.db.acquire() as conn:
+            offer = await conn.fetchrow(
+                """
+                SELECT o.*, p.seller_id, p.title as property_title, p.status as property_status
+                FROM offers o
+                JOIN properties p ON p.id = o.property_id
+                WHERE o.id = $1
+                """,
+                offer_id,
+            )
+            if not offer:
+                return {"success": False, "error": "Offer not found"}
+            if offer['buyer_id'] != buyer_id:
+                return {"success": False, "error": "Only the offer buyer can create a reservation"}
+            if offer['status'] != 'ACCEPTED':
+                return {"success": False, "error": f"Offer status must be ACCEPTED. Current: {offer['status']}"}
+            if offer['property_status'] not in ('ACTIVE', 'UNDER_DEAL'):
+                return {"success": False, "error": f"Property is not available (status: {offer['property_status']})"}
+
+            existing = await conn.fetchrow(
+                """
+                SELECT id, status
+                FROM reservations
+                WHERE property_id = $1
+                  AND status IN ('ACTIVE', 'PAYMENT_PENDING')
+                LIMIT 1
+                """,
+                offer['property_id'],
+            )
+            if existing:
+                return {
+                    "success": False,
+                    "error": f"Property already has an active/pending reservation (status: {existing['status']})",
+                }
+
+            agreed_price = Decimal(str(offer['counter_price'] or offer['offered_price']))
+            deposit_amount = (agreed_price * RESERVATION_DEPOSIT_PERCENT).quantize(Decimal('0.01'))
+            now = datetime.now(timezone.utc)
+            end_date = now + timedelta(days=RESERVATION_VALIDITY_DAYS)
+
+            reservation = await conn.fetchrow(
+                """
+                INSERT INTO reservations (
+                    property_id, buyer_id, offer_id,
+                    amount, property_price,
+                    start_date, end_date,
+                    status
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 'PAYMENT_PENDING')
+                RETURNING id, property_id, buyer_id, offer_id,
+                          amount, property_price, start_date, end_date,
+                          status, created_at
+                """,
+                offer['property_id'],
+                buyer_id,
+                offer_id,
+                deposit_amount,
+                agreed_price,
+                now,
+                end_date,
+            )
+
+        from .payment_engine.payment_service import PaymentService
+
+        payment_service = PaymentService(self.db)
+        intent_result = await payment_service.create_payment_intent(
+            intent_type='RESERVATION',
+            reference_id=reservation['id'],
+            reference_type='reservation',
+            amount=deposit_amount,
+            currency='INR',
+            payer_id=buyer_id,
+            ip_address=ip_address or 'unknown',
+            metadata={'offer_id': str(offer_id), 'property_id': str(offer['property_id'])},
+        )
+
+        if not intent_result.get('success'):
+            return {"success": False, "error": intent_result.get('error', 'Failed to create payment intent')}
+
+        async with self.db.acquire() as conn:
+            await conn.execute(
+                "UPDATE reservations SET payment_intent_id = $2 WHERE id = $1",
+                reservation['id'],
+                UUID(intent_result['intent_id']),
+            )
+
+        return {
+            "success": True,
+            "reservation": {
+                "id": str(reservation['id']),
+                "property_id": str(reservation['property_id']),
+                "property_title": offer['property_title'],
+                "buyer_id": str(reservation['buyer_id']),
+                "offer_id": str(reservation['offer_id']),
+                "amount": float(reservation['amount']),
+                "property_price": float(reservation['property_price']),
+                "status": reservation['status'],
+                "display_status": 'Payment Pending',
+                "created_at": reservation['created_at'].isoformat(),
+            },
+            "payment": {
+                "intent_id": intent_result['intent_id'],
+                "checkout_url": intent_result['checkout_url'],
+                "expires_at": intent_result['expires_at'],
+                "provider": intent_result['provider'],
+            },
+            "next_step": "Complete payment to activate reservation",
+        }
+
+    async def activate_reservation_after_payment(
+        self,
+        reservation_id: UUID,
+        payment_intent_id: UUID,
+        payment_reference: Optional[str],
+        payment_method: str = 'MOCK',
+        ip_address: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Activate reservation after payment intent is captured."""
+        async with self.db.acquire() as conn:
+            reservation = await conn.fetchrow(
+                """
+                SELECT r.*, p.seller_id, p.title as property_title
+                FROM reservations r
+                JOIN properties p ON p.id = r.property_id
+                WHERE r.id = $1
+                """,
+                reservation_id,
+            )
+            if not reservation:
+                return {"success": False, "error": "Reservation not found"}
+
+            if reservation['status'] == 'ACTIVE':
+                return {"success": True, "idempotent": True, "status": 'ACTIVE'}
+
+            if reservation['status'] != 'PAYMENT_PENDING':
+                return {
+                    "success": False,
+                    "error": f"Reservation cannot be activated from {reservation['status']} state",
+                }
+
+            async with conn.transaction():
+                await conn.execute(
+                    """
+                    UPDATE reservations
+                    SET status = 'ACTIVE',
+                        payment_reference = $2,
+                        payment_method = $3,
+                        payment_intent_id = $4
+                    WHERE id = $1
+                    """,
+                    reservation_id,
+                    payment_reference,
+                    payment_method,
+                    payment_intent_id,
+                )
+
+                await conn.execute(
+                    "UPDATE properties SET status = 'RESERVED' WHERE id = $1",
+                    reservation['property_id'],
+                )
+
+        try:
+            notifications_service = NotificationsService(self.db)
+            await notifications_service.create_notification(
+                user_id=reservation['seller_id'],
+                notification_type='PROPERTY_RESERVED',
+                title='Property Reserved',
+                message=f"Your property {reservation['property_title']} has been reserved.",
+                related_entity_type='reservation',
+                related_entity_id=reservation_id,
+            )
+        except Exception:
+            pass
+
+        try:
+            from .deal_service import DealService
+
+            deal_service = DealService(self.db)
+            deal = await deal_service.get_active_deal_by_property(property_id=reservation['property_id'])
+            if deal:
+                if deal['status'] == 'TOKEN_PENDING':
+                    await deal_service.transition_deal(
+                        deal_id=deal['id'],
+                        new_status='TOKEN_PAID',
+                        actor_id=reservation['buyer_id'],
+                        actor_role='BUYER',
+                        notes='Token payment captured via payment engine',
+                        metadata={
+                            'reservation_id': str(reservation_id),
+                            'payment_intent_id': str(payment_intent_id),
+                        },
+                        ip_address=ip_address,
+                    )
+
+                await deal_service.link_reservation(
+                    deal_id=deal['id'],
+                    reservation_id=reservation_id,
+                    token_amount=Decimal(str(reservation['amount'])),
+                    actor_id=reservation['buyer_id'],
+                    actor_role='BUYER',
+                )
+        except Exception:
+            pass
+
+        return {"success": True, "status": 'ACTIVE'}
+
+    async def expire_reservation_for_payment_timeout(self, reservation_id: UUID) -> Dict[str, Any]:
+        """Expire PAYMENT_PENDING reservation when payment intent expires/times out."""
+        async with self.db.acquire() as conn:
+            reservation = await conn.fetchrow("SELECT * FROM reservations WHERE id = $1", reservation_id)
+            if not reservation:
+                return {"success": False, "error": "Reservation not found"}
+
+            if reservation['status'] != 'PAYMENT_PENDING':
+                return {"success": True, "status": reservation['status'], "idempotent": True}
+
+            await conn.execute(
+                """
+                UPDATE reservations
+                SET status = 'EXPIRED',
+                    cancellation_reason = 'Payment intent expired before checkout completion'
+                WHERE id = $1
+                """,
+                reservation_id,
+            )
+
+        return {"success": True, "status": 'EXPIRED'}
+
+

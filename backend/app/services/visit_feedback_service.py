@@ -156,6 +156,20 @@ class VisitFeedbackService:
                 interest_level.upper() if interest_level else None,
                 liked_aspects, concerns, would_recommend)
             
+            # Trust Engine hooks (best-effort)
+            try:
+                from .trust_fraud_engine import TrustScoreService, AgentScoreService
+                visit_row = await conn.fetchrow(
+                    "SELECT property_id, agent_id FROM visit_requests WHERE id = $1", visit_id
+                )
+                if visit_row:
+                    ts = TrustScoreService(self.db)
+                    await ts.compute_property_score(visit_row["property_id"], trigger_source="BUYER_FEEDBACK")
+                    ag = AgentScoreService(self.db)
+                    await ag.compute_agent_score(visit_row["agent_id"], trigger_source="BUYER_FEEDBACK")
+            except Exception:
+                pass
+
             return {
                 "success": True,
                 "feedback_id": str(feedback_id),

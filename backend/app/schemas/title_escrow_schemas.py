@@ -6,15 +6,21 @@ from enum import Enum
 
 class TitleSearchStatus(str, Enum):
     PENDING_SEARCH = "PENDING_SEARCH"
+    IN_PROGRESS = "IN_PROGRESS"
     CLEAR = "CLEAR"
     ENCUMBRANCES_FOUND = "ENCUMBRANCES_FOUND"
+    RESOLUTION_IN_PROGRESS = "RESOLUTION_IN_PROGRESS"
     REJECTED = "REJECTED"
+    EXPIRED = "EXPIRED"
 
 class EscrowDisbursementStatus(str, Enum):
     PENDING = "PENDING"
+    APPROVED = "APPROVED"
     PROCESSING = "PROCESSING"
     DISBURSED = "DISBURSED"
     FAILED = "FAILED"
+    ON_HOLD = "ON_HOLD"
+    CANCELLED = "CANCELLED"
 
 # -----------------------------------------------------
 # TITLE SEARCHES

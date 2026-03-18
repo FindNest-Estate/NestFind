@@ -15,7 +15,6 @@ from uuid import UUID
 from ..core.database import get_db_pool
 from ..middleware.auth_middleware import get_current_user, AuthenticatedUser, require_role
 from ..services.reservation_service import ReservationService
-from ..services.payment_gateway import get_payment_provider
 
 
 router = APIRouter(prefix="/reservations", tags=["Reservations"])
@@ -24,8 +23,6 @@ router = APIRouter(prefix="/reservations", tags=["Reservations"])
 # Request Models
 class ReservationCreate(BaseModel):
     offer_id: UUID
-    payment_reference: Optional[str] = Field(None, max_length=100)
-    payment_method: Optional[str] = Field(None, max_length=50)
 
 
 class ReservationCancel(BaseModel):
@@ -56,26 +53,14 @@ async def create_reservation(
     - Reservation valid for 30 days
     """
     pool = get_db_pool()
-    payment_provider = get_payment_provider()
-
-    # 1. Verify Payment
-    if not data.payment_reference:
-        raise HTTPException(status_code=400, detail="Payment reference required")
-    
-    is_valid_payment = await payment_provider.verify_payment(data.payment_reference)
-    if not is_valid_payment:
-        raise HTTPException(status_code=400, detail="Invalid payment reference or payment failed")
-
     service = ReservationService(pool)
-    
-    result = await service.create_reservation(
+
+    result = await service.create_reservation_with_payment_intent(
         offer_id=data.offer_id,
         buyer_id=current_user.user_id,
-        payment_reference=data.payment_reference,
-        payment_method=data.payment_method,
         ip_address=get_client_ip(request)
     )
-    
+
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     
@@ -206,3 +191,7 @@ async def cancel_reservation(
         raise HTTPException(status_code=400, detail=result["error"])
     
     return result
+
+
+
+

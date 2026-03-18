@@ -226,6 +226,27 @@ class CommissionService:
                     "error": f"Invalid commission transition: {current} → {new_status}. Valid: {valid_next}"
                 }
             
+            # Payment gate: commission cannot settle unless commission payment is captured/settled.
+            if new_status in ('SETTLEMENT_PENDING', 'SETTLED'):
+                deal = await conn.fetchrow("SELECT transaction_id FROM deals WHERE id = $1", deal_id)
+                txn_id = deal['transaction_id'] if deal else None
+                if not txn_id:
+                    return {"success": False, "error": "Deal has no linked transaction for commission verification"}
+
+                from .payment_engine.payment_service import PaymentService
+                payment_svc = PaymentService(self.db)
+                payment_resp = await payment_svc.get_payment_by_reference('transaction', txn_id)
+                
+                if not payment_resp.get('success'):
+                    return {"success": False, "error": payment_resp.get('error', 'Commission payment not found')}
+
+                payment = payment_resp.get('payment')
+                if not payment or payment['status'] not in ('CAPTURED', 'SETTLED'):
+                    current_payment = payment['status'] if payment else 'NOT_FOUND'
+                    return {
+                        "success": False,
+                        "error": f"Commission payment not completed. Current payment status: {current_payment}"
+                    }
             # Build update
             update_parts = ["commission_status = $2"]
             params = [deal_id, new_status]
@@ -439,3 +460,4 @@ class CommissionService:
                     return {"success": True, "advanced": True, "new_status": "PAYABLE"}
             
             return {"success": True, "advanced": False}
+

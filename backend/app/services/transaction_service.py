@@ -1011,3 +1011,122 @@ class TransactionService:
                 }
             }
 
+
+    async def initiate_commission_payment(
+        self,
+        transaction_id: UUID,
+        seller_id: UUID,
+        ip_address: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create payment intent for seller commission (0.9%)."""
+        async with self.db.acquire() as conn:
+            txn = await conn.fetchrow(
+                "SELECT id, seller_id, status, commission_amount FROM transactions WHERE id = $1",
+                transaction_id,
+            )
+            if not txn:
+                return {"success": False, "error": "Transaction not found"}
+            if txn['seller_id'] != seller_id:
+                return {"success": False, "error": "Only seller can initiate commission payment"}
+            if txn['status'] not in ('ALL_VERIFIED', 'SELLER_VERIFIED'):
+                return {
+                    "success": False,
+                    "error": f"Commission payment can only start after verification. Current: {txn['status']}",
+                }
+
+        from .payment_engine.payment_service import PaymentService
+
+        payment_service = PaymentService(self.db)
+        intent = await payment_service.create_payment_intent(
+            intent_type='COMMISSION',
+            reference_id=transaction_id,
+            reference_type='transaction',
+            amount=Decimal(str(txn['commission_amount'])),
+            currency='INR',
+            payer_id=seller_id,
+            ip_address=ip_address or 'unknown',
+            metadata={'transaction_id': str(transaction_id)},
+        )
+        if not intent.get('success'):
+            return intent
+
+        async with self.db.acquire() as conn:
+            await conn.execute(
+                "UPDATE transactions SET commission_payment_intent_id = $2 WHERE id = $1",
+                transaction_id,
+                UUID(intent['intent_id']),
+            )
+
+        return {
+            "success": True,
+            "transaction_id": str(transaction_id),
+            "payment_intent_id": intent['intent_id'],
+            "checkout_url": intent['checkout_url'],
+            "expires_at": intent['expires_at'],
+            "provider": intent['provider'],
+        }
+
+    async def mark_commission_paid_from_intent(
+        self,
+        transaction_id: UUID,
+        payment_intent_id: UUID,
+        provider_payment_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Move transaction lifecycle after commission capture (idempotent)."""
+        async with self.db.acquire() as conn:
+            txn = await conn.fetchrow(
+                "SELECT * FROM transactions WHERE id = $1",
+                transaction_id,
+            )
+            if not txn:
+                return {"success": False, "error": "Transaction not found"}
+
+            if txn['status'] in ('SELLER_PAID', 'DOCUMENTS_PENDING', 'ADMIN_REVIEW', 'COMPLETED'):
+                return {"success": True, "idempotent": True, "status": txn['status']}
+
+            if txn['status'] not in ('ALL_VERIFIED', 'SELLER_VERIFIED'):
+                return {
+                    "success": False,
+                    "error": f"Transaction cannot move to paid from {txn['status']} status",
+                }
+
+            async with conn.transaction():
+                await conn.execute(
+                    """
+                    UPDATE transactions
+                    SET status = 'SELLER_PAID',
+                        seller_payment_reference = $2,
+                        seller_payment_method = 'MOCK_GATEWAY',
+                        seller_paid_at = NOW(),
+                        commission_payment_intent_id = $3
+                    WHERE id = $1
+                    """,
+                    transaction_id,
+                    provider_payment_id,
+                    payment_intent_id,
+                )
+
+                await conn.execute(
+                    """
+                    INSERT INTO payment_logs (
+                        transaction_id, payer_id, amount, payment_type, status,
+                        payment_reference, payment_method
+                    )
+                    VALUES ($1, $2, $3, 'COMMISSION', 'COMPLETED', $4, 'MOCK_GATEWAY')
+                    """,
+                    transaction_id,
+                    txn['seller_id'],
+                    txn['commission_amount'],
+                    provider_payment_id,
+                )
+
+                await conn.execute(
+                    "UPDATE transactions SET status = 'DOCUMENTS_PENDING' WHERE id = $1",
+                    transaction_id,
+                )
+
+        return {
+            "success": True,
+            "transaction_id": str(transaction_id),
+            "status": 'DOCUMENTS_PENDING',
+        }

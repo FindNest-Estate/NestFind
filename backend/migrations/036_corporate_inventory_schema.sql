@@ -2,21 +2,29 @@
 -- Purpose: Introduce Corporate Inventory model for iBuyer functionality (buying, renovating, reselling)
 -- Date: 2026-03-16
 
-CREATE TYPE corporate_inventory_status AS ENUM (
-    'EVALUATING',
-    'PURCHASED',
-    'UNDER_RENOVATION',
-    'LISTED_FOR_RESALE',
-    'SOLD'
-);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'corporate_inventory_status') THEN
+        CREATE TYPE corporate_inventory_status AS ENUM (
+            'EVALUATING',
+            'PURCHASED',
+            'UNDER_RENOVATION',
+            'LISTED_FOR_RESALE',
+            'SOLD'
+        );
+    END IF;
+END $$;
 
-CREATE TYPE renovation_status AS ENUM (
-    'ESTIMATED',
-    'APPROVED',
-    'IN_PROGRESS',
-    'COMPLETED',
-    'PAID'
-);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'renovation_status') THEN
+        CREATE TYPE renovation_status AS ENUM (
+            'ESTIMATED',
+            'APPROVED',
+            'IN_PROGRESS',
+            'COMPLETED',
+            'PAID'
+        );
+    END IF;
+END $$;
 
 CREATE TABLE corporate_inventory (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

@@ -105,6 +105,22 @@ class DisputeService:
             except Exception:
                 pass  # Non-blocking hook
 
+        # Trust Engine: recompute scores on dispute raised
+        if result.get("success"):
+            try:
+                from .trust_fraud_engine import TrustScoreService, AgentScoreService
+                async with self.db.acquire() as _conn:
+                    dispute_deal = await _conn.fetchrow(
+                        "SELECT property_id, agent_id FROM deals WHERE id = $1", deal_id
+                    )
+                if dispute_deal:
+                    ts = TrustScoreService(self.db)
+                    await ts.compute_property_score(dispute_deal["property_id"], trigger_source="DISPUTE_RAISED")
+                    ag = AgentScoreService(self.db)
+                    await ag.compute_agent_score(dispute_deal["agent_id"], trigger_source="DISPUTE_RAISED")
+            except Exception:
+                pass
+
         return result
 
     async def resolve_dispute(

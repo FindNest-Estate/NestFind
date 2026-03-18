@@ -299,8 +299,8 @@ async def complete_transaction(
 
 # Additional Request Models
 class SellerPayment(BaseModel):
-    payment_reference: str = Field(..., min_length=1)
-    payment_method: str = Field(default="BANK_TRANSFER")
+    # Optional metadata for future provider support
+    payment_method: str = Field(default="MOCK_GATEWAY")
 
 
 class DocumentUpload(BaseModel):
@@ -317,7 +317,7 @@ class AdminApproval(BaseModel):
 @router.post("/{transaction_id}/seller-payment")
 async def process_seller_payment(
     transaction_id: UUID,
-    data: SellerPayment,
+    data: Optional[SellerPayment] = None,
     request: Request,
     current_user: AuthenticatedUser = Depends(require_role("SELLER"))
 ):
@@ -325,11 +325,9 @@ async def process_seller_payment(
     pool = get_db_pool()
     service = TransactionService(pool)
     
-    result = await service.process_seller_payment(
+    result = await service.initiate_commission_payment(
         transaction_id=transaction_id,
         seller_id=current_user.user_id,
-        payment_reference=data.payment_reference,
-        payment_method=data.payment_method,
         ip_address=get_client_ip(request)
     )
     
@@ -435,4 +433,9 @@ async def sign_agreement(
         raise HTTPException(status_code=400, detail=result["error"])
     
     return result
+
+
+
+
+
 

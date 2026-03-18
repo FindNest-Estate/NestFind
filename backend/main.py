@@ -11,9 +11,11 @@ load_dotenv()
 from app.routers import otp, login, session, refresh, register_user, register_agent, admin_agent_approval, user, seller_properties, property_media, public_properties, public_agents, saved_properties, agent_assignments, messaging, notifications, admin_analytics, admin_transactions, admin_users, admin_properties, admin_audit_logs, buyer, collections, admin_operations # type: ignore
 
 
-from app.routers import visits, offers, reservations, transactions, disputes, property_stats, deals, agreements, finance, settlement # type: ignore
+from app.routers import visits, offers, reservations, transactions, disputes, property_stats, deals, agreements, finance, settlement, payments, webhooks # type: ignore
 from app.routers import seller_analytics, seller_offers, seller_visits, seller_transactions, seller_settings # type: ignore
-from app.routers import activate_seller, corporate_inventory, title_escrow, websocket_messaging # type: ignore
+from app.routers import activate_seller, corporate_inventory, websocket_messaging # type: ignore
+from app.routers import risk_dashboard  # type: ignore
+from app.routers import title_searches, escrow, legal_fees  # Phase 6: Title & Escrow Engine  # type: ignore
 from app.core.database import init_db_pool, close_db_pool, get_db_pool # type: ignore
 from app.jobs.scheduler import init_scheduler, start_scheduler, shutdown_scheduler # type: ignore
 from pathlib import Path
@@ -69,6 +71,7 @@ app.include_router(activate_seller.router)
 # to avoid route conflicts (e.g. /properties/browse vs /properties/{id}/media)
 app.include_router(public_properties.router)
 app.include_router(public_agents.router)
+app.include_router(risk_dashboard.router)  # includes public /properties/{id}/trust-score
 app.include_router(property_stats.router)  # View tracking and analytics
 
 # Exact match authenticated routes MUST come before parameterized routes
@@ -94,7 +97,11 @@ app.include_router(deals.router)
 app.include_router(agreements.router)
 app.include_router(finance.router)
 app.include_router(settlement.router)  # Phase 5A: Commission lifecycle & settlement
-app.include_router(title_escrow.router)
+app.include_router(title_searches.router)    # Phase 6: Title search lifecycle
+app.include_router(escrow.router)            # Phase 6: Escrow disbursement engine
+app.include_router(legal_fees.router)        # Phase 6: Legal compliance engine
+app.include_router(payments.router)
+app.include_router(webhooks.router)
 
 # Seller dashboard routers
 app.include_router(seller_analytics.router)
@@ -121,4 +128,5 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
 
