@@ -1,4 +1,4 @@
-﻿"""
+"""
 Property Service implementing SELLER_PROPERTY_LISTING workflow.
 
 Handles property CRUD operations with state machine enforcement.
@@ -826,7 +826,8 @@ class PropertyService:
                 SELECT 
                     p.id, p.title, p.type::text, p.price, p.city, p.state,
                     p.bedrooms, p.bathrooms, p.area_sqft,
-                    p.latitude, p.longitude,
+                    p.latitude, p.longitude, p.status::text,
+                    p.views_count, p.original_price, p.is_hot_sale,
                     p.created_at,
                     (SELECT file_url FROM property_media 
                      WHERE property_id = p.id AND is_primary = true AND deleted_at IS NULL 
@@ -858,7 +859,11 @@ class PropertyService:
                     "longitude": row["longitude"],
                     "thumbnail_url": row["thumbnail_url"],
                     "agent_name": row["agent_name"],
-                    "created_at": row["created_at"].isoformat()
+                    "created_at": row["created_at"].isoformat(),
+                    "status": row["status"],
+                    "views_count": row.get("views_count", 0) or 0,
+                    "original_price": float(row["original_price"]) if row.get("original_price") else None,
+                    "is_hot_sale": bool(row.get("is_hot_sale", False))
                 })
             
             return {

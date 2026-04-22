@@ -11,6 +11,8 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-tabs": "^1.1.13",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
     "@types/js-cookie": "^3.0.6",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -25,9 +27,12 @@
     "react-dom": "19.2.0",
     "react-hook-form": "^7.67.0",
     "react-leaflet": "^5.0.0",
+    "react-zoom-pan-pinch": "^4.0.3",
     "recharts": "^3.5.1",
     "sonner": "^2.0.7",
+    "suncalc": "^1.9.0",
     "tailwind-merge": "^3.4.0",
+    "three": "^0.183.2",
     "zod": "^4.1.13"
   },
   "devDependencies": {
@@ -36,6 +41,8 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/suncalc": "^1.9.2",
+    "@types/three": "^0.183.1",
     "babel-plugin-react-compiler": "1.0.0",
     "baseline-browser-mapping": "^2.10.8",
     "eslint": "^9",

@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { PropertyCard as IPropertyCard } from '@/lib/api/public';
 import { saveProperty, unsaveProperty, checkIfSaved } from '@/lib/propertiesApi';
-import { Heart, MapPin, Bed, Bath, Maximize, Home, Building2, Warehouse, TreePine, Loader2 } from 'lucide-react';
+import { Heart, MapPin, Bed, Bath, Maximize, Home, Building2, Warehouse, TreePine, Loader2, User, Eye, Flame } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { getImageUrl } from '@/lib/api';
 import { StatusBadge } from '@/components/ui/Badge';
@@ -16,7 +17,7 @@ const PROPERTY_TYPES = [
     { value: 'COMMERCIAL', label: 'Commercial', icon: Warehouse },
 ];
 
-interface PropertyCardProps {
+export interface PropertyCardProps {
     property: IPropertyCard;
     initialIsSaved?: boolean;
     onToggleSave?: (newState: boolean) => void;
@@ -30,17 +31,16 @@ function formatPrice(price: number | null): string {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(price);
 }
 
-function getTypeLabel(type: string | null): string {
-    if (!type) return 'Property';
-    const found = PROPERTY_TYPES.find(t => t.value === type);
-    return found ? found.label : type.charAt(0) + type.slice(1).toLowerCase();
-}
-
 export default function PropertyCard({ property, initialIsSaved = false, onToggleSave, showOverlay = true }: PropertyCardProps) {
     const [isSaved, setIsSaved] = useState(initialIsSaved);
     const [isLoading, setIsLoading] = useState(false);
     const { user } = useAuth();
     const TypeIcon = PROPERTY_TYPES.find(t => t.value === property.type)?.icon || Home;
+    
+    // Calculates the discount dynamically based on the DB original_price vs current price
+    const discountPercentage = property.original_price && property.original_price > (property.price || 0) 
+        ? Math.round(((property.original_price - (property.price || 0)) / property.original_price) * 100) 
+        : 0;
 
     useEffect(() => {
         const init = async () => {
@@ -81,104 +81,130 @@ export default function PropertyCard({ property, initialIsSaved = false, onToggl
     return (
         <Link
             href={`/properties/${property.id}`}
-            className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 relative"
+            className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all duration-300 relative w-full"
         >
-            {/* Image */}
-            <div className="relative aspect-[16/10] w-full bg-gray-50 overflow-hidden">
+            {/* Image Section: 16:9 Aspect Ratio */}
+            <div className="relative w-full aspect-video bg-gray-100 overflow-hidden">
                 {property.thumbnail_url ? (
-                    <img
+                    <Image
                         src={getImageUrl(property.thumbnail_url) || ''}
                         alt={property.title || 'Property'}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                        fill
+                        unoptimized
+                        className="object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-                        <TypeIcon className="w-16 h-16 text-gray-200" />
+                    <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                        <TypeIcon className="w-10 h-10 text-gray-300" />
                     </div>
                 )}
 
-                {/* Gradient overlay for readability */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                {/* Top Badges */}
+                <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
+                    {property.is_hot_sale && (
+                        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-600 text-white text-xs font-bold tracking-wide shadow-sm">
+                            <Flame className="w-3.5 h-3.5 fill-current" /> Hot Sale
+                        </span>
+                    )}
+                    {showOverlay && property.status && (
+                        <div className="shadow-sm">
+                            <StatusBadge status={property.status} dot={false} />
+                        </div>
+                    )}
+                </div>
 
-                {/* Status badge */}
-                {showOverlay && (
-                    <div className="absolute top-3 left-3 z-10">
-                        <StatusBadge status={property.status || ''} />
-                    </div>
-                )}
+                {/* Property Type Badge */}
+                <div className="absolute bottom-4 left-4 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/50 backdrop-blur-sm text-white text-xs font-semibold capitalize tracking-wide">
+                    <TypeIcon className="w-3.5 h-3.5" />
+                    <span>{property.type.replace('_', ' ').toLowerCase()}</span>
+                </div>
 
-                {/* Save button */}
+                {/* Save Button */}
                 <button
                     onClick={handleToggleSave}
                     disabled={isLoading}
-                    className="absolute top-3 right-3 w-9 h-9 flex items-center justify-center bg-white/70 hover:bg-white backdrop-blur-sm rounded-full text-gray-500 hover:text-[#FF385C] transition-all duration-200 z-20 shadow-sm"
+                    aria-label={isSaved ? "Unsave property" : "Save property"}
+                    className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white transition-colors duration-200 shadow-sm disabled:opacity-50"
                 >
                     {isLoading ? (
-                        <Loader2 className="w-[18px] h-[18px] animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
                     ) : (
-                        <Heart className={`w-[18px] h-[18px] transition-colors ${isSaved ? 'fill-[#FF385C] text-[#FF385C]' : ''}`} />
+                        <Heart className={`w-4 h-4 ${isSaved ? 'fill-rose-500 text-rose-500' : 'text-gray-600 hover:text-rose-500'}`} />
                     )}
                 </button>
-
-                {/* Property type chip */}
-                <div className="absolute bottom-3 left-3 z-10">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/80 backdrop-blur-sm text-xs font-semibold text-gray-700 shadow-sm">
-                        <TypeIcon className="w-3 h-3" />
-                        {getTypeLabel(property.type)}
-                    </span>
-                </div>
             </div>
 
-            {/* Content */}
-            <div className="p-4 flex flex-col flex-1 gap-2">
-                {/* Price */}
-                <div className="text-xl font-extrabold text-gray-900 tracking-tight">
-                    {formatPrice(property.price)}
+            {/* Content Body */}
+            <div className="flex flex-col flex-grow" style={{ padding: '20px', gap: '16px' }}>
+                {/* Header: Price & Title */}
+                <div>
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="text-xl font-bold text-blue-900">
+                            {formatPrice(property.price)}
+                        </span>
+                        {discountPercentage > 0 && (
+                            <>
+                                <span className="text-sm text-gray-400 line-through">
+                                    {formatPrice(property.original_price!)}
+                                </span>
+                                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                                    {discountPercentage}% OFF
+                                </span>
+                            </>
+                        )}
+                    </div>
+                    
+                    <h3 className="text-base font-semibold text-gray-800 line-clamp-1 capitalize">
+                        {property.title || 'Untitled Property'}
+                    </h3>
+
+                    {location && (
+                        <div className="flex items-center gap-1.5 text-sm text-gray-500 mt-1.5 capitalize">
+                            <MapPin className="w-4 h-4 shrink-0 text-gray-400" />
+                            <span className="truncate">{location.toLowerCase()}</span>
+                        </div>
+                    )}
                 </div>
 
-                {/* Stats row */}
-                <div className="flex items-center gap-4 text-[13px] text-gray-500 font-medium">
-                    {property.bedrooms !== null && (
-                        <span className="flex items-center gap-1">
-                            <Bed className="w-3.5 h-3.5 text-gray-400" />
-                            {property.bedrooms} {property.bedrooms === 1 ? 'Bed' : 'Beds'}
+                {/* Specs */}
+                <div className="flex items-center gap-4 py-3 border-t border-gray-100 mt-auto">
+                    <div className="flex items-center gap-2 text-gray-600">
+                        <Bed className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm font-medium">{property.bedrooms ?? '-'} <span className="text-xs text-gray-400 font-normal">Beds</span></span>
+                    </div>
+                    <div className="flex items-center gap-2 text-gray-600">
+                        <Bath className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm font-medium">{property.bathrooms ?? '-'} <span className="text-xs text-gray-400 font-normal">Baths</span></span>
+                    </div>
+                    <div className="flex items-center gap-2 text-gray-600">
+                        <Maximize className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm font-medium">
+                            {property.area_sqft ? property.area_sqft.toLocaleString() : '-'} 
+                            <span className="text-xs text-gray-400 font-normal ml-1">sqft</span>
                         </span>
-                    )}
-                    {property.bathrooms !== null && (
-                        <span className="flex items-center gap-1">
-                            <Bath className="w-3.5 h-3.5 text-gray-400" />
-                            {property.bathrooms} {property.bathrooms === 1 ? 'Bath' : 'Baths'}
-                        </span>
-                    )}
-                    {property.area_sqft !== null && (
-                        <span className="flex items-center gap-1">
-                            <Maximize className="w-3.5 h-3.5 text-gray-400" />
-                            {property.area_sqft.toLocaleString()} sqft
-                        </span>
-                    )}
+                    </div>
                 </div>
 
-                {/* Title */}
-                <h3 className="text-[15px] font-semibold text-gray-800 truncate leading-snug">
-                    {property.title || 'Untitled Property'}
-                </h3>
-
-                {/* Location */}
-                {location && (
-                    <div className="flex items-center gap-1 text-sm text-gray-400">
-                        <MapPin className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">{location}</span>
+                {/* Footer */}
+                <div className="pt-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100">
+                            <User className="w-3 h-3 text-blue-500" />
+                        </div>
+                        <span className="text-xs font-medium text-gray-600 capitalize">
+                            {property.agent_name ? property.agent_name.toLowerCase() : 'NestFind Agent'}
+                        </span>
                     </div>
-                )}
-
-                {/* Agent / Brokerage */}
-                <div className="mt-auto pt-3 border-t border-gray-50 flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[#FF385C]/10 to-[#FF385C]/5 flex items-center justify-center shrink-0">
-                        <Building2 className="w-3 h-3 text-[#FF385C]" />
-                    </div>
-                    <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest truncate">
-                        {property.agent_name ? `Agent: ${property.agent_name}` : 'NestFind Brokerage'}
-                    </span>
+                    
+                    {property.views_count && property.views_count > 0 ? (
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded-md">
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>{property.views_count} Live Buyers</span>
+                        </div>
+                    ) : (
+                        <span className="text-xs text-gray-400 italic">New</span>
+                    )}
                 </div>
             </div>
         </Link>

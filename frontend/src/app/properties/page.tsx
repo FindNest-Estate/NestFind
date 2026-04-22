@@ -359,10 +359,10 @@ export default function PropertiesBrowsePage() {
                             )}
 
                             {isLoading ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                                     {[...Array(8)].map((_, i) => (
                                         <div key={i} className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 animate-pulse">
-                                            <div className="aspect-[3/2] bg-gray-200" />
+                                            <div className="aspect-video bg-gray-200" />
                                             <div className="p-4 space-y-3">
                                                 <div className="h-6 bg-gray-200 rounded w-1/2" />
                                                 <div className="h-4 bg-gray-200 rounded w-3/4" />
@@ -375,7 +375,7 @@ export default function PropertiesBrowsePage() {
                                 <EmptyState />
                             ) : (
                                 <>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mb-8">
                                         {properties.map((property) => (
                                             <PropertyCard key={property.id} property={property} />
                                         ))}

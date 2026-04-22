@@ -20,6 +20,7 @@ from .trust_score_job import recompute_all_trust_scores
 from .price_anomaly_sweep_job import sweep_price_anomalies
 from .expire_title_searches_job import expire_stale_title_searches
 from .retry_disbursements_job import retry_failed_disbursements
+from .dev_token_deadline_job import expire_developer_token_deadlines
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +149,17 @@ def init_scheduler(db_pool):
         replace_existing=True,
     )
     logger.info("Scheduled job: retry_failed_disbursements (every 6 hours)")
+
+    # Developer Portal: Token deadline enforcer
+    scheduler.add_job(
+        func=expire_developer_token_deadlines,
+        args=[db_pool],
+        trigger=IntervalTrigger(minutes=15),
+        id="dev_token_deadline_enforcer",
+        name="Developer Portal: Token Deadline Enforcer",
+        replace_existing=True,
+    )
+    logger.info("Scheduled job: dev_token_deadline_enforcer (every 15 minutes)")
 
     logger.info("All scheduled jobs configured successfully")
 

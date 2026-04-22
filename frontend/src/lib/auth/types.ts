@@ -18,6 +18,7 @@ export enum UserRole {
     SELLER = 'SELLER',
     AGENT = 'AGENT',
     ADMIN = 'ADMIN',
+    DEVELOPER = 'DEVELOPER',
 }
 
 export enum UserStatus {

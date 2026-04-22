@@ -26,6 +26,7 @@ TOKEN_DURATION = {
     "AGENT": 43200,       # 30 days for agents
     "BUYER": 43200,       # 30 days for buyers
     "SELLER": 43200,      # 30 days for sellers
+    "DEVELOPER": 43200,   # 30 days for developers
     "USER": 43200,        # 30 days for legacy users
     "DEFAULT": 15,        # Default fallback
 }
@@ -35,6 +36,7 @@ REFRESH_TOKEN_DURATION = {
     "AGENT": 43200,       # 30 days for agents
     "BUYER": 43200,       # 30 days for buyers
     "SELLER": 43200,      # 30 days for sellers
+    "DEVELOPER": 43200,   # 30 days for developers
     "USER": 43200,        # 30 days for legacy users
     "DEFAULT": 10080,     # 7 days fallback
 }

@@ -298,6 +298,7 @@ async def complete_transaction(
 
 
 # Additional Request Models
+
 class SellerPayment(BaseModel):
     # Optional metadata for future provider support
     payment_method: str = Field(default="MOCK_GATEWAY")
@@ -317,8 +318,8 @@ class AdminApproval(BaseModel):
 @router.post("/{transaction_id}/seller-payment")
 async def process_seller_payment(
     transaction_id: UUID,
-    data: Optional[SellerPayment] = None,
     request: Request,
+    data: Optional[SellerPayment] = None,
     current_user: AuthenticatedUser = Depends(require_role("SELLER"))
 ):
     """Seller pays the 0.9% commission."""

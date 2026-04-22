@@ -16,6 +16,20 @@ from app.routers import seller_analytics, seller_offers, seller_visits, seller_t
 from app.routers import activate_seller, corporate_inventory, websocket_messaging # type: ignore
 from app.routers import risk_dashboard  # type: ignore
 from app.routers import title_searches, escrow, legal_fees  # Phase 6: Title & Escrow Engine  # type: ignore
+# Developer Portal routers
+from app.routers import (
+    developer_registration,
+    developer_projects,
+    developer_units,
+    developer_offers,
+    developer_deals,
+    developer_layout,
+    developer_misc,
+    developer_buildings,
+    developer_polygons,
+)  # type: ignore
+# Public Visualization Explorer
+from app.routers import visualization_router  # type: ignore
 from app.core.database import init_db_pool, close_db_pool, get_db_pool # type: ignore
 from app.jobs.scheduler import init_scheduler, start_scheduler, shutdown_scheduler # type: ignore
 from pathlib import Path
@@ -26,6 +40,10 @@ app = FastAPI(
     description="Real Estate Platform - Minimal Baseline"
 )
 
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+import logging
+
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
@@ -34,6 +52,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    print(f"422 ERROR: {exc.errors()}")
+    # Body might not be serializable (e.g. FormData). Convert to string for safety.
+    body_str = str(exc.body) if exc.body else None
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body_summary": body_str},
+    )
 
 # Database and scheduler lifecycle
 @app.on_event("startup")
@@ -112,6 +140,28 @@ app.include_router(seller_settings.router)
 
 # Corporate and iBuyer Platform routers
 app.include_router(corporate_inventory.router)
+
+# ---------------------------------------------------------------------------
+# PUBLIC VISUALIZATION EXPLORER (no auth required)
+# ---------------------------------------------------------------------------
+app.include_router(visualization_router.router)
+
+# ---------------------------------------------------------------------------
+# DEVELOPER PORTAL ROUTERS
+# ---------------------------------------------------------------------------
+app.include_router(developer_registration.router)
+app.include_router(developer_projects.router)
+app.include_router(developer_units.router)
+app.include_router(developer_deals.router)
+app.include_router(developer_layout.router)
+app.include_router(developer_buildings.router)
+app.include_router(developer_polygons.router)
+# Misc sub-routers (leads, agents, docs, analytics, settings)
+app.include_router(developer_misc.leads_router)
+app.include_router(developer_misc.agents_router)
+app.include_router(developer_misc.docs_router)
+app.include_router(developer_misc.analytics_router)
+app.include_router(developer_misc.settings_router)
 
 # Static file serving for uploads
 uploads_dir = Path("uploads")

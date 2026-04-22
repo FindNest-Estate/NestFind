@@ -38,6 +38,10 @@ class PropertyCardResponse(BaseModel):
     thumbnail_url: Optional[str]
     agent_name: Optional[str]
     created_at: str
+    status: Optional[str]
+    views_count: int = 0
+    original_price: Optional[float]
+    is_hot_sale: bool = False
 
 
 class PaginationResponse(BaseModel):

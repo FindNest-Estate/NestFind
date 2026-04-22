@@ -20,7 +20,7 @@ export default function AdminAuditLogsPage() {
             const res = await getAuditLogs({ page, per_page: 30, search: search || undefined, entity_type: entityFilter || undefined });
             if (res) {
                 setLogs(res.items || []);
-                setTotalPages(res.total_pages || 1);
+                setTotalPages(res.pages || 1);
             }
         } catch { /* handled */ } finally { setLoading(false); }
     }, [page, search, entityFilter]);

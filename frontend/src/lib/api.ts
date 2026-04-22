@@ -183,7 +183,25 @@ export async function apiClient<T = any>(
             throw error;
         }
 
-        throw new ApiError(error instanceof Error ? error.message : 'Network error', 0);
+        // Log the real error for debugging - visible in browser DevTools console
+        console.error('[API] Network/fetch error:', {
+            url,
+            method: fetchOptions.method || 'GET',
+            error,
+            message: error instanceof Error ? error.message : String(error),
+        });
+
+        // "Failed to fetch" = browser blocked the request or server is down.
+        // Provide a more actionable message.
+        let message = error instanceof Error ? error.message : 'Network error';
+
+        if (message === 'Failed to fetch' || message === 'NetworkError when attempting to fetch resource.') {
+            message = `Cannot reach the server at ${API_BASE_URL}. Please check that the backend is running.`;
+        } else if (message.toLowerCase().includes('failed to fetch')) {
+            message = `Connection failed: ${message}. The backend may be down or blocked by CORS.`;
+        }
+
+        throw new ApiError(message, 0);
     }
 }
 

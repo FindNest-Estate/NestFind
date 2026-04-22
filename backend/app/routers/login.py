@@ -88,10 +88,10 @@ async def login(
                     u.email,
                     u.full_name,
                     u.status::text,
-                    array_agg(r.name::text) as roles
+                    COALESCE(array_agg(r.name::text) FILTER (WHERE r.name IS NOT NULL), ARRAY[]::text[]) as roles
                 FROM users u
-                JOIN user_roles ur ON u.id = ur.user_id
-                JOIN roles r ON ur.role_id = r.id
+                LEFT JOIN user_roles ur ON u.id = ur.user_id
+                LEFT JOIN roles r ON ur.role_id = r.id
                 WHERE u.id = $1
                 GROUP BY u.id
                 """,
@@ -101,10 +101,12 @@ async def login(
         if not user_data:
             raise HTTPException(status_code=500, detail="User data not found after authentication")
 
-        roles_list = user_data["roles"]
+        roles_list = user_data["roles"] or []
         primary_role = "BUYER"
         if "ADMIN" in roles_list:
             primary_role = "ADMIN"
+        elif "DEVELOPER" in roles_list:
+            primary_role = "DEVELOPER"
         elif "AGENT" in roles_list:
             primary_role = "AGENT"
         elif "SELLER" in roles_list:
@@ -197,4 +199,6 @@ async def login(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        print(f"[auth/login] ERROR: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")

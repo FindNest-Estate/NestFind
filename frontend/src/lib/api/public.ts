@@ -25,6 +25,9 @@ export interface PropertyCard {
     thumbnail_url: string | null;
     agent_name: string | null;
     status?: string;
+    views_count?: number;
+    original_price?: number | null;
+    is_hot_sale?: boolean;
     created_at: string;
 }
 

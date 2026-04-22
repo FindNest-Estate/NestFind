@@ -98,67 +98,87 @@ function AdminLoginContent() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-            <div className="w-full max-w-md">
-                {/* Logo & Title */}
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl mb-4 shadow-lg">
-                        <Shield className="w-8 h-8 text-white" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-white">Admin Portal</h1>
-                    <p className="text-slate-400 mt-1">NestFind Administration</p>
+        <div className="relative min-h-screen font-sans flex items-center justify-center p-4 overflow-hidden">
+            {/* Full Background Image */}
+            <div className="fixed inset-0 z-0 bg-slate-950">
+                <img
+                    src="https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2069&auto=format&fit=crop"
+                    alt="Corporate Office"
+                    className="w-full h-full object-cover opacity-60 grayscale"
+                />
+                {/* Professional Dark Overlay */}
+                <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-[2px]" />
+            </div>
+
+            {/* Corporate Logo (Outside Card - Top Left) */}
+            <div className="absolute top-8 left-8 sm:top-12 sm:left-12 z-20">
+                <Link href="/" className="inline-block transition-opacity hover:opacity-80 text-decoration-none">
+                    <span className="text-4xl font-extrabold text-[#FF385C] tracking-tight drop-shadow-md">NestFind</span>
+                </Link>
+            </div>
+
+            {/* Login Box Wrapper */}
+            <div className="relative z-10 w-full max-w-[440px] flex flex-col items-center">
+                {/* Shield Icon Top */}
+                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-xl shadow-black/20 mb-6 relative z-20">
+                    <Shield className="w-8 h-8 text-[#FF385C]" />
                 </div>
 
-                {/* Login Card */}
-                <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-2xl p-8 shadow-xl">
+                {/* Main Glass Card */}
+                <div className="w-full bg-white shadow-2xl shadow-black/50 rounded-[1.5rem] p-8 sm:p-10 border border-white/20">
+                    <div className="text-center mb-8">
+                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Admin Portal</h1>
+                        <p className="text-sm text-slate-500 mt-2">Sign in to manage the NestFind platform.</p>
+                    </div>
+
                     <form onSubmit={handleSubmit} className="space-y-5">
-                        {/* Error Message */}
-                        {error && (
-                            <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-                                <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                                <p className="text-sm text-red-300">{error}</p>
+                       {/* Error Message */}
+                       {error && (
+                            <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-100 rounded-xl">
+                                <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                                <p className="text-sm text-red-700 font-medium">{error}</p>
                             </div>
                         )}
-
+                        
                         {/* Email Field */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
                                 Admin Email
                             </label>
                             <div className="relative">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                                 <input
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     placeholder="admin@nestfind.com"
-                                    className="w-full pl-12 pr-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl 
-                                             text-white placeholder-slate-500 focus:border-amber-500 focus:ring-2 
-                                             focus:ring-amber-500/20 transition-all outline-none"
+                                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl 
+                                             text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#FF385C] focus:ring-4 
+                                             focus:ring-[#FF385C]/10 transition-all outline-none"
                                 />
                             </div>
                         </div>
 
                         {/* Password Field */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
                                 Password
                             </label>
                             <div className="relative">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                                 <input
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="••••••••"
-                                    className="w-full pl-12 pr-12 py-3 bg-slate-900/50 border border-slate-600 rounded-xl 
-                                             text-white placeholder-slate-500 focus:border-amber-500 focus:ring-2 
-                                             focus:ring-amber-500/20 transition-all outline-none"
+                                    className="w-full pl-11 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-xl 
+                                             text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#FF385C] focus:ring-4 
+                                             focus:ring-[#FF385C]/10 transition-all outline-none"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
                                 >
                                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                                 </button>
@@ -169,9 +189,9 @@ function AdminLoginContent() {
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold 
-                                     rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all disabled:opacity-50 
-                                     disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
+                            className="w-full py-3.5 bg-slate-900 text-white font-semibold 
+                                     rounded-xl hover:bg-slate-800 transition-all disabled:opacity-50 
+                                     disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-slate-900/20 mt-2"
                         >
                             {isSubmitting ? (
                                 <>
@@ -179,19 +199,16 @@ function AdminLoginContent() {
                                     Authenticating...
                                 </>
                             ) : (
-                                <>
-                                    <Shield className="w-5 h-5" />
-                                    Access Admin Panel
-                                </>
+                                'Sign In to Admin Panel'
                             )}
                         </button>
                     </form>
 
                     {/* Footer */}
-                    <div className="mt-6 pt-6 border-t border-slate-700 text-center">
+                    <div className="mt-8 pt-6 border-t border-slate-100 text-center">
                         <Link
                             href="/login"
-                            className="text-sm text-slate-400 hover:text-white transition-colors"
+                            className="text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
                         >
                             ← Back to User Login
                         </Link>
@@ -199,9 +216,9 @@ function AdminLoginContent() {
                 </div>
 
                 {/* Security Notice */}
-                <div className="mt-6 text-center">
-                    <p className="text-xs text-slate-500">
-                        🔒 Secure Admin Portal • Session expires in 15 minutes
+                <div className="mt-8 text-center relative z-10">
+                    <p className="text-xs font-medium text-slate-400">
+                        🔒 Secure Admin Portal • Restricted Access
                     </p>
                 </div>
             </div>

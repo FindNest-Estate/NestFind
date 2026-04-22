@@ -267,7 +267,8 @@ class DisputeService:
                 """
                 SELECT d.id, d.category as type, d.status, d.description,
                        d.created_at, d.resolution_notes as admin_notes, d.evidence_urls,
-                       u.full_name as raised_by_name, u.role as raised_by_role
+                       u.full_name as raised_by_name,
+                       (SELECT r.name FROM user_roles ur JOIN roles r ON ur.role_id = r.id WHERE ur.user_id = u.id LIMIT 1) as raised_by_role
                 FROM disputes d
                 JOIN users u ON u.id = d.raised_by_id
                 WHERE d.deal_id = $1
@@ -301,7 +302,8 @@ class DisputeService:
                 """
                 SELECT d.id, d.deal_id, d.category as dispute_type, d.status, d.description,
                        d.created_at, d.evidence_urls,
-                       u.full_name as raised_by_name, u.role as raised_by_role
+                       u.full_name as raised_by_name,
+                       (SELECT r.name FROM user_roles ur JOIN roles r ON ur.role_id = r.id WHERE ur.user_id = u.id LIMIT 1) as raised_by_role
                 FROM disputes d
                 JOIN users u ON u.id = d.raised_by_id
                 WHERE d.deal_id IS NOT NULL
@@ -334,7 +336,8 @@ class DisputeService:
                 """
                 SELECT d.id, d.deal_id, d.category as dispute_type, d.status, d.description,
                        d.resolution_notes as admin_notes, d.created_at, d.resolved_at, d.evidence_urls,
-                       u.full_name as raised_by_name, u.role as raised_by_role,
+                       u.full_name as raised_by_name,
+                       (SELECT r.name FROM user_roles ur JOIN roles r ON ur.role_id = r.id WHERE ur.user_id = u.id LIMIT 1) as raised_by_role,
                        deal.buyer_id, deal.seller_id, deal.agent_id,
                        deal.is_frozen, deal.freeze_reason
                 FROM disputes d

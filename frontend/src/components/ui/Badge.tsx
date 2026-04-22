@@ -99,8 +99,10 @@ const STATUS_MAP: Record<string, { label: string; variant: BadgeVariant }> = {
     ASSIGNED: { label: 'Assigned', variant: 'info' },
     VERIFICATION_IN_PROGRESS: { label: 'Verifying', variant: 'warning' },
     ACTIVE: { label: 'Active', variant: 'success' },
+    UNDER_DEAL: { label: 'In Deal', variant: 'warning' },
     RESERVED: { label: 'Reserved', variant: 'brand' },
     SOLD: { label: 'Sold', variant: 'success' },
+    JUST_ARRIVED: { label: 'Just Arrived', variant: 'info' },
 
     // Visit statuses
     REQUESTED: { label: 'Requested', variant: 'warning' },

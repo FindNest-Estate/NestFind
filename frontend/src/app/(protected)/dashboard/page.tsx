@@ -28,6 +28,7 @@ const ROLE_HOME_PAGES: Record<string, string> = {
     [UserRole.SELLER]: '/sell/dashboard', // Sellers go to dashboard
     [UserRole.AGENT]: '/agent/dashboard', // Agents go to dashboard
     [UserRole.ADMIN]: '/admin',           // Admins go to admin panel
+    [UserRole.DEVELOPER]: '/developer', // Developers go to developer portal
 };
 
 export default function DashboardRouterPage() {

@@ -20,6 +20,8 @@ import type { NextRequest } from 'next/server';
 const PUBLIC_ROUTES = [
     '/',
     '/properties',
+    '/projects',
+    '/demo',
     '/about',
     '/contact',
     '/agents',

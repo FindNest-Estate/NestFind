@@ -17,8 +17,8 @@ export default function BecomeSellerButton() {
     const [showModal, setShowModal] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Don't render if user already has SELLER role or is not a buyer
-    if (!user || user.roles?.includes(UserRole.SELLER)) {
+    // Don't render if user already has SELLER role, is a developer, or is not logged in
+    if (!user || user.roles?.includes(UserRole.SELLER) || user.roles?.includes(UserRole.DEVELOPER)) {
         return null;
     }
 

@@ -95,9 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setActiveContext(storedContext);
                 } else {
                     let defaultContext = UserRole.BUYER;
-                    if (validRoles.includes(UserRole.AGENT)) defaultContext = UserRole.AGENT;
+                    if (validRoles.includes(UserRole.ADMIN)) defaultContext = UserRole.ADMIN;
+                    else if (validRoles.includes(UserRole.DEVELOPER)) defaultContext = UserRole.DEVELOPER;
+                    else if (validRoles.includes(UserRole.AGENT)) defaultContext = UserRole.AGENT;
                     else if (validRoles.includes(UserRole.SELLER)) defaultContext = UserRole.SELLER;
-                    else if (validRoles.includes(UserRole.ADMIN)) defaultContext = UserRole.ADMIN;
 
                     setActiveContext(defaultContext);
                     localStorage.setItem(ACTIVE_CONTEXT_KEY, defaultContext);
@@ -133,9 +134,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const validRoles = newUser.roles || [newUser.role];
 
         let initialContext = UserRole.BUYER;
-        if (validRoles.includes(UserRole.AGENT)) initialContext = UserRole.AGENT;
+        if (validRoles.includes(UserRole.ADMIN)) initialContext = UserRole.ADMIN;
+        else if (validRoles.includes(UserRole.DEVELOPER)) initialContext = UserRole.DEVELOPER;
+        else if (validRoles.includes(UserRole.AGENT)) initialContext = UserRole.AGENT;
         else if (validRoles.includes(UserRole.SELLER)) initialContext = UserRole.SELLER;
-        else if (validRoles.includes(UserRole.ADMIN)) initialContext = UserRole.ADMIN;
 
         setActiveContext(initialContext);
         localStorage.setItem(ACTIVE_CONTEXT_KEY, initialContext);

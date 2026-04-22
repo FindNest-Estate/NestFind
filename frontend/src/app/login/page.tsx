@@ -280,6 +280,15 @@ function LoginContent() {
                             </p>
                         )}
 
+                        {!isAdminLogin && (
+                            <p className="text-sm font-medium text-gray-600">
+                                Are you a Builder or Developer?{' '}
+                                <Link href="/register/developer" className="text-[#FF385C] font-semibold hover:text-[#E61E4D] transition-colors hover:underline underline-offset-4">
+                                    Register your company
+                                </Link>
+                            </p>
+                        )}
+
                         <div className="pt-6 border-t border-gray-100">
                             {isAdminLogin ? (
                                 <Link href="/login" className="text-xs font-semibold text-gray-500 hover:text-gray-900 transition-colors">

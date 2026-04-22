@@ -82,6 +82,32 @@ export default function RegisterPage() {
                             </svg>
                         </div>
                     </Link>
+                    {/* Developer / Builder Registration Card */}
+                    <Link
+                        href="/register/developer"
+                        className="group relative flex items-start p-6 rounded-2xl border-2 border-gray-100 hover:border-[#FF385C] hover:bg-red-50/10 transition-all duration-300 ease-in-out cursor-pointer shadow-sm hover:shadow-md"
+                    >
+                        <div className="flex-shrink-0 mr-5">
+                            <div className="w-14 h-14 rounded-full bg-gray-100 group-hover:bg-red-100 flex items-center justify-center transition-colors duration-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-7 h-7 text-gray-600 group-hover:text-[#FF385C] transition-colors duration-300">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="text-lg font-bold text-gray-900 group-hover:text-[#FF385C] transition-colors duration-300">
+                                I'm a Developer / Builder
+                            </h3>
+                            <p className="mt-1 text-sm text-gray-500 leading-relaxed font-medium">
+                                List large-scale projects — apartments, villas, gated communities, and commercial properties.
+                            </p>
+                        </div>
+                        <div className="flex items-center self-center ml-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-gray-300 group-hover:text-[#FF385C] group-hover:translate-x-1 transition-all duration-300">
+                                <path fillRule="evenodd" d="M16.28 11.47a.75.75 0 010 1.06l-7.5 7.5a.75.75 0 01-1.06-1.06L14.69 12 7.72 5.03a.75.75 0 011.06-1.06l7.5 7.5z" clipRule="evenodd" />
+                            </svg>
+                        </div>
+                    </Link>
                 </div>
 
                 <div className="text-center mt-10">

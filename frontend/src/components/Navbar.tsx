@@ -20,6 +20,7 @@ import {
     Users,
     ClipboardList,
     Shield,
+    Scale,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -60,6 +61,7 @@ export default function Navbar() {
                         <li><Link href="/buyer/dashboard" className="nav-link"><LayoutDashboard className="w-4 h-4" />Dashboard</Link></li>
                         <li><Link href="/properties" className="nav-link"><Search className="w-4 h-4" />Buy / Rent</Link></li>
                         <li><Link href="/agents" className="nav-link"><Users className="w-4 h-4" />Find Agent</Link></li>
+                        <li><Link href="/lawyers" className="nav-link"><Scale className="w-4 h-4" />Find Lawyer</Link></li>
                     </>
                 );
             case UserRole.SELLER:
@@ -78,8 +80,22 @@ export default function Navbar() {
                         <li><Link href="/agent/listings" className="nav-link"><ClipboardList className="w-4 h-4" />Listings</Link></li>
                     </>
                 );
+            case UserRole.DEVELOPER:
+                return (
+                    <>
+                        <li><Link href="/developer" className="nav-link"><LayoutDashboard className="w-4 h-4" />Dashboard</Link></li>
+                        <li><Link href="/developer/projects" className="nav-link"><Building2 className="w-4 h-4" />Projects</Link></li>
+                        <li><Link href="/developer/inventory" className="nav-link"><ClipboardList className="w-4 h-4" />Inventory</Link></li>
+                    </>
+                );
             default:
-                return <li><Link href="/properties" className="nav-link">Buy</Link></li>;
+                return (
+                    <>
+                        <li><Link href="/properties" className="nav-link">Buy</Link></li>
+                        <li><Link href="/agents" className="nav-link">Agents</Link></li>
+                        <li><Link href="/lawyers" className="nav-link">Lawyers</Link></li>
+                    </>
+                );
         }
     };
 
@@ -94,6 +110,9 @@ export default function Navbar() {
         ...(user?.roles?.includes(UserRole.ADMIN) ? [
             { href: '/admin/agents', label: 'Admin Panel', icon: Shield },
         ] : []),
+        ...(user?.roles?.includes(UserRole.DEVELOPER) ? [
+            { label: 'Developer Portal', icon: Building2, action: 'DEVELOPER', href: '/developer' },
+        ] : []),
         { href: '/profile', label: 'My Profile', icon: User },
         { href: '/settings', label: 'Settings', icon: Settings },
     ];
@@ -105,7 +124,8 @@ export default function Navbar() {
                 <Link
                     href={
                         activeContext === UserRole.AGENT ? '/agent/dashboard' :
-                            activeContext === UserRole.SELLER ? '/sell/dashboard' : '/'
+                            activeContext === UserRole.SELLER ? '/sell/dashboard' :
+                                activeContext === UserRole.DEVELOPER ? '/developer' : '/'
                     }
                     className="flex items-center gap-2 font-bold text-xl tracking-tight transition-transform hover:scale-[1.02]"
                 >
@@ -156,7 +176,14 @@ export default function Navbar() {
                                                 {getInitials(user.full_name)}
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="font-semibold text-[var(--gray-900)] text-sm truncate">{user.full_name}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-semibold text-[var(--gray-900)] text-sm truncate">{user.full_name}</p>
+                                                    {user.roles?.includes(UserRole.DEVELOPER) && (
+                                                        <span className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                                                            Developer
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <p className="text-xs text-[var(--gray-500)] truncate">{user.email}</p>
                                             </div>
                                         </div>

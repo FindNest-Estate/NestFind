@@ -17,6 +17,11 @@ router = APIRouter(prefix="/user", tags=["User"])
 
 from datetime import datetime
 
+class DeveloperProfileInfo(BaseModel):
+    id: UUID
+    company_name: str
+    status: str
+
 class UserResponse(BaseModel):
     id: UUID
     email: str
@@ -27,6 +32,7 @@ class UserResponse(BaseModel):
     roles: List[str]
     created_at: Optional[datetime] = None
     avatar_url: Optional[str] = None
+    developer_profile: Optional[DeveloperProfileInfo] = None
 
 
 class UpdateProfileRequest(BaseModel):
@@ -80,12 +86,16 @@ async def get_me(
                     u.mobile_number, 
                     u.status::text, 
                     u.created_at, 
-                    array_agg(r.name::text) as roles
+                    COALESCE(array_agg(r.name::text) FILTER (WHERE r.name IS NOT NULL), ARRAY[]::text[]) as roles,
+                    dp.id as profile_id,
+                    dp.company_name,
+                    dp.status::text as profile_status
                 FROM users u
-                JOIN user_roles ur ON u.id = ur.user_id
-                JOIN roles r ON ur.role_id = r.id
+                LEFT JOIN user_roles ur ON u.id = ur.user_id
+                LEFT JOIN roles r ON ur.role_id = r.id
+                LEFT JOIN developer_profiles dp ON u.id = dp.user_id
                 WHERE u.id = $1
-                GROUP BY u.id
+                GROUP BY u.id, dp.id
                 """,
                 current_user["user_id"]
             )
@@ -93,12 +103,14 @@ async def get_me(
             if not user_data:
                 raise HTTPException(status_code=404, detail="User not found")
             
-            roles_list = user_data["roles"]
+            roles_list = user_data["roles"] or []
             # Determine primary role for backward compatibility
-            # Priority: ADMIN > AGENT > SELLER > BUYER
+            # Priority: ADMIN > DEVELOPER > AGENT > SELLER > BUYER
             primary_role = "BUYER"
             if "ADMIN" in roles_list:
                 primary_role = "ADMIN"
+            elif "DEVELOPER" in roles_list:
+                primary_role = "DEVELOPER"
             elif "AGENT" in roles_list:
                 primary_role = "AGENT"
             elif "SELLER" in roles_list:
@@ -107,6 +119,14 @@ async def get_me(
                 primary_role = "BUYER"
             elif roles_list:
                 primary_role = roles_list[0]
+
+            developer_profile = None
+            if user_data["profile_id"]:
+                developer_profile = DeveloperProfileInfo(
+                    id=user_data["profile_id"],
+                    company_name=user_data["company_name"],
+                    status=user_data["profile_status"]
+                )
 
             return UserResponse(
                 id=user_data["id"],
@@ -117,7 +137,8 @@ async def get_me(
                 role=primary_role,
                 roles=roles_list,
                 created_at=user_data["created_at"],
-                avatar_url=None
+                avatar_url=None,
+                developer_profile=developer_profile
             )
     
     except HTTPException:
@@ -261,6 +282,3 @@ async def change_password(
             success=True,
             message="Password updated successfully"
         )
-
-
-
